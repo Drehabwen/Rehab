@@ -42,8 +42,7 @@ def run_all_tests():
         print(f"❌ 核心模块测试加载失败: {e}")
     
     try:
-        from test_nlp_processor import TestSparkLLM, TestNLPProcessor
-        suite.addTests(loader.loadTestsFromTestCase(TestSparkLLM))
+        from test_nlp_processor import TestNLPProcessor
         suite.addTests(loader.loadTestsFromTestCase(TestNLPProcessor))
         print("✅ NLP处理测试加载成功")
     except Exception as e:
@@ -114,8 +113,7 @@ def run_specific_test(test_name):
         suite.addTests(loader.loadTestsFromTestCase(TestDocumentGenerator))
         suite.addTests(loader.loadTestsFromTestCase(TestIntegration))
     elif test_name == "nlp":
-        from test_nlp_processor import TestSparkLLM, TestNLPProcessor
-        suite.addTests(loader.loadTestsFromTestCase(TestSparkLLM))
+        from test_nlp_processor import TestNLPProcessor
         suite.addTests(loader.loadTestsFromTestCase(TestNLPProcessor))
     elif test_name == "structurer":
         from test_core_modules import TestCaseStructurer

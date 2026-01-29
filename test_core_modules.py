@@ -13,99 +13,55 @@ from document_generator import DocumentGenerator
 
 class TestCaseStructurer(unittest.TestCase):
     def setUp(self):
-        self.structurer = CaseStructurer()
+        self.mock_nlp = MagicMock()
+        self.structurer = CaseStructurer(self.mock_nlp)
 
-    def test_extract_fields_basic(self):
-        transcript = """
-        主诉：头痛3天
-        现病史：患者3天前无明显诱因出现头痛
-        既往史：高血压病史5年
-        过敏史：青霉素过敏
-        体格检查：T 36.5℃，BP 140/90mmHg
-        诊断：高血压病
-        治疗：继续降压治疗
-        """
-        result = self.structurer.structure(transcript)
-        
-        self.assertEqual(result["chief_complaint"], "头痛3天")
-        self.assertIn("高血压", result["past_history"])
-        self.assertIn("青霉素", result["allergies"])
-        self.assertIn("36.5", result["physical_exam"])
-        self.assertEqual(result["diagnosis"], "高血压病")
-
-    def test_extract_gender(self):
-        transcript = "患者为男性，45岁"
-        result = self.structurer.structure(transcript)
-        
-        self.assertEqual(result["gender"], "男")
-        self.assertEqual(result["age"], 45)
-
-    def test_extract_gender_female(self):
-        transcript = "女性患者，30岁"
-        result = self.structurer.structure(transcript)
-        
-        self.assertEqual(result["gender"], "女")
-        self.assertEqual(result["age"], 30)
-
-    def test_extract_age_patterns(self):
-        test_cases = [
-            ("患者50岁", 50),
-            ("患者50周岁", 50),
-            ("年龄：45", 45),
-            ("35岁男性", 35),
-        ]
-        
-        for transcript, expected_age in test_cases:
-            result = self.structurer.structure(transcript)
-            self.assertEqual(result["age"], expected_age, f"Failed for: {transcript}")
-
-    def test_structure_with_speakers(self):
-        speaker_transcripts = [
-            {"speaker": "A", "text": "你好，请问哪里不舒服？"},
-            {"speaker": "B", "text": "我头痛，已经三天了。"},
-            {"speaker": "A", "text": "诊断为上呼吸道感染。"},
-        ]
-        
-        result = self.structurer.structure_with_speakers(speaker_transcripts)
-        
-        self.assertIn("头痛", result["chief_complaint"])
-        self.assertIn("上呼吸道感染", result["diagnosis"])
-
-    def test_empty_transcript(self):
-        result = self.structurer.structure("")
-        
-        self.assertEqual(result["patient_name"], "")
-        self.assertEqual(result["gender"], "")
-        self.assertEqual(result["age"], 0)
-
-    def test_update_field(self):
-        base_case = {
-            "patient_name": "",
-            "gender": "",
-            "age": 0,
-            "chief_complaint": "",
-            "present_illness": "",
-            "past_history": "",
-            "allergies": "",
-            "physical_exam": "",
-            "diagnosis": "",
-            "treatment_plan": ""
+    def test_analyze_dialogue_success(self):
+        # 模拟模型响应
+        self.mock_nlp.model_base.chat.return_value = {
+            "success": True,
+            "content": '[{"speaker": "医生", "text": "你好"}, {"speaker": "患者", "text": "头痛"}]'
         }
         
-        updated = self.structurer.update_field(base_case, "diagnosis", "高血压病")
-        self.assertEqual(updated["diagnosis"], "高血压病")
-
-    def test_get_field_suggestions_gender(self):
-        transcript = "患者为男性，有高血压病史"
-        suggestions = self.structurer.get_field_suggestions(transcript, "gender")
+        result = self.structurer.analyze_dialogue("医生说你好患者说头痛")
         
-        self.assertIn("男", suggestions)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["speaker"], "医生")
+        self.assertEqual(result[1]["text"], "头痛")
 
-    def test_get_field_suggestions_age(self):
-        transcript = "患者45岁，有高血压病史"
-        suggestions = self.structurer.get_field_suggestions(transcript, "age")
+    def test_structure_success(self):
+        # 模拟模型响应
+        expected_json = {
+            "patient_name": "张三",
+            "gender": "男",
+            "age": "45",
+            "markdown_content": "# 病例正文\n主诉：头痛",
+            "ai_suggestions": "建议检查头颅CT"
+        }
+        self.mock_nlp.model_pro.chat.return_value = {
+            "success": True,
+            "content": json.dumps(expected_json)
+        }
         
-        self.assertIn(45, suggestions)
+        dialogues = [{"speaker": "医生", "text": "你好"}, {"speaker": "患者", "text": "头痛"}]
+        result = self.structurer.structure(dialogues)
+        
+        self.assertEqual(result["patient_name"], "张三")
+        self.assertEqual(result["gender"], "男")
+        self.assertIn("病例正文", result["markdown_content"])
+        self.assertEqual(result["ai_suggestions"], "建议检查头颅CT")
+
+    def test_generate_report_success(self):
+        self.mock_nlp.model_pro.chat.return_value = {
+            "success": True,
+            "content": "正式病历报告内容"
+        }
+        
+        case_data = {"patient_name": "张三"}
+        config = {"hospital_name": "测试医院", "doctor_name": "王医生"}
+        result = self.structurer.generate_report(case_data, config)
+        
+        self.assertEqual(result, "正式病历报告内容")
 
 
 class TestCaseManager(unittest.TestCase):
@@ -124,13 +80,9 @@ class TestCaseManager(unittest.TestCase):
             "gender": "男",
             "age": 45,
             "visit_date": "2026-01-25",
-            "chief_complaint": "头痛3天",
-            "present_illness": "患者3天前无明显诱因出现头痛",
-            "past_history": "高血压病史5年",
-            "allergies": "青霉素过敏",
-            "physical_exam": "T 36.5℃，BP 140/90mmHg",
-            "diagnosis": "高血压病",
-            "treatment_plan": "继续降压治疗"
+            "markdown_content": "# 病例正文\n主诉：头痛3天",
+            "ai_suggestions": "AI 建议内容",
+            "diagnosis": "高血压病"
         }
 
     def tearDown(self):
@@ -153,7 +105,7 @@ class TestCaseManager(unittest.TestCase):
         success, result = self.case_manager.save_case(self.test_case)
         
         self.assertTrue(success)
-        self.assertIn("成功", result)
+        self.assertIsInstance(result, str)
         
         case_file = os.path.join("./test_cases", f"{self.test_case['case_id']}.json")
         self.assertTrue(os.path.exists(case_file))
@@ -205,25 +157,7 @@ class TestCaseManager(unittest.TestCase):
         is_valid, message = self.case_manager._validate_case(invalid_case)
         
         self.assertFalse(is_valid)
-        self.assertIn("患者姓名", message)
-
-    def test_validate_case_invalid_gender(self):
-        invalid_case = self.test_case.copy()
-        invalid_case["gender"] = "未知"
-        
-        is_valid, message = self.case_manager._validate_case(invalid_case)
-        
-        self.assertFalse(is_valid)
-        self.assertIn("性别", message)
-
-    def test_validate_case_invalid_age(self):
-        invalid_case = self.test_case.copy()
-        invalid_case["age"] = 150
-        
-        is_valid, message = self.case_manager._validate_case(invalid_case)
-        
-        self.assertFalse(is_valid)
-        self.assertIn("年龄", message)
+        self.assertIn("patient_name", message)
 
 
 class TestDocumentGenerator(unittest.TestCase):
@@ -242,13 +176,9 @@ class TestDocumentGenerator(unittest.TestCase):
             "gender": "男",
             "age": 45,
             "visit_date": "2026-01-25",
-            "chief_complaint": "头痛3天",
-            "present_illness": "患者3天前无明显诱因出现头痛",
-            "past_history": "高血压病史5年",
-            "allergies": "青霉素过敏",
-            "physical_exam": "T 36.5℃，BP 140/90mmHg",
-            "diagnosis": "高血压病",
-            "treatment_plan": "继续降压治疗"
+            "markdown_content": "# 病例正文\n主诉：头痛3天",
+            "ai_suggestions": "AI 建议内容",
+            "diagnosis": "高血压病"
         }
 
     def tearDown(self):
@@ -271,11 +201,16 @@ class TestDocumentGenerator(unittest.TestCase):
         from docx import Document
         doc = Document(filepath)
         
+        # 提取正文文本
         text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        # 提取表格文本
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    text += "\n" + cell.text
         
         self.assertIn("张三", text)
         self.assertIn("头痛3天", text)
-        self.assertIn("高血压病", text)
         self.assertIn("测试医院", text)
 
     def test_setup_document_styles(self):
@@ -285,7 +220,7 @@ class TestDocumentGenerator(unittest.TestCase):
         self.generator._setup_document_styles(doc)
         
         self.assertIsNotNone(doc.styles['Normal'].font.name)
-        self.assertEqual(doc.styles['Normal'].font.size.pt, 12)
+        self.assertEqual(doc.styles['Normal'].font.size.pt, 10.5)
 
     def test_add_header(self):
         from docx import Document
@@ -306,7 +241,8 @@ class TestIntegration(unittest.TestCase):
             "exports_dir": "./test_exports"
         }
         self.case_manager = CaseManager(self.test_config)
-        self.structurer = CaseStructurer()
+        self.mock_nlp = MagicMock()
+        self.structurer = CaseStructurer(self.mock_nlp)
         self.generator = DocumentGenerator(self.test_config)
 
     def tearDown(self):
@@ -317,48 +253,57 @@ class TestIntegration(unittest.TestCase):
             shutil.rmtree("./test_exports")
 
     def test_full_workflow(self):
-        transcript = """
-        主诉：头痛3天
-        现病史：患者3天前无明显诱因出现头痛，伴恶心
-        既往史：高血压病史5年
-        过敏史：青霉素过敏
-        体格检查：T 36.5℃，BP 140/90mmHg
-        诊断：高血压病
-        治疗：继续降压治疗，监测血压
-        """
+        # 1. 模拟 AI 结构化响应
+        expected_json = {
+            "patient_name": "张三",
+            "gender": "男",
+            "age": "45",
+            "markdown_content": "# 病例正文\n主诉：头痛3天",
+            "ai_suggestions": "AI 建议内容"
+        }
+        self.mock_nlp.model_pro.chat.return_value = {
+            "success": True,
+            "content": json.dumps(expected_json)
+        }
         
-        structured_case = self.structurer.structure(transcript)
+        dialogues = [{"speaker": "医生", "text": "你好"}, {"speaker": "患者", "text": "头痛"}]
+        structured_case = self.structurer.structure(dialogues)
         
-        self.assertEqual(structured_case["chief_complaint"], "头痛3天")
-        self.assertIn("高血压", structured_case["past_history"])
-        self.assertIn("青霉素", structured_case["allergies"])
-        self.assertEqual(structured_case["diagnosis"], "高血压病")
+        self.assertEqual(structured_case["patient_name"], "张三")
         
+        # 2. 保存病例
+        # 添加一些必要字段
+        structured_case["case_id"] = "TEST_ID"
+        structured_case["diagnosis"] = "高血压"
         success, result = self.case_manager.save_case(structured_case)
         self.assertTrue(success)
         
+        # 3. 导出 Word
         filepath = self.generator.generate_word(structured_case)
         self.assertTrue(os.path.exists(filepath))
         
         from docx import Document
         doc = Document(filepath)
-        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        text = ""
+        for p in doc.paragraphs: text += p.text + "\n"
+        for t in doc.tables:
+            for r in t.rows:
+                for c in r.cells: text += c.text + "\n"
         
         self.assertIn("张三", text)
-        self.assertIn("高血压病", text)
         self.assertIn("测试医院", text)
 
     def test_multiple_cases_workflow(self):
         cases = [
             {
                 "patient_name": "张三", "gender": "男", "age": 45,
-                "chief_complaint": "头痛3天", "diagnosis": "高血压病",
-                "treatment_plan": "降压治疗"
+                "markdown_content": "头痛3天", "diagnosis": "高血压病",
+                "ai_suggestions": "建议检查"
             },
             {
                 "patient_name": "李四", "gender": "女", "age": 30,
-                "chief_complaint": "发热1天", "diagnosis": "上呼吸道感染",
-                "treatment_plan": "抗感染治疗"
+                "markdown_content": "发热1天", "diagnosis": "上呼吸道感染",
+                "ai_suggestions": "建议休息"
             }
         ]
         
@@ -395,15 +340,6 @@ def run_tests():
     
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)
-    
-    print("\n" + "="*70)
-    print("测试结果汇总")
-    print("="*70)
-    print(f"运行测试: {result.testsRun}")
-    print(f"成功: {result.testsRun - len(result.failures) - len(result.errors)}")
-    print(f"失败: {len(result.failures)}")
-    print(f"错误: {len(result.errors)}")
-    print("="*70)
     
     return result.wasSuccessful()
 

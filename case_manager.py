@@ -33,29 +33,36 @@ class CaseManager:
         return f"{today}_{count:03d}"
 
     def _validate_case(self, case: Dict) -> tuple[bool, str]:
-        required_fields = ["case_id", "patient_name", "gender", "age", "visit_date", "chief_complaint", "diagnosis", "treatment_plan"]
+        # 核心必填字段
+        required_fields = ["patient_name", "gender", "age"]
         
         for field in required_fields:
-            if field not in case or not case[field]:
+            if field not in case or (isinstance(case[field], str) and not case[field].strip() and field == "patient_name"):
                 return False, f"缺少必填字段: {field}"
         
-        if case["gender"] not in ["男", "女"]:
-            return False, "性别必须为'男'或'女'"
+        # 处理日期
+        if "visit_date" not in case or not case["visit_date"]:
+            case["visit_date"] = datetime.now().strftime("%Y-%m-%d")
         
-        if not isinstance(case["age"], int) or case["age"] < 0 or case["age"] > 120:
-            return False, "年龄必须在0-120之间"
-        
-        try:
-            datetime.strptime(case["visit_date"], "%Y-%m-%d")
-        except ValueError:
-            return False, "就诊日期格式错误，应为YYYY-MM-DD"
-        
-        if len(case["patient_name"]) < 2 or len(case["patient_name"]) > 20:
-            return False, "患者姓名长度必须在2-20字符之间"
+        # 添加精准时间戳保障真实性
+        case["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+        # 兼容旧版本和新版本的正文存储
+        if "markdown_content" not in case and "chief_complaint" not in case:
+            return False, "缺少病例正文"
+            
+        # 兼容旧版本的诊断字段（用于列表显示）
+        if "diagnosis" not in case or not case["diagnosis"]:
+            # 如果没有明确的诊断字段，尝试从正文中提取第一行或设为“详见病历”
+            case["diagnosis"] = "见病历详情"
         
         return True, ""
 
     def save_case(self, case: Dict) -> tuple[bool, str]:
+        # 如果没有 case_id，说明是新病例，生成一个
+        if not case.get("case_id"):
+            case["case_id"] = self._generate_case_id()
+            
         is_valid, error = self._validate_case(case)
         if not is_valid:
             return False, error
