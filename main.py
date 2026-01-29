@@ -13,11 +13,13 @@ import case_structurer
 import voice
 import case_manager
 import document_generator
+import ruiku_manager
 
 from case_manager import CaseManager
 from document_generator import DocumentGenerator
 from nlp_processor import NLPProcessor
 from case_structurer import CaseStructurer
+from ruiku_manager import MedicalRuiku
 
 # 设置外观
 ctk.set_appearance_mode("System")
@@ -46,6 +48,7 @@ class VoiceToCaseApp(ctk.CTk):
         self.document_generator = DocumentGenerator(self.config)
         self.nlp_processor = NLPProcessor(self.config)
         self.case_structurer = CaseStructurer(self.nlp_processor)
+        self.ruiku_manager = MedicalRuiku(self.config)
         
         self.voice_recognizer = voice.VoiceRecognizer(self.config)
         
@@ -91,11 +94,14 @@ class VoiceToCaseApp(ctk.CTk):
         self.open_button = ctk.CTkButton(self.sidebar_frame, text="刷新历史", command=self.refresh_history, fg_color="#82E0AA", hover_color="#58D68D")
         self.open_button.grid(row=2, column=0, padx=20, pady=10)
         
+        self.ruiku_button = ctk.CTkButton(self.sidebar_frame, text="瑞库 (知识库)", command=self.show_ruiku, fg_color="#F8C471", hover_color="#F39C12")
+        self.ruiku_button.grid(row=3, column=0, padx=20, pady=10)
+        
         self.reload_button = ctk.CTkButton(self.sidebar_frame, text="全量同步代码", command=self.reload_ai_modules, fg_color="#A2D9CE", hover_color="#76D7C4", text_color="#1B4F72")
-        self.reload_button.grid(row=3, column=0, padx=20, pady=10)
+        self.reload_button.grid(row=4, column=0, padx=20, pady=10)
         
         self.settings_button = ctk.CTkButton(self.sidebar_frame, text="软件设置", command=self.show_settings, fg_color="#BDC3C7", hover_color="#A6ACAF")
-        self.settings_button.grid(row=4, column=0, padx=20, pady=10)
+        self.settings_button.grid(row=5, column=0, padx=20, pady=10)
         
         self.appearance_mode_label = ctk.CTkLabel(self.sidebar_frame, text="外观模式:", anchor="w")
         self.appearance_mode_label.grid(row=5, column=0, padx=20, pady=(10, 0))
@@ -134,6 +140,7 @@ class VoiceToCaseApp(ctk.CTk):
             importlib.reload(case_structurer)
             importlib.reload(case_manager)
             importlib.reload(document_generator)
+            importlib.reload(ruiku_manager)
             
             # 3. 重新实例化所有业务对象
             # 注意：这里会保留当前 UI 状态，但底层处理逻辑已更新
@@ -141,6 +148,7 @@ class VoiceToCaseApp(ctk.CTk):
             self.document_generator = document_generator.DocumentGenerator(self.config)
             self.nlp_processor = nlp_processor.NLPProcessor(self.config)
             self.case_structurer = case_structurer.CaseStructurer(self.nlp_processor)
+            self.ruiku_manager = ruiku_manager.MedicalRuiku(self.config)
             
             # 特别处理录音对象：确保旧的录音线程（如果有）不会冲突
             if self.is_recording:
@@ -521,6 +529,116 @@ class VoiceToCaseApp(ctk.CTk):
                 messagebox.showerror("错误", f"保存失败：{str(e)}\n\n详情请查看控制台输出")
 
         ctk.CTkButton(frame, text="保存所有配置", command=save_all, height=40).pack(fill=tk.X, padx=20, pady=30)
+
+    def show_ruiku(self):
+        """显示瑞库 (知识库) 窗口"""
+        ruiku_win = ctk.CTkToplevel(self)
+        ruiku_win.title("瑞库 - 智能病历知识库")
+        ruiku_win.geometry("900x700")
+        ruiku_win.after(10, lambda: ruiku_win.focus_get()) # 解决 Toplevel 焦点问题
+        
+        # 容器
+        container = ctk.CTkFrame(ruiku_win, fg_color="transparent")
+        container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # 顶部：搜索与统计
+        header_frame = ctk.CTkFrame(container)
+        header_frame.pack(fill=tk.X, pady=(0, 20))
+        
+        ctk.CTkLabel(header_frame, text="瑞库检索", font=ctk.CTkFont(size=18, weight="bold")).pack(side=tk.LEFT, padx=15, pady=10)
+        
+        search_entry = ctk.CTkEntry(header_frame, placeholder_text="搜索疾病、症状或患者姓名...", width=400)
+        search_entry.pack(side=tk.LEFT, padx=10, pady=10)
+        
+        # 统计信息展示
+        stats = self.ruiku_manager.get_overview()
+        stats_label = ctk.CTkLabel(header_frame, text=f"库内病历总数: {stats['total_cases']} | 热门诊断: {', '.join([d[0] for d in stats['top_diagnoses'][:2]])}")
+        stats_label.pack(side=tk.RIGHT, padx=15)
+        
+        # 中间：结果展示区域
+        content_frame = ctk.CTkFrame(container)
+        content_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 左侧：列表
+        list_frame = ctk.CTkFrame(content_frame, width=400)
+        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        ctk.CTkLabel(list_frame, text="检索结果", font=ctk.CTkFont(weight="bold")).pack(pady=5)
+        
+        tree_container = ctk.CTkFrame(list_frame)
+        tree_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        tree = ttk.Treeview(tree_container, columns=("id", "name", "date", "diag"), show="headings")
+        tree.heading("id", text="编号")
+        tree.heading("name", text="姓名")
+        tree.heading("date", text="日期")
+        tree.heading("diag", text="诊断")
+        tree.column("id", width=100)
+        tree.column("name", width=80)
+        tree.column("date", width=100)
+        tree.column("diag", width=150)
+        
+        sb = ttk.Scrollbar(tree_container, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=sb.set)
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 右侧：详细分析 & 相似度推荐
+        detail_frame = ctk.CTkFrame(content_frame, width=450)
+        detail_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        
+        ctk.CTkLabel(detail_frame, text="AI 洞察与相似病例", font=ctk.CTkFont(weight="bold")).pack(pady=5)
+        
+        insight_text = ctk.CTkTextbox(detail_frame, font=("Segoe UI", 12))
+        insight_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        def run_ai_analysis():
+            insight_text.delete("0.0", "end")
+            insight_text.insert("end", "正在利用 AI 进行病历库深度趋势分析，请稍候...\n\n")
+            
+            def thread_func():
+                analysis = self.ruiku_manager.get_ai_trends(self.nlp_processor)
+                self.after(0, lambda: insight_text.delete("0.0", "end"))
+                self.after(0, lambda: insight_text.insert("end", analysis))
+                
+            threading.Thread(target=thread_func, daemon=True).start()
+
+        ctk.CTkButton(detail_frame, text="AI 深度趋势分析", command=run_ai_analysis, fg_color="#48C9B0").pack(pady=10)
+        
+        def perform_search(event=None):
+            query = search_entry.get().strip()
+            results = self.ruiku_manager.search(query)
+            
+            # 清空 Tree
+            for i in tree.get_children():
+                tree.delete(i)
+                
+            for res in results:
+                tree.insert("", tk.END, values=(res.get("case_id"), res.get("patient_name"), res.get("visit_date"), res.get("diagnosis")))
+            
+            # 更新 AI 洞察
+            if query:
+                insight_text.delete("0.0", "end")
+                insight_text.insert("end", f"正在分析关于 '{query}' 的历史趋势...\n\n")
+                # 这里可以扩展 LLM 分析
+                insight_text.insert("end", f"找到 {len(results)} 条相关记录。\n")
+                if len(results) > 0:
+                    insight_text.insert("end", f"在该搜索条件下，最常见的处置建议是：[基于历史数据的模拟分析]\n")
+
+        search_entry.bind("<Return>", perform_search)
+        
+        # 初始加载
+        perform_search()
+        
+        # 如果当前有正在处理的病例，自动显示相似病例
+        current_content = self.case_fields["chief_complaint"].get("0.0", "end").strip()
+        if current_content and len(current_content) > 10:
+            similar = self.ruiku_manager.find_similar_cases(current_content)
+            if similar:
+                insight_text.insert("0.0", "=== 发现当前病例的相似历史记录 ===\n")
+                for s in similar:
+                    insight_text.insert("end", f"• {s['visit_date']} - {s['patient_name']} - {s['diagnosis']}\n")
+                insight_text.insert("end", "================================\n\n")
 
     def create_transcription_panel(self, parent):
         self.trans_frame = ctk.CTkFrame(parent, fg_color=("#FFFFFF", "#2B2B2B")) # 纯白卡片感
