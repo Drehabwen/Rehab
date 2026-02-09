@@ -352,6 +352,23 @@ def calculate_wrist_rom(direction, side, landmarks, width, height):
         return abs(angle)
     elif direction == 'extension':
         return abs(angle)
+    elif direction == 'ulnar-deviation':
+        # Vector from wrist to elbow (forearm)
+        v_forearm = {"x": elbow["x"] - wrist["x"], "y": elbow["y"] - wrist["y"]}
+        # Vector from wrist to pinky finger
+        pinky = get_p(LANDMARKS['LEFT_PINKY'] if side == 'left' else LANDMARKS['RIGHT_PINKY'])
+        v_pinky = {"x": pinky["x"] - wrist["x"], "y": pinky["y"] - wrist["y"]}
+        angle = calculate_signed_angle_between_vectors_2d(v_forearm, v_pinky)
+        # Normalize and determine deviation
+        return abs(angle - 180) if angle > 0 else abs(angle + 180)
+    elif direction == 'radial-deviation':
+        # Vector from wrist to elbow (forearm)
+        v_forearm = {"x": elbow["x"] - wrist["x"], "y": elbow["y"] - wrist["y"]}
+        # Vector from wrist to thumb
+        thumb = get_p(LANDMARKS['LEFT_THUMB'] if side == 'left' else LANDMARKS['RIGHT_THUMB'])
+        v_thumb = {"x": thumb["x"] - wrist["x"], "y": thumb["y"] - wrist["y"]}
+        angle = calculate_signed_angle_between_vectors_2d(v_forearm, v_thumb)
+        return abs(angle - 180) if angle > 0 else abs(angle + 180)
     
     return abs(angle)
 

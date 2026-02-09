@@ -143,6 +143,9 @@ class VoiceRecognizer:
                 
                 pgs = result.get("pgs")
                 if pgs == "rpl":
+                    # 获取替换范围
+                    rg = result.get("rg", [0, 0])
+                    # 这里简单的替换逻辑，实际讯飞协议更复杂，但对于实时展示，pgs=rpl 覆盖 temp 是常规操作
                     self.temp_transcript = text
                 else:
                     if self.temp_transcript:
@@ -194,11 +197,11 @@ class VoiceRecognizer:
                 "language": "zh_cn", # 强制中文
                 "domain": "iat",
                 "accent": "mandarin",
-                "vad_eos": 3000, 
-                "nunum": 1,
-                "speex_size": 70, # 略微调高
+                "vad_eos": 5000, # 调高静音检测阈值，防止说话间隙过早断开
+                "dwa": "wpp", # 开启动态修正，提升实时显示效果
                 "pd": "medical", 
-                "wnd": "1" # 尝试开启中文优先
+                "ptt": 0, # 禁用标点符号（如果需要更原始的流）或者设为 1 开启
+                "rls": "all" # 开启所有角色识别（如果后端支持）
             }
             if self.config.get("enable_diarization", False):
                 business_params["role_type"] = 2

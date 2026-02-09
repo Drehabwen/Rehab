@@ -31,8 +31,11 @@
             border-radius: 2rem;
         }
         .btn-premium {
-            @apply transition-all duration-300 active:scale-95;
+            transition: all 0.3s ease;
             border-radius: 1rem;
+        }
+        .btn-premium:active {
+            transform: scale(0.95);
         }
     </style>
 </head>
@@ -100,7 +103,8 @@
                 <div class="lg:col-span-1 space-y-6">
                     <div class="glass-panel p-8 flex flex-col items-center text-center shadow-sm hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-500">
                         <div id="record-btn-container" class="relative mb-6">
-                            <button id="record-btn" class="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-full flex items-center justify-center text-white text-3xl shadow-xl shadow-blue-200 transition-all active:scale-95 group">
+                            <canvas id="audio-wave" class="absolute inset-0 w-full h-full pointer-events-none opacity-30"></canvas>
+                            <button id="record-btn" class="w-24 h-24 bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-full flex items-center justify-center text-white text-3xl shadow-xl shadow-blue-200 transition-all active:scale-95 group relative z-10">
                                 <i class="fas fa-microphone"></i>
                             </button>
                         </div>

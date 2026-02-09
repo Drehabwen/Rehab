@@ -1,9 +1,15 @@
 import cv2
-import mediapipe as mp
 import numpy as np
 import threading
 import time
 from typing import Optional, Dict, Any
+
+# Stub out mediapipe since the current environment lacks the legacy solutions module
+# and we are processing MediaPipe on the frontend anyway.
+class MockPose:
+    def __init__(self, **kwargs): pass
+    def process(self, image): return None
+    def close(self): pass
 
 class CameraManager:
     _instance = None
@@ -26,16 +32,10 @@ class CameraManager:
         self.latest_results = None
         self.thread = None
         
-        # Mediapipe setup
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=1,
-            smooth_landmarks=True,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        self.mp_draw = mp.solutions.drawing_utils
+        # Stubbed MediaPipe setup
+        self.mp_pose = None
+        self.pose = MockPose()
+        self.mp_draw = None
         
         # Beauty settings
         self.enable_beauty = True

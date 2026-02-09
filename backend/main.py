@@ -82,7 +82,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Perform analysis
                 result = analyze_posture(
                     view=request.view,
-                    landmarks=[lm.dict() for lm in request.landmarks],
+                    landmarks=request.landmarks,
                     width=request.width,
                     height=request.height
                 )
@@ -145,9 +145,11 @@ try:
     medvoice_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Deeprehab-MedVoice-AI--", "src")
     if os.path.exists(medvoice_path):
         sys.path.append(medvoice_path)
-        print("MedVoice AI modules found, ready for integration.")
+        from api_server import app as medvoice_app
+        app.mount("/medvoice", medvoice_app)
+        print("MedVoice AI modules integrated at /medvoice")
 except Exception as e:
-    print(f"MedVoice AI integration skipped: {e}")
+    print(f"MedVoice AI integration failed: {e}")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
 @layer base {
   :root {
@@ -54,6 +54,70 @@
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600;
+    @apply bg-clip-text text-transparent bg-gradient-to-br from-antey-primary via-blue-600 to-antey-accent;
+  }
+
+  .bento-card {
+    @apply bg-white border border-antey-border rounded-[2.5rem] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] transition-all duration-500 hover:shadow-[0_20px_40px_-12px_rgba(0,0,0,0.1)] hover:-translate-y-1 overflow-hidden relative;
+  }
+
+  .bento-card-glass {
+    @apply bg-white/70 backdrop-blur-2xl border border-white/40 rounded-[2.5rem] shadow-xl transition-all duration-500 hover:shadow-2xl hover:-translate-y-1 overflow-hidden relative;
+  }
+
+  .mesh-gradient {
+    background-color: #f8fafc;
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.05) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, rgba(20, 184, 166, 0.05) 0px, transparent 50%);
+  }
+
+  .glow-border {
+    @apply relative overflow-hidden;
+  }
+  .glow-border::after {
+    content: '';
+    @apply absolute inset-0 rounded-[inherit] border border-antey-primary/30 opacity-0 transition-opacity duration-500 pointer-events-none;
+    box-shadow: inset 0 0 15px rgba(13, 148, 136, 0.1), 0 0 15px rgba(13, 148, 136, 0.1);
+  }
+  .glow-border:hover::after {
+    @apply opacity-100;
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0%,
+      rgba(255, 255, 255, 0.6) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite linear;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .animate-pulse-subtle {
+    animation: pulse-subtle 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes pulse-subtle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(0.98); }
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
   }
 }

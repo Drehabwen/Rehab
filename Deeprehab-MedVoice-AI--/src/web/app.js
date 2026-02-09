@@ -8,6 +8,36 @@ let streamSocket = null;
 let timerInterval;
 let startTime;
 let lastProcessIndex = 0; // 用于流式发送音频的分片索引
+let waveCanvas, waveCtx;
+
+// --- Waveform Visualization ---
+function initWaveform() {
+    waveCanvas = document.getElementById('audio-wave');
+    waveCtx = waveCanvas.getContext('2d');
+    waveCanvas.width = waveCanvas.offsetWidth * window.devicePixelRatio;
+    waveCanvas.height = waveCanvas.offsetHeight * window.devicePixelRatio;
+}
+
+function drawWave(powerLevel) {
+    if (!waveCtx || !isRecording) return;
+    const w = waveCanvas.width;
+    const h = waveCanvas.height;
+    waveCtx.clearRect(0, 0, w, h);
+    
+    waveCtx.fillStyle = 'rgba(37, 99, 235, 0.2)';
+    const radius = (h / 2) * (0.5 + (powerLevel / 100) * 0.5);
+    
+    waveCtx.beginPath();
+    waveCtx.arc(w / 2, h / 2, radius, 0, Math.PI * 2);
+    waveCtx.fill();
+    
+    // Outer ring
+    waveCtx.strokeStyle = 'rgba(37, 99, 235, 0.4)';
+    waveCtx.lineWidth = 2;
+    waveCtx.beginPath();
+    waveCtx.arc(w / 2, h / 2, radius + 10, 0, Math.PI * 2);
+    waveCtx.stroke();
+}
 
 // DOM Elements
 const recordBtn = document.getElementById('record-btn');
@@ -112,26 +142,35 @@ async function startRecording() {
         streamSocket.onopen = () => {
             console.log('WebSocket 连接成功，等待音频输入...');
             recordStatus.innerText = "正在聆听...";
+            showToast("实时语音链路已建立，请开始说话");
         };
 
         streamSocket.onmessage = (e) => {
             try {
                 const data = JSON.parse(e.data);
                 if (data.status === 'update') {
-                    transcriptContent.innerText = data.text;
+                    // 实时更新文字内容
+                    const text = data.text || "";
+                    transcriptContent.innerText = text;
                     transcriptContent.scrollTop = transcriptContent.scrollHeight;
-                    // 只要有文字，就允许点击结构化按钮
-                    if (data.text && data.text.length > 5) {
+                    
+                    // 状态提示：显示正在输入
+                    recordStatus.innerHTML = '<span class="flex items-center gap-2"><i class="fas fa-keyboard animate-pulse text-blue-400"></i> AI 正在转录...</span>';
+                    
+                    // 只要有文字且长度足够，就允许点击结构化按钮
+                    if (text.trim().length > 5) {
                         structureBtn.disabled = false;
                     }
                 } else if (data.status === 'complete') {
                     transcriptContent.innerText = data.text;
-                    structureBtn.disabled = false; // 确保完成时按钮可用
+                    recordStatus.innerText = "转录完成";
+                    structureBtn.disabled = false; 
                     showToast("录音已完成，正在自动启动 AI 角色分析与结构化...");
-                    handleStructure(); // 自动进入下一阶段
+                    handleStructure(); 
                 } else if (data.status === 'error') {
                     console.error('ASR 后端错误:', data.message);
                     showToast("转录异常: " + data.message, "error");
+                    recordStatus.innerText = "转录异常";
                 }
             } catch (err) {
                 console.error('解析后端消息失败:', err);
@@ -157,6 +196,7 @@ async function startRecording() {
         sampleRate: 16000,
         bitRate: 16,
         onProcess: function(buffers, powerLevel, bufferDuration, bufferSampleRate) {
+            drawWave(powerLevel);
             if (isRecording && streamSocket && streamSocket.readyState === WebSocket.OPEN) {
                 while (lastProcessIndex < buffers.length) {
                     const buffer = buffers[lastProcessIndex];
@@ -327,7 +367,11 @@ function displayStructuredData(data) {
     });
 
     // 2. 更新 AI 建议
-    suggestionsContent.innerText = data.ai_suggestions || "暂无建议";
+    if (data.ai_suggestions) {
+        suggestionsContent.innerHTML = data.ai_suggestions.replace(/\n/g, '<br>');
+    } else {
+        suggestionsContent.innerText = "暂无建议";
+    }
     
     // 3. 更新病历报告 (改为可编辑)
     reportContent.value = data.markdown_content || "暂无完整病历";
