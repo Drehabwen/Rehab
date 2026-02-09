@@ -65,32 +65,35 @@ export default function MeasurementChart() {
   const displayData = chartData.slice(-100);
 
   return (
-    <div className="h-[400px] flex flex-col relative">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+    <div className="h-full flex flex-col relative">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <div>
-          <h3 className="text-xl font-bold text-gray-900">活动度实时趋势</h3>
-          <p className="text-sm text-gray-500 mt-1">记录关节活动的角度变化曲线</p>
+          <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-antey-accent animate-pulse" />
+            活动度实时趋势
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest">Real-time ROM Analysis</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
            {activeMeasurements.map(m => {
              const standardRange = getStandardRange(m.joint, m.direction);
              return (
-               <div key={m.id} className="bg-white px-4 py-2.5 rounded-2xl border border-gray-100 shadow-sm flex flex-col">
-                 <div className="flex items-center space-x-2 mb-1">
-                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: m.color }} />
-                   <span className="text-xs font-bold text-gray-900">
-                     {JOINT_NAMES[m.joint] || m.joint} {m.side ? `(${SIDE_NAMES[m.side] || m.side})` : ''}
-                   </span>
-                 </div>
-                 <div className="flex items-baseline space-x-2">
-                   <span className="text-lg font-black" style={{ color: m.color }}>
-                     {m.maxAngle === -Infinity ? '0' : m.maxAngle.toFixed(1)}°
-                   </span>
-                   {standardRange && (
-                     <span className="text-[10px] text-gray-400 font-medium">
-                       参考: {standardRange.min}-{standardRange.max}°
+               <div key={m.id} className="bg-white/80 backdrop-blur-sm px-4 py-2 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+                 <div className="w-1.5 h-8 rounded-full" style={{ backgroundColor: m.color }} />
+                 <div>
+                   <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                     {JOINT_NAMES[m.joint] || m.joint}
+                   </div>
+                   <div className="flex items-baseline gap-1.5">
+                     <span className="text-sm font-black text-slate-900 leading-none">
+                       {m.maxAngle === -Infinity ? '0.0' : m.maxAngle.toFixed(1)}°
                      </span>
-                   )}
+                     {standardRange && (
+                       <span className="text-[8px] text-slate-400 font-black uppercase tracking-tighter">
+                         REF: {standardRange.min}-{standardRange.max}°
+                       </span>
+                     )}
+                   </div>
                  </div>
                </div>
              );
@@ -98,37 +101,51 @@ export default function MeasurementChart() {
         </div>
       </div>
       
-      <div className="flex-1 w-full min-h-[250px]">
+      <div className="flex-1 w-full min-h-[250px] relative">
+        <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ 
+          backgroundImage: 'linear-gradient(#f1f5f9 1px, transparent 1px), linear-gradient(90deg, #f1f5f9 1px, transparent 1px)',
+          backgroundSize: '40px 40px'
+        }} />
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={displayData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+          <LineChart data={displayData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+            <defs>
+              {activeMeasurements.map(m => (
+                <linearGradient key={`grad-${m.id}`} id={`color-${m.id}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={m.color} stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor={m.color} stopOpacity={0}/>
+                </linearGradient>
+              ))}
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis 
               dataKey="timestamp" 
               type="number" 
               domain={['auto', 'auto']} 
               tickFormatter={(val) => val.toFixed(1) + 's'}
-              tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }}
+              tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 700 }}
               tickLine={false}
               axisLine={false}
+              hide={!isMeasuring}
             />
             <YAxis 
               domain={[0, 180]} 
-              tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 500 }}
+              tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 700 }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(val) => val + '°'}
             />
             <Tooltip 
               contentStyle={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.98)', 
-                borderRadius: '16px', 
-                border: '1px solid #f3f4f6', 
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                padding: '12px'
+                backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                borderRadius: '20px', 
+                border: '1px solid #f1f5f9', 
+                boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.05)',
+                padding: '12px',
+                backdropFilter: 'blur(10px)'
               }}
-              itemStyle={{ fontSize: '12px', fontWeight: 600, padding: '2px 0' }}
-              labelStyle={{ fontSize: '11px', fontWeight: 700, color: '#9ca3af', marginBottom: '8px', textTransform: 'uppercase' }}
-              cursor={{ stroke: '#e5e7eb', strokeWidth: 2 }}
+              itemStyle={{ fontSize: '11px', fontWeight: 800, padding: '2px 0' }}
+              labelStyle={{ fontSize: '10px', fontWeight: 900, color: '#94a3b8', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.1em' }}
+              cursor={{ stroke: '#e2e8f0', strokeWidth: 2, strokeDasharray: '5 5' }}
               formatter={(value: number, name: string) => {
                   const m = activeMeasurements.find(am => am.id === name);
                   if (m) {
@@ -140,20 +157,21 @@ export default function MeasurementChart() {
                   }
                   return [value.toFixed(1) + '°', name];
               }}
-              labelFormatter={(label: number) => `时间: ${label.toFixed(2)}s`}
+              labelFormatter={(label: number) => `T+ ${label.toFixed(2)}s`}
             />
             
             {activeMeasurements.map(m => (
-                <Line 
-                  key={m.id}
-                  type="monotone" 
-                  dataKey={m.id} 
-                  stroke={m.color} 
-                  strokeWidth={3} 
-                  dot={false} 
-                  activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', fill: m.color }}
-                  isAnimationActive={false}
-                />
+              <Line 
+                key={m.id}
+                type="monotone" 
+                dataKey={m.id} 
+                stroke={m.color} 
+                strokeWidth={4} 
+                dot={false} 
+                activeDot={{ r: 6, strokeWidth: 2, stroke: '#fff', fill: m.color }}
+                isAnimationActive={false}
+                connectNulls
+              />
             ))}
           </LineChart>
         </ResponsiveContainer>

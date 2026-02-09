@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { HubSidebar } from './components/HubSidebar';
-import { Bell, Camera, Mic, Search, Activity, ChevronRight, TrendingUp, Users, Calendar, ArrowUpRight, Clock } from 'lucide-react';
+import { Bell, Camera, Mic, Search, Activity, ChevronRight, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
 import { MedVoicePlugin } from '@/plugins/medvoice/MedVoicePlugin';
+import { GlobalExport } from '@/components/GlobalExport';
 
 export const NexusHub: React.FC = () => {
   const [activePlugin, setActivePlugin] = useState('dashboard');
@@ -14,18 +15,6 @@ export const NexusHub: React.FC = () => {
     { id: 'dashboard', name: '总览', icon: Activity, color: 'text-antey-primary' },
     { id: 'vision3', name: '体态分析', icon: Camera, color: 'text-antey-accent' },
     { id: 'medvoice', name: '语音助手', icon: Mic, color: 'text-purple-500' },
-  ];
-
-  const stats = [
-    { label: '今日接待', value: '12', trend: '+15%', icon: Users, color: 'bg-blue-500' },
-    { label: '平均时长', value: '24m', trend: '-2m', icon: Clock, color: 'bg-teal-500' },
-    { label: '康复评分', value: '92', trend: '+4.2', icon: TrendingUp, color: 'bg-indigo-500' },
-  ];
-
-  const recentActivities = [
-    { name: '王晓明', type: '体态分析', time: '10:30 AM', status: '已完成' },
-    { name: '张大爷', type: '关节测量', time: '11:15 AM', status: '待审核' },
-    { name: '李女士', type: '步态评估', time: '02:00 PM', status: '准备中' },
   ];
 
   return (
@@ -60,6 +49,7 @@ export const NexusHub: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-2">
+              <GlobalExport />
               <button className="relative p-2.5 text-slate-500 hover:bg-white hover:shadow-sm rounded-xl transition-all group">
                 <Bell size={20} className="group-hover:scale-110 transition-transform" />
                 <span className="absolute top-3 right-3 w-1.5 h-1.5 bg-red-500 rounded-full border-2 border-white"></span>
@@ -108,35 +98,10 @@ export const NexusHub: React.FC = () => {
                 </div>
               </section>
 
-              {/* Stats Bento Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {stats.map((stat, i) => (
-                  <div key={i} className="bento-card glow-border p-8 group">
-                    <div className="flex justify-between items-start mb-6">
-                      <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform duration-500", stat.color)}>
-                        <stat.icon size={28} />
-                      </div>
-                      <div className={cn(
-                        "flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider",
-                        stat.trend.startsWith('+') ? "text-emerald-600 bg-emerald-50" : "text-blue-600 bg-blue-50"
-                      )}>
-                        {stat.trend.startsWith('+') ? <TrendingUp size={12} /> : <Clock size={12} />}
-                        {stat.trend}
-                      </div>
-                    </div>
-                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">{stat.label}</div>
-                    <div className="text-5xl font-black text-slate-900 tracking-tighter group-hover:translate-x-1 transition-transform duration-500">{stat.value}</div>
-                    <div className="absolute top-0 right-0 p-6 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-4 group-hover:translate-x-0">
-                      <ArrowUpRight size={20} className="text-slate-200" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
               {/* Main Content Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Tools Selector */}
-                <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {plugins.slice(1).map(plugin => (
                     <button 
                       key={plugin.id}
@@ -160,45 +125,6 @@ export const NexusHub: React.FC = () => {
                       </div>
                     </button>
                   ))}
-                </div>
-
-                {/* Recent Activity Card */}
-                <div className="lg:col-span-4 bento-card p-10 flex flex-col">
-                  <div className="flex items-center justify-between mb-10">
-                    <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] flex items-center gap-3">
-                      <span className="w-1 h-4 bg-antey-primary rounded-full" />
-                      最近动态
-                    </h3>
-                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
-                      <Activity size={14} />
-                    </div>
-                  </div>
-                  <div className="space-y-8 flex-1">
-                    {recentActivities.map((activity, i) => (
-                      <div key={i} className="flex items-center gap-5 group cursor-pointer">
-                        <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-antey-primary group-hover:text-white group-hover:shadow-lg group-hover:shadow-antey-primary/20 transition-all duration-500">
-                          <Users size={20} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-[13px] font-black text-slate-900 group-hover:text-antey-primary transition-colors">{activity.name}</div>
-                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{activity.type}</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[10px] font-bold text-slate-400 mb-1.5">{activity.time}</div>
-                          <span className={cn(
-                            "text-[8px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest",
-                            activity.status === '已完成' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : 
-                            activity.status === '待审核' ? "bg-amber-50 text-amber-600 border border-amber-100" : "bg-blue-50 text-blue-600 border border-blue-100"
-                          )}>
-                            {activity.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button className="w-full mt-10 py-5 rounded-[1.5rem] bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] hover:bg-antey-primary hover:text-white hover:shadow-xl hover:shadow-antey-primary/20 transition-all duration-500">
-                    查看全部记录
-                  </button>
                 </div>
               </div>
             </div>

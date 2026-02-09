@@ -1,4 +1,5 @@
 import json
+import re
 
 class CaseStructurer:
     def __init__(self, nlp_processor):
@@ -6,23 +7,18 @@ class CaseStructurer:
 
     def _clean_json_content(self, content, is_list=False):
         """
-        通用的 JSON 强力清理工具
+        更强力的 JSON 清理工具，处理各种 LLM 常见的干扰内容
         """
         if not content:
-            return ""
+            return "[]" if is_list else "{}"
             
         json_str = content.strip()
         
-        # 1. 处理 Markdown 代码块
-        if "```" in json_str:
-            import re
-            # 尝试匹配 ```json ... ``` 或 ``` ... ```
-            pattern = r"```(?:json)?\s*([\s\S]*?)\s*```"
-            match = re.search(pattern, json_str)
-            if match:
-                json_str = match.group(1).strip()
+        # 1. 移除 Markdown 代码块标记
+        json_str = re.sub(r'```(?:json)?\s*', '', json_str)
+        json_str = re.sub(r'\s*```', '', json_str)
         
-        # 2. 尝试定位括号界定范围
+        # 2. 移除可能的头部文字解释 (例如 "这是你要的 JSON:")
         start_char = "[" if is_list else "{"
         end_char = "]" if is_list else "}"
         
@@ -31,40 +27,90 @@ class CaseStructurer:
         
         if start_idx != -1 and end_idx != -1:
             json_str = json_str[start_idx:end_idx+1]
+        
+        # 3. 处理常见的 JSON 语法错误 (如尾随逗号)
+        # 移除对象或数组最后一个元素后的逗号
+        json_str = re.sub(r',\s*([\]}])', r'\1', json_str)
             
         return json_str
 
-    def analyze_and_structure(self, input_data):
+    def analyze_and_structure(self, input_data, vision3_data=None, mode="standard"):
         """
         合并步骤：一键完成角色分析与病历结构化
         """
         if not input_data:
             return [], {}
             
-        prompt = f"""你是一位极其专业的全科医生和医疗速记员。请根据以下原始转录文本，完成对话还原与病历结构化。
+        # 准备 Vision3 体态评估数据描述
+        vision_desc = ""
+        if vision3_data:
+            active = vision3_data.get("active", [])
+            vision_desc = "\n【Vision3 体态评估参考数据】\n"
+            for item in active:
+                vision_desc += f"- {item.get('side', '') or ''}{item.get('joint', '')}{item.get('direction', '')}: 最大角度 {item.get('maxAngle', 0)}°, 当前角度 {item.get('currentAngle', 0)}°\n"
+            
+            latest = vision3_data.get("latest_saved")
+            if latest:
+                vision_desc += f"- 历史保存记录日期: {latest.get('date', '未知')}\n"
 
-【第一部分：对话还原要求】
-1. **角色标注**：精准识别说话人：[医生]、[患者]、[家属]。
-2. **术语修正**：将口语化的表达修正为医学专业词汇（例如：“心口堵”->“胸闷”，“肚子拉稀”->“腹泻”）。
-3. **内容提炼**：去除冗余口癖和无意义重复，保持对话逻辑连贯。
+        if mode == "soap":
+            prompt = f"""你是一位极其专业的全科医生和康复专家。请根据以下原始转录文本和 Vision3 体态评估数据，完成 SOAP 格式的病历构建。
 
-【第二部分：病历结构化要求】
-从对话中提取并总结以下标准字段，若对话中未提及某项，请填写“未提及”：
-- 主诉：患者就诊的最主要症状/体征及持续时间。
-- 现病史：详细描述起病情况、症状特点、病情演变、伴随症状及诊治经过。
-- 既往史：包括既往疾病、手术史、过敏史及家族史。
-- 体格检查：提取对话中提到的生命体征（血压、心率、体温等）及专科检查结果。
-- 诊断：根据对话内容给出的初步诊断或临床印象。
-- 处理意见：包括药物治疗方案、进一步检查计划或生活饮食建议。
+【SOAP 结构要求】
+1. **S (Subjective) 主观资料**：描述患者的主诉、现病史、既往史、症状表现及患者的主观感受。
+2. **O (Objective) 客观检查**：描述体格检查结果、影像学检查及【Vision3 体态评估参考数据】中的量化指标。
+3. **A (Assessment) 评估诊断**：结合主客观资料，给出初步诊断、功能评估及康复分级。
+4. **P (Plan) 治疗计划**：制定后续的治疗方案、康复训练建议及随访计划。
 
-【第三部分：临床建议】
-- AI 建议：基于以上信息，给出 2-3 条简明扼要的临床处理建议或鉴别诊断提醒。
+【跨维度推理要求】
+- **AI 建议**：分析【Vision3 数据】与患者主诉之间的关联（例如：主诉腰痛，体态数据显示腰椎前屈受限，AI 应指出这种一致性并提出康复重点）。
+
+【输入数据】
+{vision_desc}
 
 【原始转录】
 {input_data}
 
 【输出格式要求】
-必须输出严格的 JSON 对象，禁止包含任何 Markdown 格式以外的说明文字，结构如下：
+必须输出严格的 JSON 对象，禁止包含任何说明文字，结构如下：
+{{
+  "analyzed_dialogue": [
+    {{"speaker": "角色", "text": "提炼后的内容"}}
+  ],
+  "structured_case": {{
+    "S": "...",
+    "O": "...",
+    "A": "...",
+    "P": "...",
+    "ai_suggestions": "跨维度推理建议..."
+  }}
+}}
+"""
+        else:
+            prompt = f"""你是一位极其专业的全科医生和医疗速记员。请根据以下原始转录文本，完成对话还原与病历结构化。
+
+【第一部分：对话还原要求】
+1. **角色标注**：精准识别说话人：[医生]、[患者]、[家属]。
+2. **术语修正**：将口语化的表达修正为医学专业词汇。
+3. **内容提炼**：去除冗余口癖，保持逻辑连贯。
+
+【第二部分：病历结构化要求】
+从对话中提取并总结以下标准字段：
+- 主诉：患者就诊的最主要症状及持续时间。
+- 现病史：起病情况、症状特点、病情演变。
+- 既往史：既往疾病、手术史、过敏史。
+- 体格检查：生命体征及专科检查结果。
+- 诊断：初步诊断或临床印象。
+- 处理意见：治疗方案、检查计划或生活建议。
+
+【第三部分：临床建议】
+- AI 建议：给出 2-3 条简明扼要的临床处理建议。
+
+【原始转录】
+{input_data}
+
+【输出格式要求】
+必须输出严格的 JSON 对象，结构如下：
 {{
   "analyzed_dialogue": [
     {{"speaker": "角色", "text": "提炼后的内容"}}
@@ -79,10 +125,9 @@ class CaseStructurer:
     "ai_suggestions": "AI 建议内容..."
   }}
 }}
-
-禁止任何开场白或解释。"""
+"""
         
-        print(f"DEBUG: 正在进行一键式 AI 角色分析与病历结构化...")
+        print(f"DEBUG: 正在进行一键式 AI 角色分析与病历结构化 (Mode: {mode})...")
         result = self.nlp.model_pro.chat(prompt)
         
         if result["success"]:

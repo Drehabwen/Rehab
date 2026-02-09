@@ -65,6 +65,109 @@ class DocumentGenerator:
         if not os.path.exists(self.exports_dir):
             os.makedirs(self.exports_dir)
 
+    def generate_html(self, case: Dict) -> str:
+        filename = f"{case['case_id']}_{case['patient_name']}_病历.html"
+        filepath = os.path.join(self.exports_dir, filename)
+        
+        hospital_name = self.config.get("hospital_name", "XX社区卫生服务中心")
+        doctor_name = self.config.get("doctor_name", "王医生")
+        visit_date = case.get('visit_date', datetime.now().strftime('%Y-%m-%d'))
+        auth_time = case.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+            <meta charset="UTF-8">
+            <title>门诊病历 - {case.get('patient_name', '')}</title>
+            <style>
+                body {{ font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 40px; }}
+                .header {{ text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }}
+                .hospital-name {{ font-size: 24px; font-weight: bold; margin-bottom: 5px; }}
+                .title {{ font-size: 20px; letter-spacing: 5px; }}
+                .patient-info {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; background: #f9f9f9; }}
+                .info-item {{ font-size: 14px; }}
+                .info-label {{ font-weight: bold; color: #666; }}
+                .section {{ margin-bottom: 25px; }}
+                .section-title {{ font-size: 16px; font-weight: bold; background: #eee; padding: 5px 10px; border-left: 4px solid #333; margin-bottom: 10px; }}
+                .section-content {{ padding: 0 10px; white-space: pre-wrap; }}
+                .footer {{ margin-top: 50px; text-align: right; border-top: 1px solid #eee; padding-top: 20px; }}
+                .signature {{ font-size: 16px; font-weight: bold; margin-bottom: 10px; }}
+                .timestamp {{ font-size: 12px; color: #999; }}
+                .ai-suggestions {{ background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-top: 20px; }}
+                .ai-title {{ color: #16a34a; font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div class="hospital-name">{hospital_name}</div>
+                <div class="title">门诊病历</div>
+            </div>
+            
+            <div class="patient-info">
+                <div class="info-item"><span class="info-label">姓名：</span>{case.get('patient_name', '')}</div>
+                <div class="info-item"><span class="info-label">性别：</span>{case.get('gender', '未提供')}</div>
+                <div class="info-item"><span class="info-label">年龄：</span>{case.get('age', '未提供')}岁</div>
+                <div class="info-item"><span class="info-label">病历号：</span>{case.get('case_id', '')}</div>
+            </div>
+            
+            <div class="info-item" style="margin-bottom: 20px;"><span class="info-label">就诊日期：</span>{visit_date}</div>
+        """
+        
+        if "markdown_content" in case and case["markdown_content"]:
+            clean_content = self._clean_markdown(case["markdown_content"])
+            html_content += f"""
+            <div class="section">
+                <div class="section-content">{clean_content}</div>
+            </div>
+            """
+            
+            if "ai_suggestions" in case and case["ai_suggestions"]:
+                clean_suggestions = self._clean_markdown(case["ai_suggestions"])
+                html_content += f"""
+                <div class="ai-suggestions">
+                    <div class="ai-title">✨ AI 临床建议</div>
+                    <div class="section-content">{clean_suggestions}</div>
+                </div>
+                """
+        else:
+            sections = [
+                ("主诉", case.get("chief_complaint", "")),
+                ("现病史", case.get("present_illness", "")),
+                ("既往史", case.get("past_history", "")),
+                ("过敏史", case.get("allergies", "")),
+                ("体格检查", case.get("physical_exam", "")),
+                ("诊断", case.get("diagnosis", "")),
+                ("治疗方案", case.get("treatment_plan", ""))
+            ]
+            
+            for title, content in sections:
+                if content:
+                    clean_text = self._clean_markdown(content)
+                    html_content += f"""
+                    <div class="section">
+                        <div class="section-title">{title}</div>
+                        <div class="section-content">{clean_text}</div>
+                    </div>
+                    """
+        
+        html_content += f"""
+            <div class="footer">
+                <div class="signature">医生签名：{doctor_name} ____________________</div>
+                <div class="timestamp">存证时间戳：{auth_time}</div>
+            </div>
+            <script>
+                // 自动打印或保存逻辑可以在这里添加
+            </script>
+        </body>
+        </html>
+        """
+        
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(html_content)
+            
+        return filepath
+
     def generate_word(self, case: Dict) -> str:
         doc = Document()
         

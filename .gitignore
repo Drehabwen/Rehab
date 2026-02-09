@@ -7,3 +7,7 @@ __pycache__
 .env
 *.log
 .DS_Store
+
+# Medical Config (Crucial for privacy)
+Deeprehab-MedVoice-AI--/config.json
+Deeprehab-MedVoice-AI--/src/core/config.json

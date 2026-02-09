@@ -1,4 +1,5 @@
 import json
+import os
 import base64
 import hashlib
 import hmac
@@ -20,16 +21,36 @@ except ImportError:
 class VoiceRecognizer:
     def __init__(self, config=None):
         if config is None:
-            try:
-                with open("config.json", "r", encoding="utf-8") as f:
-                    config = json.load(f)
-            except:
+            # 尝试多个可能的路径加载配置
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            src_dir = os.path.dirname(current_dir)
+            project_root = os.path.dirname(src_dir)
+            
+            possible_paths = [
+                os.path.join(os.getcwd(), "config.json"),
+                os.path.join(current_dir, "config.json"),
+                os.path.join(src_dir, "config.json"),
+                os.path.join(project_root, "config.json")
+            ]
+            
+            for config_path in possible_paths:
+                if os.path.exists(config_path):
+                    try:
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            config = json.load(f)
+                            break
+                    except:
+                        continue
+            
+            if config is None:
                 config = {}
 
         self.config = config
+        print(f"DEBUG: VoiceRecognizer initializing with config keys: {list(config.keys()) if config else 'None'}")
         self.APPID = str(config.get("asr_appid") or config.get("spark_appid") or "").strip()
         self.API_KEY = str(config.get("asr_api_key") or config.get("spark_api_key") or "").strip()
         self.API_SECRET = str(config.get("asr_api_secret") or config.get("spark_api_secret") or "").strip()
+        print(f"DEBUG: APPID='{self.APPID}', API_KEY_LEN={len(self.API_KEY)}, API_SECRET_LEN={len(self.API_SECRET)}")
         self.URL = "wss://iat-api.xfyun.cn/v2/iat"
         
         self.is_running = False
@@ -69,10 +90,11 @@ class VoiceRecognizer:
         
         return self.URL + "?" + urlencode(params)
 
-    def start(self, on_update=None, on_complete=None, on_error=None, use_pyaudio=True):
+    def start(self, on_update=None, on_complete=None, on_error=None, on_power=None, use_pyaudio=True):
         self.on_update = on_update
         self.on_complete = on_complete
         self.on_error = on_error
+        self.on_power = on_power
         self.is_running = True
         self.use_pyaudio = use_pyaudio and HAS_PYAUDIO
         self.is_recording_manual_stop = False
@@ -80,6 +102,15 @@ class VoiceRecognizer:
         self.full_transcript = ""
         self.temp_transcript = ""
         self.session_count = 0
+
+        # 检查 API 配置
+        print(f"DEBUG: VoiceRecognizer.start check - APPID='{self.APPID}', API_KEY_LEN={len(self.API_KEY)}, API_SECRET_LEN={len(self.API_SECRET)}")
+        if not self.APPID or not self.API_KEY or not self.API_SECRET:
+            error_msg = f"ASR API 配置缺失 (AppID/Key/Secret)，请检查 config.json。当前值: AppID='{self.APPID}', Key长度={len(self.API_KEY)}, Secret长度={len(self.API_SECRET)}"
+            print(f"ERROR: {error_msg}")
+            if self.on_error:
+                self.on_error(error_msg)
+            return
         
         # 清空音频队列
         while not self.audio_queue.empty():
@@ -169,12 +200,19 @@ class VoiceRecognizer:
             print(f"Message processing error: {e}")
 
     def _on_error(self, ws, error):
+        error_str = str(error)
         if not isinstance(error, websocket.WebSocketConnectionClosedException):
+            print(f"ASR WebSocket Error: {error_str}")
             if self.on_error:
-                self.on_error(str(error))
+                self.on_error(f"语音识别连接异常: {error_str}")
 
     def _on_close(self, ws, close_status_code, close_msg):
-        pass
+        if not self.is_recording_manual_stop and close_status_code is not None:
+             print(f"ASR WebSocket Closed: {close_status_code} - {close_msg}")
+             # 如果是非手动停止且连接关闭，且没有报错，可能需要重连或报错
+             if not self.callback_done and close_status_code != 1000:
+                 if self.on_error:
+                     self.on_error(f"语音识别连接意外断开 ({close_status_code})")
 
     def _on_open(self, ws, session_id):
         threading.Thread(target=self._send_audio, args=(ws, session_id), daemon=True).start()
@@ -191,7 +229,14 @@ class VoiceRecognizer:
             language = self.config.get("iat_language", "zh_cn")
             
             if self.use_pyaudio:
-                stream = p.open(format=pyaudio.paInt16, channels=1, rate=sample_rate, input=True, frames_per_buffer=1024)
+                try:
+                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=sample_rate, input=True, frames_per_buffer=1024)
+                except Exception as e:
+                    error_msg = f"无法打开麦克风设备: {str(e)}"
+                    print(f"ERROR: {error_msg}")
+                    if self.on_error:
+                        self.on_error(error_msg)
+                    return # 终止线程
             
             business_params = {
                 "language": "zh_cn", # 强制中文
@@ -200,8 +245,7 @@ class VoiceRecognizer:
                 "vad_eos": 5000, # 调高静音检测阈值，防止说话间隙过早断开
                 "dwa": "wpp", # 开启动态修正，提升实时显示效果
                 "pd": "medical", 
-                "ptt": 0, # 禁用标点符号（如果需要更原始的流）或者设为 1 开启
-                "rls": "all" # 开启所有角色识别（如果后端支持）
+                "ptt": 1
             }
             if self.config.get("enable_diarization", False):
                 business_params["role_type"] = 2
@@ -221,6 +265,15 @@ class VoiceRecognizer:
                 if self.use_pyaudio:
                     try:
                         data = stream.read(1024, exception_on_overflow=False)
+                        # 计算音量用于前端波形显示
+                        if self.on_power:
+                            import numpy as np
+                            audio_data = np.frombuffer(data, dtype=np.int16)
+                            if len(audio_data) > 0:
+                                peak = np.abs(audio_data).max()
+                                # 映射到 0-100 范围
+                                power = min(100, int(peak / 327.68))
+                                self.on_power(power)
                     except:
                         break
                 else:
@@ -285,14 +338,14 @@ if __name__ == "__main__":
     r.stop()
 
 class VoiceRecorder:
-    def __init__(self):
-        self.recognizer = VoiceRecognizer()
+    def __init__(self, config=None):
+        self.recognizer = VoiceRecognizer(config)
         self.is_recording = False
         self.last_result = ""
         self.error = None
         self._complete_event = threading.Event()
 
-    def start_recording(self, on_update=None):
+    def start_recording(self, on_update=None, on_complete=None, on_error=None, on_power=None):
         if self.is_recording:
             return
         
@@ -301,20 +354,25 @@ class VoiceRecorder:
         self.error = None
         self._complete_event.clear()
 
-        def on_complete(text):
+        def _on_complete(text):
             self.last_result = text
             self.is_recording = False
             self._complete_event.set()
+            if on_complete:
+                on_complete(text)
 
-        def on_error(err):
+        def _on_error(err):
             self.error = err
             self.is_recording = False
             self._complete_event.set()
+            if on_error:
+                on_error(err)
 
         self.recognizer.start(
             on_update=on_update,
-            on_complete=on_complete,
-            on_error=on_error
+            on_complete=_on_complete,
+            on_error=_on_error,
+            on_power=on_power
         )
 
     def stop_recording(self, timeout=30):

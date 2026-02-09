@@ -9,6 +9,7 @@ import json
 import base64
 import tempfile
 import asyncio
+import numpy as np
 from datetime import datetime
 import logging
 import uvicorn
@@ -47,24 +48,44 @@ logger = logging.getLogger(__name__)
 
 # 加载配置
 def load_config():
-    config_path = "config.json"
-    if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    else:
-        return {
-            "hospital_name": "XX社区卫生服务中心",
-            "doctor_name": "王医生",
-            "audio_sample_rate": 16000,
-            "audio_channels": 1,
-            "cases_dir": "./cases",
-            "exports_dir": "./exports"
-        }
+    # 尝试多个可能的路径
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    
+    possible_paths = [
+        os.path.join(os.getcwd(), "config.json"),
+        os.path.join(current_dir, "config.json"),
+        os.path.join(project_root, "config.json"),
+        os.path.join(os.path.dirname(project_root), "config.json")
+    ]
+    
+    for config_path in possible_paths:
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    logger.info(f"正在加载配置文件: {config_path}")
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"解析配置文件失败 {config_path}: {e}")
+    
+    logger.warning("未找到配置文件 config.json，将使用默认配置")
+    return {
+        "hospital_name": "XX社区卫生服务中心",
+        "doctor_name": "王医生",
+        "audio_sample_rate": 16000,
+        "audio_channels": 1,
+        "cases_dir": "./cases",
+        "exports_dir": "./exports",
+        "asr_appid": "",
+        "asr_api_key": "",
+        "asr_api_secret": ""
+    }
 
 config = load_config()
 
 # 初始化组件
-recorder = VoiceRecorder()
+print(f"DEBUG: api_server initializing components with config keys: {list(config.keys()) if config else 'None'}")
+recorder = VoiceRecorder(config)
 nlp_processor = NLPProcessor(config)
 case_structurer = CaseStructurer(nlp_processor)
 doc_generator = DocumentGenerator(config)
@@ -93,6 +114,8 @@ class TranscribeRequest(BaseModel):
 
 class StructureRequest(BaseModel):
     transcript: str
+    vision3_data: Optional[Dict[str, Any]] = None
+    mode: Optional[str] = "standard"
     separate_speakers: Optional[bool] = True
 
 class GenerateRequest(BaseModel):
@@ -179,8 +202,12 @@ async def transcribe_audio(request: TranscribeRequest):
 @app.post("/api/structure")
 async def structure_case(request: StructureRequest):
     try:
-        # 使用合并后的方法，大幅提升速度
-        analyzed_dialogue, structured_case = case_structurer.analyze_and_structure(request.transcript)
+        # 使用合并后的方法，支持 Vision3 数据和 SOAP 模式
+        analyzed_dialogue, structured_case = case_structurer.analyze_and_structure(
+            request.transcript, 
+            vision3_data=request.vision3_data,
+            mode=request.mode
+        )
         
         return {
             'status': 'success',
@@ -231,6 +258,8 @@ async def export_document(request: ExportRequest):
 
         if request.export_format == "pdf":
             file_path = doc_generator.generate_pdf(case_data)
+        elif request.export_format == "html":
+            file_path = doc_generator.generate_html(case_data)
         else:
             file_path = doc_generator.generate_word(case_data)
             
@@ -337,7 +366,6 @@ async def websocket_stream_transcribe(websocket: WebSocket):
                 # 数据质量校验：检查是否全为 0 (静音或采集失败)
                 if len(audio_chunk) > 0:
                     # 检查音量大小
-                    import numpy as np
                     audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
                     peak = np.abs(audio_data).max() if len(audio_data) > 0 else 0
                     
@@ -406,71 +434,87 @@ async def get_case_detail(case_id: str):
 
 @app.websocket("/ws/record")
 async def websocket_record(websocket: WebSocket):
-    # 显式允许所有 Origin 的 WebSocket 连接
     await websocket.accept()
+    logger.info("收到前端后端主导录音 WebSocket 连接")
+    
     queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
 
     def on_update(text):
-        # 使用 call_soon_threadsafe 确保跨线程推送数据到 asyncio 队列
-        loop.call_soon_threadsafe(queue.put_nowait, text)
+        loop.call_soon_threadsafe(queue.put_nowait, {"type": "update", "text": text})
+        
+    def on_complete(text):
+        loop.call_soon_threadsafe(queue.put_nowait, {"type": "complete", "text": text})
+        
+    def on_error(error):
+        logger.error(f"ASR Core Error: {error}")
+        loop.call_soon_threadsafe(queue.put_nowait, {"type": "error", "message": str(error)})
 
-    try:
-        # 等待前端发送开始指令
-        data = await websocket.receive_json()
-        if data.get("command") == "start":
-            # 启动录音
-            recorder.start_recording(on_update=on_update)
-            logger.info("收到前端指令，录音已启动")
-            
-            # 启动一个并发任务来读取队列并发送给前端
-            async def send_updates():
-                while recorder.is_recording:
-                    try:
-                        text = await asyncio.wait_for(queue.get(), timeout=0.5)
-                        await websocket.send_json({
-                            "status": "update",
-                            "text": text
-                        })
-                    except asyncio.TimeoutError:
-                        continue
-                    except Exception as e:
-                        logger.error(f"发送实时数据失败: {e}")
-                        break
+    def on_power(power):
+        loop.call_soon_threadsafe(queue.put_nowait, {"type": "power", "power": power})
 
-            # 运行发送循环，同时监听前端的停止指令
-            send_task = asyncio.create_task(send_updates())
-            
+    async def send_updates():
+        try:
             while True:
-                # 监听可能的停止指令或断开连接
-                try:
-                    msg = await asyncio.wait_for(websocket.receive_json(), timeout=1.0)
-                    if msg.get("command") == "stop":
-                        logger.info("收到前端停止指令")
-                        final_text = recorder.stop_recording()
-                        await websocket.send_json({
-                            "status": "completed",
-                            "text": final_text
-                        })
-                        break
-                except asyncio.TimeoutError:
-                    if not recorder.is_recording:
-                        break
+                msg = await queue.get()
+                if msg["type"] == "update":
+                    await websocket.send_json({"status": "update", "text": msg["text"]})
+                elif msg["type"] == "complete":
+                    await websocket.send_json({"status": "complete", "text": msg["text"]})
+                elif msg["type"] == "error":
+                    await websocket.send_json({"status": "error", "message": msg["message"]})
+                elif msg["type"] == "power":
+                    await websocket.send_json({"status": "power", "power": msg["power"]})
+        except Exception as e:
+            logger.error(f"WS 发送任务异常: {e}")
+
+    send_task = None
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            command = data.get("command")
+            
+            if command == "start":
+                if recorder.is_recording:
+                    await websocket.send_json({"status": "error", "message": "录音已在运行中"})
                     continue
-            
-            send_task.cancel()
-            try:
-                await send_task
-            except asyncio.CancelledError:
-                pass
-            
+                
+                logger.info("启动后端本地麦克风录音...")
+                
+                try:
+                    # 使用更新后的 start_recording 接口
+                    recorder.start_recording(
+                        on_update=on_update,
+                        on_complete=on_complete,
+                        on_error=on_error,
+                        on_power=on_power
+                    )
+                    
+                    send_task = asyncio.create_task(send_updates())
+                    await websocket.send_json({"status": "started"})
+                except Exception as e:
+                    logger.error(f"启动录音失败: {e}", exc_info=True)
+                    await websocket.send_json({"status": "error", "message": f"启动录音失败: {str(e)}"})
+                
+            elif command == "stop":
+                if recorder.is_recording:
+                    logger.info("停止后端本地麦克风录音")
+                    final_text = recorder.stop_recording()
+                    # stop_recording 会触发 on_complete，不需要手动发完成消息
+                else:
+                    await websocket.send_json({"status": "error", "message": "未在录音状态"})
+                    
     except WebSocketDisconnect:
-        logger.info("WebSocket 已断开")
+        logger.info("前端 WebSocket 已断开")
     except Exception as e:
-        logger.error(f"WebSocket 异常: {e}")
+        logger.error(f"WebSocket 流程异常: {e}", exc_info=True)
     finally:
-        recorder.stop_recording()
-        logger.info("WebSocket 录音流程结束")
+        if recorder.is_recording:
+            recorder.stop_recording()
+        if send_task:
+            send_task.cancel()
+        logger.info("后端录音 WebSocket 流程结束")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)

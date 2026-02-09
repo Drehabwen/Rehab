@@ -8,45 +8,53 @@ import {
   Save, 
   RefreshCw, 
   ClipboardCheck, 
-  User, 
   History,
   MessageSquare,
   Activity,
   ChevronRight,
-  Plus
+  Plus,
+  Layout,
+  Stethoscope
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface StructuredCase {
-  '主诉'?: string;
-  '现病史'?: string;
-  '既往史'?: string;
-  '体格检查'?: string;
-  '诊断'?: string;
-  '处理意见'?: string;
-  'ai_suggestions'?: string;
-  [key: string]: string | undefined;
-}
+import { useMeasurementStore } from '@/store/useMeasurementStore';
+import { useCaseStore, StructuredCase } from '@/store/useCaseStore';
+import { useVoiceRecorder } from './hooks/useVoiceRecorder';
+import { GlobalExport } from '@/components/GlobalExport';
 
 export const MedVoicePlugin: React.FC = () => {
-  const [isRecording, setIsRecording] = useState(false);
-  const isRecordingRef = useRef(false);
+  const standardSections = [
+    { id: '主诉', icon: MessageSquare, color: 'text-blue-500', bgColor: 'bg-blue-50' },
+    { id: '现病史', icon: Activity, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
+    { id: '既往史', icon: History, color: 'text-amber-500', bgColor: 'bg-amber-50' },
+    { id: '体格检查', icon: ClipboardCheck, color: 'text-purple-500', bgColor: 'bg-purple-50' },
+    { id: '诊断', icon: FileText, color: 'text-rose-500', bgColor: 'bg-rose-50' },
+    { id: '处理意见', icon: Save, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
+    { id: 'ai_suggestions', icon: Activity, color: 'text-purple-600', bgColor: 'bg-purple-50', label: 'AI 临床建议' },
+  ];
+
+  const soapSections = [
+    { id: 'S', label: 'S (Subjective) 主观资料', icon: MessageSquare, color: 'text-blue-500', bgColor: 'bg-blue-50' },
+    { id: 'O', label: 'O (Objective) 客观检查', icon: Activity, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
+    { id: 'A', label: 'A (Assessment) 评估诊断', icon: ClipboardCheck, color: 'text-purple-500', bgColor: 'bg-purple-50' },
+    { id: 'P', label: 'P (Plan) 治疗计划', icon: Save, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
+    { id: 'ai_suggestions', label: 'AI 跨维度推理', icon: Activity, color: 'text-purple-600', bgColor: 'bg-purple-50' },
+  ];
+
+  const [viewMode, setViewMode] = useState<'standard' | 'soap'>('standard');
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [structuredCase, setStructuredCase] = useState<StructuredCase | null>(null);
+  const { structuredCase, setStructuredCase, patientInfo, setPatientInfo } = useCaseStore();
   const [activeSection, setActiveSection] = useState<string>('主诉');
-  const [recordTime, setRecordTime] = useState(0);
   
-  const wsRef = useRef<WebSocket | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { activeMeasurements, savedMeasurements } = useMeasurementStore();
 
-  // 同步 ref
+  // 当切换视图模式时，重置激活的章节
   useEffect(() => {
-    isRecordingRef.current = isRecording;
-  }, [isRecording]);
+    const currentSections = viewMode === 'standard' ? standardSections : soapSections;
+    setActiveSection(currentSections[0].id);
+  }, [viewMode]);
 
   // 格式化时间
   const formatTime = (seconds: number) => {
@@ -95,44 +103,15 @@ export const MedVoicePlugin: React.FC = () => {
     ctx.fill();
   }, []);
 
-  // 初始化 WebSocket
-  const connectWS = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    const ws = new WebSocket(`${protocol}//${host}/medvoice/ws/stream_transcribe`);
-    
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.status === 'update') {
-          setTranscript(data.text || '');
-        } else if (data.status === 'complete') {
-          setTranscript(data.text || '');
-          // 自动触发结构化
-          if (data.text && data.text.length > 5) {
-            handleStructure(data.text);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to parse WS message', err);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket closed');
-      if (isRecordingRef.current) {
-        console.log('Retrying connection...');
-        setTimeout(connectWS, 1000);
-      }
-    };
-
-    wsRef.current = ws;
-    return ws;
-  }, []);
+  // 使用自定义 Hook 管理录音逻辑
+  const { isRecording, recordTime, startRecording, stopRecording } = useVoiceRecorder({
+    onTranscriptUpdate: (text) => setTranscript(text),
+    onTranscriptComplete: (text) => {
+      setTranscript(text);
+      if (text.length > 5) handleStructure(text);
+    },
+    onWaveformUpdate: (power) => drawWaveform(power),
+  });
 
   const handleStructure = async (text?: string) => {
     const content = text || transcript;
@@ -140,15 +119,36 @@ export const MedVoicePlugin: React.FC = () => {
     
     setIsProcessing(true);
     try {
+      // 获取 Vision3 体态数据
+      const visionData = {
+        active: activeMeasurements.map(m => ({
+          joint: m.joint,
+          direction: m.direction,
+          side: m.side,
+          maxAngle: m.maxAngle,
+          currentAngle: m.currentAngle
+        })),
+        latest_saved: savedMeasurements.length > 0 ? savedMeasurements[0] : null
+      };
+
       const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
       const response = await fetch(`${window.location.protocol}//${host}/medvoice/api/structure`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: content }),
+        body: JSON.stringify({ 
+          transcript: content,
+          vision3_data: visionData,
+          mode: viewMode
+        }),
       });
       const result = await response.json();
       if (result.status === 'success') {
         setStructuredCase(result.data.structured_case);
+        // 如果切换到 SOAP 模式且当前选中的 section 不在 SOAP 中，则重置 activeSection
+        const currentSections = viewMode === 'soap' ? soapSections : standardSections;
+        if (!currentSections.find(s => s.id === activeSection)) {
+          setActiveSection(currentSections[0].id);
+        }
       }
     } catch (err) {
       console.error('Structuring failed', err);
@@ -157,79 +157,9 @@ export const MedVoicePlugin: React.FC = () => {
     }
   };
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
 
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-      audioContextRef.current = audioContext;
 
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-      const ws = connectWS();
-
-      processor.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        
-        // 计算音量用于波形显示
-        let sum = 0;
-        for (let i = 0; i < inputData.length; i++) {
-          sum += inputData[i] * inputData[i];
-        }
-        const rms = Math.sqrt(sum / inputData.length);
-        const power = Math.min(100, rms * 500);
-        drawWaveform(power);
-
-        // 转换为 Int16 PCM
-        const pcmData = new Int16Array(inputData.length);
-        for (let i = 0; i < inputData.length; i++) {
-          const s = Math.max(-1, Math.min(1, inputData[i]));
-          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(pcmData.buffer);
-        }
-      };
-
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-
-      setIsRecording(true);
-      setRecordTime(0);
-      timerRef.current = setInterval(() => {
-        setRecordTime(prev => prev + 1);
-      }, 1000);
-
-    } catch (err) {
-      console.error('Failed to start recording', err);
-    }
-  };
-
-  const stopRecording = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ command: 'stop' }));
-    }
-
-    streamRef.current?.getTracks().forEach(track => track.stop());
-    audioContextRef.current?.close();
-    
-    setIsRecording(false);
-  };
-
-  const sections = [
-    { id: '主诉', icon: MessageSquare, color: 'text-blue-500', bgColor: 'bg-blue-50' },
-    { id: '现病史', icon: Activity, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
-    { id: '既往史', icon: History, color: 'text-amber-500', bgColor: 'bg-amber-50' },
-    { id: '体格检查', icon: ClipboardCheck, color: 'text-purple-500', bgColor: 'bg-purple-50' },
-    { id: '诊断', icon: FileText, color: 'text-rose-500', bgColor: 'bg-rose-50' },
-    { id: '处理意见', icon: Save, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
-    { id: 'ai_suggestions', icon: Activity, color: 'text-purple-600', bgColor: 'bg-purple-50', label: 'AI 临床建议' },
-  ];
+  const sections = viewMode === 'standard' ? standardSections : soapSections;
 
   const currentSectionData = sections.find(s => s.id === activeSection);
 
@@ -359,11 +289,39 @@ export const MedVoicePlugin: React.FC = () => {
                 <span className="w-1.5 h-5 bg-gradient-to-b from-antey-primary to-blue-500 rounded-full" />
                 AI 自动化病历构建
               </h3>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-6">
+                {/* View Mode Toggle */}
+                <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
+                  <button 
+                    onClick={() => setViewMode('standard')}
+                    className={cn(
+                      "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                      viewMode === 'standard' 
+                        ? "bg-white text-antey-primary shadow-sm" 
+                        : "text-slate-400 hover:text-slate-600"
+                    )}
+                  >
+                    标准模式
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('soap')}
+                    className={cn(
+                      "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                      viewMode === 'soap' 
+                        ? "bg-white text-purple-600 shadow-sm" 
+                        : "text-slate-400 hover:text-slate-600"
+                    )}
+                  >
+                    SOAP 模式
+                  </button>
+                </div>
+                
+                <div className="flex items-center gap-4">
                 <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
                   AI 分析结果 · 仅供参考
                 </span>
                 <div className="flex items-center gap-3">
+                  <GlobalExport />
                   <button className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 hover:bg-antey-primary hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all group shadow-sm hover:shadow-lg hover:shadow-antey-primary/20">
                     <Plus size={16} className="group-hover:rotate-90 transition-transform duration-500" />
                     保存并同步
@@ -371,8 +329,9 @@ export const MedVoicePlugin: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="flex-1 flex gap-10 min-h-0">
+          <div className="flex-1 flex gap-10 min-h-0">
               {/* Navigation Tabs */}
               <div className="w-56 flex flex-col gap-2.5">
                 {sections.map(section => (
@@ -445,25 +404,6 @@ export const MedVoicePlugin: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Patient Quick Info Card */}
-          <div className="grid grid-cols-3 gap-6">
-            {[
-              { label: '患者姓名', value: '王晓明', icon: User, color: 'text-blue-500', bg: 'bg-blue-50' },
-              { label: '就诊类型', value: '初次评估', icon: Activity, color: 'text-teal-500', bg: 'bg-teal-50' },
-              { label: '预约编号', value: '#REF-20240209', icon: ClipboardCheck, color: 'text-indigo-500', bg: 'bg-indigo-50' }
-            ].map((item, i) => (
-              <div key={i} className="bento-card p-6 flex items-center gap-5 group hover:translate-y-[-4px] transition-all duration-500">
-                <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500", item.bg, item.color)}>
-                  <item.icon size={28} />
-                </div>
-                <div>
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{item.label}</div>
-                  <div className="text-xl font-black text-slate-900 tracking-tight group-hover:text-antey-primary transition-colors">{item.value}</div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>

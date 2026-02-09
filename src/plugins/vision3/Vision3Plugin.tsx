@@ -311,20 +311,60 @@ export const Vision3Plugin: React.FC = () => {
           </div>
 
           {/* Floating Controls: Joint Info (ROM only) */}
-          <div className="absolute top-10 right-10 flex flex-col gap-4">
-            {activeTab === 'rom' && (
-              <div className="bg-black/40 backdrop-blur-3xl rounded-2xl border border-white/10 p-4 flex items-center gap-4 shadow-2xl min-w-[200px]">
-                <div className="w-10 h-10 rounded-xl bg-antey-accent/20 flex items-center justify-center text-antey-accent">
-                  <Activity size={20} />
-                </div>
-                <div>
-                  <div className="text-[9px] font-black text-white/40 uppercase tracking-widest leading-none mb-1">测量目标</div>
-                  <div className="text-xs font-black text-white uppercase tracking-widest leading-none">
-                    {activeMeasurements[0] ? `已选: ${jointNameMap[activeMeasurements[0].joint]}` : '未选择关节'}
+          <div className="absolute top-10 right-10 flex flex-col gap-4 z-20">
+            {activeTab === 'rom' && activeMeasurements.map((m, idx) => (
+              <div key={m.id} className="bg-black/40 backdrop-blur-3xl rounded-3xl border border-white/10 p-6 flex flex-col gap-4 shadow-2xl min-w-[240px] animate-in slide-in-from-right duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: m.color }}>
+                    <Activity size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] leading-none mb-1.5">正在测量</div>
+                    <div className="text-sm font-black text-white uppercase tracking-widest leading-none">
+                      {jointNameMap[m.joint] || m.joint} {m.side ? (m.side === 'left' ? '(左)' : '(右)') : ''}
+                    </div>
                   </div>
                 </div>
+
+                <div className="flex items-baseline justify-between gap-4 mt-2">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">实时角度</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-5xl font-black text-white tracking-tighter tabular-nums">
+                        {m.currentAngle.toFixed(1)}
+                      </span>
+                      <span className="text-sm font-black text-white/40 uppercase">deg</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">峰值</span>
+                    <span className="text-xl font-black text-antey-accent">
+                      {m.maxAngle === -Infinity ? '0.0' : m.maxAngle.toFixed(1)}°
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mini Sparkline indicator */}
+                {isMeasuring && m.data.length > 1 && (
+                  <div className="h-10 flex items-end gap-1 px-1">
+                    {m.data.slice(-20).map((p, i) => {
+                      const height = Math.max(4, (p.angle / 180) * 40);
+                      return (
+                        <div 
+                          key={i} 
+                          className="flex-1 rounded-full opacity-60 transition-all duration-300"
+                          style={{ 
+                            height: `${height}px`, 
+                            backgroundColor: m.color,
+                            opacity: 0.3 + (i / 20) * 0.7
+                          }} 
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
+            ))}
           </div>
 
           {/* Analysis Overlays */}
@@ -401,20 +441,22 @@ export const Vision3Plugin: React.FC = () => {
         </div>
 
         {/* Right Panel: Enhanced Data Dashboard */}
-        <div className="col-span-12 lg:col-span-4 row-span-2 lg:row-span-6 flex flex-col gap-6 overflow-hidden pr-2">
+        <div className="col-span-12 lg:col-span-4 row-span-2 lg:row-span-6 flex flex-col gap-4 overflow-hidden pr-2">
           
           {activeTab === 'rom' && (
-            <div className="bento-card p-6 bg-white/60 backdrop-blur-md border border-white/40 shadow-xl animate-in slide-in-from-right-4 duration-500">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                  <Settings2 size={14} />
-                  待测关节选择
+            <div className="bento-card p-4 bg-white/60 backdrop-blur-md border border-white/40 shadow-lg animate-in slide-in-from-right-4 duration-500">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Settings2 size={12} />
+                  关节配置
                 </h3>
-                <div className="px-3 py-1 bg-antey-accent/10 rounded-full">
-                  <span className="text-[9px] font-black text-antey-accent uppercase tracking-widest">ROM 配置</span>
+                <div className="px-2 py-0.5 bg-antey-accent/10 rounded-lg">
+                  <span className="text-[8px] font-black text-antey-accent uppercase tracking-widest">ROM</span>
                 </div>
               </div>
-              <JointSelector />
+              <div className="scale-95 origin-top">
+                <JointSelector />
+              </div>
             </div>
           )}
 
@@ -611,43 +653,48 @@ export const Vision3Plugin: React.FC = () => {
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 min-h-[280px] bg-slate-50/30 rounded-[2.5rem] border border-slate-100/50 p-6 mb-8">
+                <div className="flex-1 min-h-[420px] bg-slate-50/30 rounded-[2.5rem] border border-slate-100/50 p-6 mb-8 relative group/chart">
+                  <div className="absolute top-6 right-6 z-10 opacity-0 group-hover/chart:opacity-100 transition-opacity">
+                    <button className="p-2 bg-white/80 backdrop-blur-md rounded-xl border border-slate-200 shadow-sm text-slate-400 hover:text-antey-accent hover:border-antey-accent/30 transition-all">
+                      <Maximize2 size={16} />
+                    </button>
+                  </div>
                   <MeasurementChart />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-6 mb-8">
-                  <div className="p-6 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm group hover:border-antey-accent/30 hover:shadow-xl transition-all duration-500">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-500 shadow-sm">
-                        <Maximize2 size={16} />
+                  <div className="p-8 bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/40 shadow-xl group hover:border-antey-accent/30 hover:shadow-2xl transition-all duration-500">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-500 shadow-sm">
+                        <Maximize2 size={18} />
                       </div>
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">本次最大角度</span>
                     </div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-black text-slate-900 tracking-tighter">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-black text-slate-900 tracking-tighter tabular-nums">
                         {activeMeasurements[0]?.maxAngle !== -Infinity ? activeMeasurements[0]?.maxAngle.toFixed(1) : '0.0'}
                       </span>
                       <span className="text-sm font-black text-slate-400 uppercase tracking-widest">deg</span>
                     </div>
                   </div>
                   
-                  <div className="p-6 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm group hover:border-antey-accent/30 hover:shadow-xl transition-all duration-500 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4">
+                  <div className="p-8 bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/40 shadow-xl group hover:border-antey-accent/30 hover:shadow-2xl transition-all duration-500 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-6">
                       <div className={cn(
-                        "text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest",
+                        "text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest",
                         (activeMeasurements[0]?.maxAngle || 0) >= 140 ? "bg-emerald-100 text-emerald-600" : "bg-amber-100 text-amber-600"
                       )}>
                         {((activeMeasurements[0]?.maxAngle || 0) / 150 * 100).toFixed(0)}% 达标
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="p-2.5 bg-blue-50 rounded-xl text-blue-500 shadow-sm">
-                        <CheckCircle size={16} />
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="p-3 bg-blue-50 rounded-2xl text-blue-500 shadow-sm">
+                        <CheckCircle size={18} />
                       </div>
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">临床参考值</span>
                     </div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-black text-antey-accent tracking-tighter">150.0</span>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-black text-antey-accent tracking-tighter tabular-nums">150.0</span>
                       <span className="text-sm font-black text-slate-400 uppercase tracking-widest">deg</span>
                     </div>
                   </div>
