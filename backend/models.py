@@ -74,3 +74,23 @@ class AnalysisResponse(BaseModel):
     issues: List[PostureIssue]
     annotations: List[VisualAnnotation] = []
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
+
+class TemporalStability(BaseModel):
+    swayArea: float
+    maxDeviation: float
+    stdDev: float
+    velocity: float
+
+class TemporalAnalysisRequest(BaseModel):
+    type: str = "POSTURE_BATCH_ANALYSIS"
+    view: str
+    duration: float
+    frameCount: int
+    averages: PostureMetrics
+    stability: TemporalStability
+
+class HTMLReportResponse(BaseModel):
+    type: str = "HTML_REPORT"
+    html: str
+    reportId: str
+    timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))

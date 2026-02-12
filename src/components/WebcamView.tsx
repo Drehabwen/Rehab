@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Results } from '@mediapipe/holistic';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
-import { usePostureWS, Landmark } from '@/hooks/usePostureWS';
+import { usePostureWS } from '@/hooks/usePostureWS';
+import { Landmark } from '@/types/posture';
 import BaseWebcamView from './shared/BaseWebcamView';
 
 const JOINT_NAMES: Record<string, string> = {

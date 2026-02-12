@@ -43,7 +43,9 @@ describe('WebcamView', () => {
       status: 'connected',
       analyze: vi.fn(),
       analyzeJoint: mockAnalyzeJoint,
-      jointResult: null
+      analyzeBatch: vi.fn(),
+      jointResult: null,
+      htmlReport: null
     });
 
     mockedUseCameraStream.mockReturnValue({

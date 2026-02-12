@@ -111,7 +111,7 @@ export const Vision3Plugin: React.FC = () => {
   const checkUserPosition = useCallback((landmarks: PoseLandmark[]) => {
     if (!landmarks || landmarks.length < 33) return false;
     const keyPointsIndices = [0, 11, 12, 23, 24]; // Nose, Shoulders, Hips
-    const visible = keyPointsIndices.every(idx => landmarks[idx].visibility > 0.5);
+    const visible = keyPointsIndices.every(idx => (landmarks[idx].visibility ?? 0) > 0.5);
     return visible;
   }, []);
 

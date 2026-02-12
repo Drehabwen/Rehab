@@ -3,6 +3,8 @@ import { Results, POSE_CONNECTIONS } from '@mediapipe/holistic';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { Camera as CameraIcon, CheckCircle, AlertTriangle, User, RefreshCw, FileDown } from 'lucide-react';
 import { usePostureWS, VisualAnnotation, PostureIssue, PostureMetrics, Landmark } from '@/hooks/usePostureWS';
+import { useNavigate } from 'react-router-dom';
+import { PostureProcessor } from '@/lib/posture-processor';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -18,6 +20,7 @@ const BOX = {
 type PostureResult = { issues: PostureIssue[]; metrics: PostureMetrics; image: string };
 
 export default function Posture() {
+  const navigate = useNavigate();
   const viewOptions = [
     { id: 'front', label: '正视图' },
     { id: 'side', label: '侧视图' },
@@ -39,11 +42,13 @@ export default function Posture() {
   const reportCanvasRef = useRef<HTMLCanvasElement>(null);
   
   // WebSocket for posture analysis
-  const { result: wsResult, analyze } = usePostureWS();
+  const { result: wsResult, htmlReport, analyze, analyzeBatch } = usePostureWS();
 
   // Auto-capture states
-  const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown'>('idle');
+  const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown' | 'recording'>('idle');
   const [countdown, setCountdown] = useState(3);
+  const [recordingProgress, setRecordingProgress] = useState(0);
+  const recordingStartTimeRef = useRef<number>(0);
   const [isInPosition, setIsInPosition] = useState(false);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -55,7 +60,7 @@ export default function Posture() {
 
     // Check visibility of key points (Nose, Shoulders, Hips, Ankles)
     const keyPointsIndices = [0, 11, 12, 23, 24, 27, 28];
-    const visible = keyPointsIndices.every(idx => landmarks[idx].visibility > 0.6);
+    const visible = keyPointsIndices.every(idx => (landmarks[idx].visibility ?? 0) > 0.6);
     if (!visible) return false;
 
     // Check bounds
@@ -165,6 +170,16 @@ export default function Posture() {
     }
   }, [wsResult, capturedImage, landmarks, drawResultCanvas]);
 
+  useEffect(() => {
+    if (htmlReport) {
+      // Show success message or redirect to report center
+      if (confirm('体态分析报告已生成，是否前往报告中心查看？')) {
+        navigate('/report');
+      }
+      setCaptureStatus('idle');
+    }
+  }, [htmlReport, navigate]);
+
   const handleCapture = useCallback((video: HTMLVideoElement) => {
     if (landmarksBufferRef.current.length === 0) return;
     
@@ -251,9 +266,26 @@ export default function Posture() {
            setCaptureStatus('scanning');
            setCountdown(3);
         }
+      } else if (status === 'recording') {
+        const now = performance.now();
+        const elapsed = now - recordingStartTimeRef.current;
+        const progress = Math.min((elapsed / 2000) * 100, 100);
+        setRecordingProgress(progress);
+
+        if (elapsed >= 2000) {
+          setCaptureStatus('idle');
+          // Trigger Batch Analysis
+          const analysis = PostureProcessor.process(
+            landmarksBufferRef.current,
+            view,
+            2000
+          );
+          analyzeBatch(analysis);
+          landmarksBufferRef.current = [];
+        }
       }
     }
-  }, [checkUserPosition]);
+  }, [checkUserPosition, analyzeBatch, view]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -262,6 +294,9 @@ export default function Posture() {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(countdownIntervalRef.current!);
+            setCaptureStatus('recording');
+            recordingStartTimeRef.current = performance.now();
+            landmarksBufferRef.current = [];
             return 0;
           }
           return prev - 1;
@@ -383,6 +418,45 @@ export default function Posture() {
                   </div>
               )}
 
+              {/* Recording Overlay */}
+              {captureStatus === 'recording' && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 backdrop-blur-[4px] z-30">
+                  <div className="relative w-48 h-48 flex items-center justify-center">
+                    <svg className="w-full h-full transform -rotate-90">
+                      <circle
+                        cx="96"
+                        cy="96"
+                        r="88"
+                        stroke="currentColor"
+                        strokeWidth="12"
+                        fill="transparent"
+                        className="text-white/10"
+                      />
+                      <circle
+                        cx="96"
+                        cy="96"
+                        r="88"
+                        stroke="currentColor"
+                        strokeWidth="12"
+                        fill="transparent"
+                        strokeDasharray={552.92}
+                        strokeDashoffset={552.92 * (1 - recordingProgress / 100)}
+                        className="text-blue-500 transition-all duration-100 ease-linear"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-4xl font-black text-white">{Math.round(recordingProgress)}%</span>
+                      <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest mt-1">采集数据中</span>
+                    </div>
+                  </div>
+                  <div className="mt-8 flex items-center gap-2 px-4 py-2 bg-red-500/20 rounded-full border border-red-500/50 animate-pulse">
+                    <div className="h-2 w-2 bg-red-500 rounded-full" />
+                    <span className="text-xs font-black text-red-400 uppercase tracking-widest">Recording</span>
+                  </div>
+                </div>
+              )}
+
               {/* Status Indicator */}
               {isCameraOn && (
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4">
@@ -398,17 +472,19 @@ export default function Posture() {
                     <div className="px-6 py-3 bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 flex items-center gap-3">
                       <div className={cn(
                         "h-3 w-3 rounded-full animate-pulse",
-                        isInPosition ? "bg-green-500" : "bg-yellow-500"
+                        captureStatus === 'recording' ? "bg-red-500" : (isInPosition ? "bg-green-500" : "bg-yellow-500")
                       )} />
                       <span className="text-sm font-bold text-white uppercase tracking-wider">
-                        {isInPosition ? "准备就绪" : "正在寻找体态..."}
+                        {captureStatus === 'recording' ? "正在录制时序数据" : (isInPosition ? "准备就绪" : "正在寻找体态...")}
                       </span>
-                      <button 
-                        onClick={resetAnalysis}
-                        className="ml-4 p-1.5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer pointer-events-auto"
-                      >
-                        <RefreshCw className="h-4 w-4 text-gray-400" />
-                      </button>
+                      {captureStatus !== 'recording' && (
+                        <button 
+                          onClick={resetAnalysis}
+                          className="ml-4 p-1.5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer pointer-events-auto"
+                        >
+                          <RefreshCw className="h-4 w-4 text-gray-400" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -479,8 +555,8 @@ export default function Posture() {
                       </div>
                     </div>
                   ) : (
-                    result.issues.map((issue, idx) => (
-                      <div key={idx} className="flex items-start gap-4 p-5 bg-amber-50 rounded-3xl border border-amber-100">
+                    result.issues.map((issue) => (
+                      <div key={issue.id} className="flex items-start gap-4 p-5 bg-amber-50 rounded-3xl border border-amber-100">
                         <AlertTriangle className="h-6 w-6 text-amber-500 shrink-0 mt-0.5" />
                         <div>
                           <p className="font-bold text-amber-900">{issue.title}</p>
@@ -554,8 +630,8 @@ export default function Posture() {
         <div className="space-y-6 mb-12">
           <h3 className="text-2xl font-black border-l-4 border-blue-600 pl-4">评估建议</h3>
           <div className="grid grid-cols-1 gap-4">
-            {result?.issues.map((issue, idx) => (
-              <div key={idx} className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+            {result?.issues.map((issue) => (
+              <div key={issue.id} className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
                 <p className="text-lg font-black text-slate-900 mb-1">{issue.title}</p>
                 <p className="text-slate-600">{issue.description}</p>
               </div>

@@ -1,33 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { PostureMetrics, PostureIssue, Landmark } from '@/types/posture';
+import { TemporalAnalysis } from '@/lib/posture-processor';
+import { useMeasurementStore } from '@/store/useMeasurementStore';
 
-export interface Landmark {
-  x: number;
-  y: number;
-  z?: number;
-  visibility?: number;
-}
-
-export interface PostureIssue {
-  id: string;
-  type: string;
-  severity: 'mild' | 'moderate' | 'severe';
-  title: string;
-  description: string;
-  recommendation: string;
-  points?: { x: number; y: number }[];
-}
-
-export interface PostureMetrics {
-  shoulderAngle?: number;
-  hipAngle?: number;
-  headDeviation?: number;
-  headForward?: number;
-  shoulderRounded?: number;
-  headPitch?: number;
-  headYaw?: number;
-  headRoll?: number;
-  head_axes?: { x: number; y: number }[];
-}
+// Re-export types for backward compatibility
+export type { PostureMetrics, PostureIssue, Landmark };
 
 export interface VisualAnnotation {
   type: 'line' | 'point' | 'angle' | 'text';
@@ -54,9 +31,12 @@ interface JointResult {
 export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
+  const [htmlReport, setHtmlReport] = useState<string | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout>();
+  const savePostureReport = useMeasurementStore(state => state.savePostureReport);
+  const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
 
   const connect = useCallback(() => {
     try {
@@ -74,8 +54,10 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
           if (data.type === 'ANALYSIS_RESULT') {
             setResult(data);
           } else if (data.type === 'JOINT_RESULT') {
-            // Update joint results and ensure we keep the latest timestamp
             setJointResult(data);
+          } else if (data.type === 'HTML_REPORT') {
+            setHtmlReport(data.html);
+            savePostureReport(currentViewRef.current, data.html);
           }
         } catch (e) {
           console.error('Failed to parse analysis result:', e);
@@ -97,7 +79,7 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
       console.error('Connection error:', e);
       setStatus('error');
     }
-  }, [url]);
+  }, [url, savePostureReport]);
 
   useEffect(() => {
     connect();
@@ -107,8 +89,9 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
     };
   }, [connect]);
 
-  const analyze = useCallback((view: string, landmarks: Landmark[], width: number, height: number, imageData?: string) => {
+  const analyze = useCallback((view: 'front' | 'side' | 'back', landmarks: Landmark[], width: number, height: number, imageData?: string) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
+      currentViewRef.current = view;
       ws.current.send(JSON.stringify({
         type: 'POSTURE_SYNC',
         view,
@@ -139,5 +122,15 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
     }
   }, []);
 
-  return { result, jointResult, status, analyze, analyzeJoint };
+  const analyzeBatch = useCallback((analysis: TemporalAnalysis) => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      currentViewRef.current = analysis.view;
+      ws.current.send(JSON.stringify({
+        type: 'POSTURE_BATCH_ANALYSIS',
+        ...analysis
+      }));
+    }
+  }, []);
+
+  return { result, jointResult, htmlReport, status, analyze, analyzeJoint, analyzeBatch };
 }

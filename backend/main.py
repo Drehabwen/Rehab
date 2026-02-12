@@ -10,10 +10,16 @@ import json
 # Add current directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from models import AnalysisRequest, AnalysisResponse, PostureMetrics, JointAnalysisRequest, JointAnalysisResponse
+from models import (
+    AnalysisRequest, AnalysisResponse, PostureMetrics, 
+    JointAnalysisRequest, JointAnalysisResponse,
+    TemporalAnalysisRequest, HTMLReportResponse
+)
 from utils.posture_analysis import analyze_posture
 from utils.joint_analysis import calculate_joint_angle
 from utils.camera_stream import CameraManager
+from utils.llm_reporter import generate_posture_report
+import uuid
 
 app = FastAPI(
     title="Vision3 AI Backend",
@@ -133,6 +139,26 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_text(response.json())
                 except Exception as e:
                     print(f"Error processing JOINT_ANALYSIS: {e}")
+            
+            elif message.get("type") == "POSTURE_BATCH_ANALYSIS":
+                try:
+                    # Validate and parse using Pydantic
+                    request = TemporalAnalysisRequest(**message)
+                    print(f"Received batch analysis for view: {request.view}")
+                    
+                    # Generate HTML report using LLM
+                    html_content = generate_posture_report(request.dict())
+                    
+                    # Construct response
+                    report_response = HTMLReportResponse(
+                        html=html_content,
+                        reportId=str(uuid.uuid4())
+                    )
+                    
+                    # Send back the HTML report
+                    await websocket.send_text(report_response.json())
+                except Exception as e:
+                    print(f"Error processing POSTURE_BATCH_ANALYSIS: {e}")
                 
     except WebSocketDisconnect:
         print("WebSocket disconnected")

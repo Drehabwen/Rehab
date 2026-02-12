@@ -19,6 +19,13 @@ export interface ActiveMeasurement {
   color: string;
 }
 
+export interface PostureReport {
+  id: string;
+  date: number;
+  view: string;
+  html: string;
+}
+
 interface MeasurementState {
   activeMeasurements: ActiveMeasurement[];
   isMeasuring: boolean;
@@ -28,6 +35,7 @@ interface MeasurementState {
     date: number;
     measurements: ActiveMeasurement[];
   }>;
+  postureReports: PostureReport[];
 
   // Actions
   addMeasurement: (joint: JointType, direction: MovementDirection, side: 'left' | 'right' | null) => void;
@@ -39,6 +47,8 @@ interface MeasurementState {
   resetMeasurement: () => void;
   saveMeasurement: () => void;
   deleteSavedMeasurement: (id: string) => void;
+  savePostureReport: (view: string, html: string) => void;
+  deletePostureReport: (id: string) => void;
 }
 
 const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#db2777'];
@@ -58,6 +68,7 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
   isMeasuring: false,
   startTime: null,
   savedMeasurements: [],
+  postureReports: [],
 
   addMeasurement: (joint, direction, side) => set((state) => {
     // Check if already exists to prevent duplicates (optional, but good UX)
@@ -178,5 +189,18 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
 
   deleteSavedMeasurement: (id) => set((state) => ({
     savedMeasurements: state.savedMeasurements.filter(m => m.id !== id)
+  })),
+
+  savePostureReport: (view, html) => set((state) => ({
+    postureReports: [{
+      id: crypto.randomUUID(),
+      date: Date.now(),
+      view,
+      html
+    }, ...state.postureReports]
+  })),
+
+  deletePostureReport: (id) => set((state) => ({
+    postureReports: state.postureReports.filter(r => r.id !== id)
   }))
 }));
