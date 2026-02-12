@@ -12,6 +12,8 @@ import {
   Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { config } from '@/lib/config';
+import { logger } from '@/lib/logger';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { useCaseStore, StructuredCase } from '@/store/useCaseStore';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
@@ -119,8 +121,7 @@ export const MedVoicePlugin: React.FC = () => {
         latest_saved: savedMeasurements.length > 0 ? savedMeasurements[0] : null
       };
 
-      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-      const response = await fetch(`${window.location.protocol}//${host}/medvoice/api/structure`, {
+      const response = await fetch(`${config.apiUrl}/medvoice/api/structure`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -139,7 +140,7 @@ export const MedVoicePlugin: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error('Structuring failed', err);
+      logger.error('Structuring failed', err);
     } finally {
       setIsProcessing(false);
     }

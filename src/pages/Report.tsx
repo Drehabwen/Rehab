@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ManualAnalysis from '@/components/ManualAnalysis';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 const JOINT_NAMES: Record<string, string> = {
   'cervical': '颈椎',
@@ -74,7 +75,7 @@ export default function Report() {
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`report-${id}.pdf`);
     } catch (err) {
-      console.error('PDF generation failed', err);
+      logger.error('PDF generation failed', err);
       alert('导出PDF失败，请重试');
     }
   };

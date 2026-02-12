@@ -6,6 +6,7 @@ import { usePostureWS, VisualAnnotation, PostureIssue, PostureMetrics, Landmark 
 import { useNavigate } from 'react-router-dom';
 import { PostureProcessor } from '@/lib/posture-processor';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import BaseWebcamView from '@/components/shared/BaseWebcamView';
@@ -383,7 +384,7 @@ export default function Posture() {
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`posture-analysis-${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (err) {
-      console.error('PDF generation failed', err);
+      logger.error('PDF generation failed', err);
       alert('导出PDF失败，请重试');
     } finally {
       element.style.display = 'none';

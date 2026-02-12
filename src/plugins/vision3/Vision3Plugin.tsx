@@ -2,30 +2,26 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Results } from '@mediapipe/holistic';
 import { 
   AlertTriangle, 
-  Play, 
-  RefreshCw, 
-  Video, 
-  VideoOff,
-  Maximize2,
   Activity,
   History,
   Settings2,
+  CheckCircle,
   TrendingUp,
+  Maximize2,
+  Play,
   Square,
   RotateCcw,
-  ArrowRight,
-  Scan,
-  Zap,
-  Dna,
-  CheckCircle,
-  Save
+  Save,
 } from 'lucide-react';
 import { usePostureWS, PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
 import { cn } from '@/lib/utils';
+import { TabButton, ViewToggle, IconButton } from '@/components/ui/Buttons';
 import BaseWebcamView from '@/components/shared/BaseWebcamView';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import MeasurementChart from '@/components/MeasurementChart';
 import JointSelector from '@/components/JointSelector';
+import { AssessmentCard, assessmentCards } from './components/AssessmentCard';
+import { CameraControls } from './components/CameraControls';
 import {
   jointNameMap,
   HeadAxes,
@@ -190,127 +186,90 @@ export const Vision3Plugin: React.FC = () => {
       <div className="flex items-center justify-between bg-white/40 backdrop-blur-xl p-3 rounded-[2rem] border border-white/60 shadow-sm">
         <div className="flex items-center gap-4">
           {isEntryMode ? (
-            <div className="flex p-1.5 bg-slate-100/50 rounded-2xl">
-              <button 
+            <div className="flex p-1.5 bg-slate-100/50 rounded-2xl" role="tablist" aria-label="功能模式选择">
+              <TabButton
+                active={activeTab === 'posture'}
                 onClick={() => { setActiveTab('posture'); setIsEntryMode(true); }}
-                className={cn(
-                  "px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-500 flex items-center gap-3",
-                  activeTab === 'posture' 
-                    ? "bg-white text-antey-primary shadow-lg shadow-antey-primary/5 ring-1 ring-slate-200" 
-                    : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
-                )}
+                icon={Activity}
+                activeColor="primary"
+                ariaLabel="体态评估模式"
               >
-                <Activity size={16} className={cn("transition-transform duration-500", activeTab === 'posture' && "scale-110")} />
                 体态评估
-              </button>
-              <button 
+              </TabButton>
+              <TabButton
+                active={activeTab === 'rom'}
                 onClick={() => setActiveTab('rom')}
-                className={cn(
-                  "px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-[0.2em] transition-all duration-500 flex items-center gap-3",
-                  activeTab === 'rom' 
-                    ? "bg-white text-antey-accent shadow-lg shadow-antey-accent/5 ring-1 ring-slate-200" 
-                    : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
-                )}
+                icon={Activity}
+                activeColor="accent"
+                ariaLabel="关节测量模式"
               >
-                <TrendingUp size={16} className={cn("transition-transform duration-500", activeTab === 'rom' && "scale-110")} />
                 关节测量
-              </button>
+              </TabButton>
             </div>
           ) : (
             <div className="flex items-center gap-3">
               <button 
                 onClick={() => setIsEntryMode(true)}
-                className="group flex items-center gap-3 px-6 py-3 bg-white text-slate-900 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all duration-300"
+                aria-label="返回中心概览"
+                tabIndex={0}
+                className={cn(
+                  "group flex items-center gap-3 px-6 py-3 bg-white text-slate-900 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all duration-300",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-antey-primary focus-visible:ring-offset-2"
+                )}
               >
-                <RotateCcw size={16} className="text-antey-primary group-hover:rotate-[-45deg] transition-transform" />
+                <Activity size={16} className="text-antey-primary group-hover:rotate-[-45deg] transition-transform" aria-hidden="true" />
                 <span className="text-[11px] font-black uppercase tracking-widest">返回中心概览</span>
               </button>
               
-              <div className="w-px h-8 bg-slate-200 mx-2" />
+              <div className="w-px h-8 bg-slate-200" aria-hidden="true" />
               
-              <div className="flex p-1.5 bg-slate-100/50 rounded-2xl">
-                {(['front', 'side', 'back'] as const).map((v) => (
-                  <button
-                    key={v}
-                    onClick={() => setView(v)}
-                    className={cn(
-                      "px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all duration-300 flex items-center gap-2",
-                      view === v 
-                        ? "bg-white text-antey-primary shadow-md ring-1 ring-slate-200" 
-                        : "text-slate-400 hover:text-slate-600"
-                    )}
-                  >
-                    <div className={cn("w-1.5 h-1.5 rounded-full", view === v ? "bg-antey-primary" : "bg-slate-300")} />
-                    {v === 'front' ? '正面视角' : v === 'side' ? '侧面视角' : '背面视角'}
-                  </button>
-                ))}
-              </div>
+              <ViewToggle
+                options={[
+                  { value: 'front', label: '正面视角' },
+                  { value: 'side', label: '侧面视角' },
+                  { value: 'back', label: '背面视角' },
+                ]}
+                value={view}
+                onChange={(v) => setView(v as 'front' | 'side' | 'back')}
+                ariaLabel="视角切换"
+              />
             </div>
           )}
         </div>
         
         <div className="flex items-center gap-6 px-6">
           <div className="flex items-center gap-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            系统就绪
-            <span className="w-px h-4 bg-slate-200 mx-2" />
-            <History size={14} className="text-slate-300" />
-            2026.02.09
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
+            <span>系统就绪</span>
+            <span className="w-px h-4 bg-slate-200" aria-hidden="true" />
+            <History size={14} className="text-slate-300" aria-hidden="true" />
+            <span>2026.02.09</span>
           </div>
-          <button className="p-2.5 text-slate-400 hover:bg-white hover:text-antey-primary hover:shadow-sm rounded-xl transition-all duration-300">
-            <Settings2 size={18} />
-          </button>
+          <IconButton
+            onClick={() => {}}
+            icon={Settings2}
+            ariaLabel="打开设置"
+            variant="default"
+          />
         </div>
       </div>
 
       {/* Conditional Rendering: Entry Hub vs Active Mode */}
       {activeTab === 'posture' && isEntryMode ? (
-        <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 grid-rows-2 gap-8 animate-in fade-in zoom-in-95 duration-700">
-          {[
-            { id: 'front', title: '正面体态扫描', desc: '评估 O/X 型腿、高低肩、骨盆侧倾', icon: Scan, color: 'from-blue-500 to-cyan-400', tag: '基础评估' },
-            { id: 'side', title: '侧面体态分析', desc: '诊断圆肩驼背、头颈前倾、骨盆前倾', icon: Activity, color: 'from-emerald-500 to-teal-400', tag: '关键指标' },
-            { id: 'back', title: '背面平衡测试', desc: '监测脊柱侧弯风险、足跟轴线', icon: History, color: 'from-purple-500 to-indigo-400', tag: '结构对称' },
-            { id: 'squat', title: '深蹲功能检测', desc: '评估下肢稳定性与关节联动', icon: Zap, color: 'from-orange-500 to-amber-400', tag: '动态进阶', disabled: true },
-            { id: 'scoliosis', title: '脊柱侧弯筛查', desc: '深度 3D 脊柱曲率建模与评估', icon: Dna, color: 'from-rose-500 to-pink-400', tag: '专项检测', disabled: true },
-            { id: 'custom', title: '自定义评估', desc: '灵活配置您的个性化检测流程', icon: Settings2, color: 'from-slate-500 to-slate-400', tag: '实验室', disabled: true },
-          ].map((card) => (
-            <button
+        <div 
+          className="flex-1 grid grid-cols-2 lg:grid-cols-3 grid-rows-2 gap-8 animate-in fade-in zoom-in-95 duration-700"
+          role="list"
+          aria-label="评估选项列表"
+        >
+          {assessmentCards.map((card) => (
+            <AssessmentCard
               key={card.id}
-              disabled={card.disabled}
-              onClick={() => {
-                if (card.id === 'front' || card.id === 'side' || card.id === 'back') {
-                  setView(card.id as 'front' | 'side' | 'back');
-                  setIsEntryMode(false);
-                }
+              {...card}
+              onSelect={(id) => {
+                setView(id);
+                setIsEntryMode(false);
               }}
-              className={cn(
-                "group relative bento-card-glass p-10 flex flex-col items-start text-left transition-all duration-500 hover:translate-y-[-8px]",
-                card.disabled ? "opacity-40 grayscale cursor-not-allowed" : "hover:shadow-[0_40px_80px_rgba(13,148,136,0.15)] hover:ring-2 hover:ring-antey-primary/20 bg-white/40 border-white/60"
-              )}
-            >
-              <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 shadow-lg group-hover:scale-110 transition-transform duration-500 bg-gradient-to-br text-white", card.color)}>
-                <card.icon size={32} />
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500/60">{card.tag}</span>
-                  {card.disabled && <span className="px-2 py-0.5 bg-slate-200/50 text-[8px] font-black text-slate-500 rounded-md uppercase tracking-widest">即将上线</span>}
-                </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-antey-primary transition-colors">{card.title}</h3>
-                <p className="text-[13px] font-medium text-slate-600/80 leading-relaxed max-w-[240px]">
-                  {card.desc}
-                </p>
-              </div>
-
-              <div className="mt-8 flex items-center gap-2 text-antey-primary font-black text-[11px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0">
-                立即启动评估
-                <ArrowRight size={16} className="animate-pulse" />
-              </div>
-
-              {/* Decorative Mesh Background */}
-              <div className={cn("absolute -bottom-4 -right-4 w-32 h-32 bg-gradient-to-br opacity-[0.05] rounded-full blur-2xl transition-all group-hover:opacity-[0.15] group-hover:scale-150", card.color)} />
-            </button>
+            />
           ))}
         </div>
       ) : (
@@ -336,9 +295,10 @@ export const Vision3Plugin: React.FC = () => {
           {/* Fullscreen Toggle Button */}
           <button 
             onClick={toggleFullscreen}
-            className="absolute top-6 right-6 p-3 bg-black/40 backdrop-blur-md text-white/60 hover:text-white hover:bg-black/60 rounded-2xl border border-white/10 transition-all z-40 opacity-0 group-hover:opacity-100"
+            aria-label={isFullscreen ? '退出全屏' : '进入全屏'}
+            className="absolute top-6 right-6 p-3 bg-black/40 backdrop-blur-md text-white/60 hover:text-white hover:bg-black/60 rounded-2xl border border-white/10 transition-all z-40 opacity-0 group-hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-antey-primary"
           >
-            {isFullscreen ? <Maximize2 size={20} className="rotate-180" /> : <Maximize2 size={20} />}
+            <Activity size={20} className={cn(isFullscreen && "rotate-180")} aria-hidden="true" />
           </button>
           
           {/* AI Scanning Effect */}
@@ -452,73 +412,20 @@ export const Vision3Plugin: React.FC = () => {
             </div>
           )}
 
-          {/* Floating Controls: Ultra Premium Glassmorphism */}
-          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-8 p-6 bg-slate-900/60 backdrop-blur-3xl rounded-[3rem] border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-700 translate-y-8 group-hover:translate-y-0 shadow-[0_40px_100px_rgba(0,0,0,0.5)] ring-1 ring-white/10 z-30">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={() => setIsCameraOn(!isCameraOn)}
-                className={cn(
-                  "w-16 h-16 rounded-[1.5rem] flex flex-col items-center justify-center gap-1.5 transition-all duration-500 relative group/btn",
-                  isCameraOn ? "bg-white/10 text-white hover:bg-white/20 hover:scale-110" : "bg-rose-500/80 text-white shadow-2xl shadow-rose-500/40 hover:scale-110"
-                )}
-              >
-                {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
-                <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">{isCameraOn ? '关闭' : '开启'}</span>
-                {isCameraOn && <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />}
-              </button>
-            </div>
-            
-            <div className="w-px h-14 bg-white/10" />
-            
-            {activeTab === 'posture' ? (
-              <div className="flex items-center gap-6">
-                <button 
-                  onClick={() => setCaptureStatus('countdown')}
-                  disabled={captureStatus !== 'idle'}
-                  className={cn(
-                    "px-10 h-16 rounded-[1.5rem] flex items-center gap-4 font-black text-sm uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl",
-                    captureStatus === 'idle' 
-                      ? "bg-antey-primary text-white hover:bg-antey-primary/80 hover:scale-105 hover:shadow-antey-primary/40" 
-                      : "bg-white/10 text-white/40 cursor-not-allowed"
-                  )}
-                >
-                  <Scan size={24} className={cn(captureStatus === 'scanning' && "animate-spin")} />
-                  {captureStatus === 'idle' ? '开始全维度扫描' : captureStatus === 'countdown' ? '准备拍照...' : '分析中...'}
-                </button>
-                
-                <button 
-                  onClick={() => setView(view === 'front' ? 'side' : view === 'side' ? 'back' : 'front')}
-                  className="w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110"
-                >
-                  <RotateCcw size={20} className="rotate-180" />
-                  <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">切换视图</span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-6">
-                <button 
-                  onClick={() => isMeasuring ? stopMeasurement() : startMeasurement()}
-                  className={cn(
-                    "px-10 h-16 rounded-[1.5rem] flex items-center gap-4 font-black text-sm uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl",
-                    isMeasuring 
-                      ? "bg-rose-500 text-white hover:bg-rose-500/80 hover:scale-105" 
-                      : "bg-antey-accent text-white hover:bg-antey-accent/80 hover:scale-105 shadow-antey-accent/40"
-                  )}
-                >
-                  {isMeasuring ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
-                  {isMeasuring ? '结束测量任务' : '启动关节采集'}
-                </button>
-
-                <button 
-                  onClick={() => resetMeasurement()}
-                  className="w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110"
-                >
-                  <RefreshCw size={20} />
-                  <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">重置</span>
-                </button>
-              </div>
-            )}
-          </div>
+          <CameraControls
+            isCameraOn={isCameraOn}
+            onToggleCamera={() => setIsCameraOn(!isCameraOn)}
+            activeTab={activeTab}
+            captureStatus={captureStatus}
+            onStartCapture={() => setCaptureStatus('countdown')}
+            onSwitchView={() => setView(view === 'front' ? 'side' : view === 'side' ? 'back' : 'front')}
+            isMeasuring={isMeasuring}
+            onStartMeasurement={startMeasurement}
+            onStopMeasurement={stopMeasurement}
+            onResetMeasurement={resetMeasurement}
+            onToggleFullscreen={toggleFullscreen}
+            isFullscreen={isFullscreen}
+          />
         </div>
 
         {/* Right Panel: Enhanced Data Dashboard */}

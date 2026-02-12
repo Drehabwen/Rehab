@@ -7,13 +7,21 @@ export default {
     container: {
       center: true,
     },
+    screens: {
+      'xs': '475px',
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       colors: {
         antey: {
-          primary: "#0D9488", // 医疗绿
-          secondary: "#0F172A", // 深色背景
-          accent: "#3B82F6", // 蓝色点缀
-          surface: "#F8FAFC", // 浅色表面
+          primary: "#0D9488",
+          secondary: "#0F172A",
+          accent: "#3B82F6",
+          surface: "#F8FAFC",
           border: "#E2E8F0",
           gradient: {
             start: "#0D9488",
@@ -28,6 +36,10 @@ export default {
         blob: "blob 7s infinite",
         scan: "scan 3s linear infinite",
         "spin-slow": "spin-slow 8s linear infinite",
+        "fade-in": "fade-in 0.3s ease-out",
+        "slide-up": "slide-up 0.3s ease-out",
+        "slide-down": "slide-down 0.3s ease-out",
+        "scale-in": "scale-in 0.2s ease-out",
       },
       keyframes: {
         "accordion-down": {
@@ -45,16 +57,16 @@ export default {
         },
         blob: {
           "0%": {
-            transform: "translate(0px, 0px) scale(1)",
+            transform: "translate3d(0px, 0px, 0) scale(1)",
           },
           "33%": {
-            transform: "translate(30px, -50px) scale(1.1)",
+            transform: "translate3d(30px, -50px, 0) scale(1.1)",
           },
           "66%": {
-            transform: "translate(-20px, 20px) scale(0.9)",
+            transform: "translate3d(-20px, 20px, 0) scale(0.9)",
           },
           "100%": {
-            transform: "translate(0px, 0px) scale(1)",
+            transform: "translate3d(0px, 0px, 0) scale(1)",
           },
         },
         scan: {
@@ -64,6 +76,22 @@ export default {
         "spin-slow": {
           from: { transform: "rotate(0deg)" },
           to: { transform: "rotate(360deg)" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "slide-up": {
+          from: { opacity: "0", transform: "translate3d(0, 10px, 0)" },
+          to: { opacity: "1", transform: "translate3d(0, 0, 0)" },
+        },
+        "slide-down": {
+          from: { opacity: "0", transform: "translate3d(0, -10px, 0)" },
+          to: { opacity: "1", transform: "translate3d(0, 0, 0)" },
+        },
+        "scale-in": {
+          from: { opacity: "0", transform: "scale3d(0.95, 0.95, 1)" },
+          to: { opacity: "1", transform: "scale3d(1, 1, 1)" },
         },
       },
     },

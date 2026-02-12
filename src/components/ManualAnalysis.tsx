@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { X, Save, Move, Pen, Type, ArrowRight, Eraser, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import html2canvas from 'html2canvas';
 
 // Types
@@ -251,7 +252,7 @@ export default function ManualAnalysis({ imageUrl, onClose, onSave }: ManualAnal
       const canvas = await html2canvas(element, { useCORS: true, scale: 2 });
       onSave(canvas.toDataURL('image/jpeg'));
     } catch (err) {
-      console.error(err);
+      logger.error('Manual analysis save failed:', err);
     }
   };
 

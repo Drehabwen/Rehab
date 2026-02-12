@@ -2,6 +2,10 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PostureMetrics, PostureIssue, Landmark } from '@/types/posture';
 import { TemporalAnalysis } from '@/lib/posture-processor';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
+import { config } from '@/lib/config';
+import { createLogger } from '@/lib/logger';
+
+const logger = createLogger('[PostureWS]');
 
 // Re-export types for backward compatibility
 export type { PostureMetrics, PostureIssue, Landmark };
@@ -28,7 +32,7 @@ interface JointResult {
   timestamp: number;
 }
 
-export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
+export function usePostureWS(url: string = config.wsUrl) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
   const [htmlReport, setHtmlReport] = useState<string | null>(null);
@@ -45,7 +49,7 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
       ws.current = new WebSocket(url);
 
       ws.current.onopen = () => {
-        console.log('Posture WebSocket Connected');
+        logger.info('WebSocket Connected');
         setStatus('connected');
       };
 
@@ -61,23 +65,22 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
             savePostureReport(currentViewRef.current, data.html, lastBatchTimeSeriesRef.current);
           }
         } catch (e) {
-          console.error('Failed to parse analysis result:', e);
+          logger.error('Failed to parse analysis result:', e);
         }
       };
 
       ws.current.onclose = () => {
-        console.log('Posture WebSocket Disconnected');
+        logger.info('WebSocket Disconnected');
         setStatus('disconnected');
-        // Auto reconnect
         reconnectTimeout.current = setTimeout(connect, 3000);
       };
 
       ws.current.onerror = (error) => {
-        console.error('Posture WebSocket Error:', error);
+        logger.error('WebSocket Error:', error);
         setStatus('error');
       };
     } catch (e) {
-      console.error('Connection error:', e);
+      logger.error('Connection error:', e);
       setStatus('error');
     }
   }, [url, savePostureReport]);

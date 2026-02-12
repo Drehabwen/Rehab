@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Download, FileText, FileCode, FileType, ChevronDown, Loader2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { config } from '@/lib/config';
+import { logger } from '@/lib/logger';
 import { useCaseStore } from '@/store/useCaseStore';
 
 interface ExportOption {
@@ -29,8 +31,7 @@ export const GlobalExport: React.FC = () => {
 
     setIsExporting(format);
     try {
-      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-      const response = await fetch(`${window.location.protocol}//${host}/medvoice/api/export`, {
+      const response = await fetch(`${config.apiUrl}/medvoice/api/export`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -66,7 +67,7 @@ export const GlobalExport: React.FC = () => {
         throw new Error(error.detail || '导出失败');
       }
     } catch (err) {
-      console.error('Export failed:', err);
+      logger.error('Export failed:', err);
       alert(`导出失败: ${err instanceof Error ? err.message : '未知错误'}`);
     } finally {
       setIsExporting(null);

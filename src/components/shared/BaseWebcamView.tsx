@@ -5,6 +5,7 @@ import { Video, VideoOff, Loader2 } from 'lucide-react';
 import { useCameraStream } from '@/hooks/useCameraStream';
 import { useMediaPipe } from '@/hooks/useMediaPipe';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 interface BaseWebcamViewProps {
   isCameraOn: boolean;
@@ -44,9 +45,9 @@ export default function BaseWebcamView({
 
     if (isCameraOn && stream) {
       if (video.srcObject !== stream) {
-        console.log("[BaseWebcamView] Syncing stream to video");
+        logger.info("[BaseWebcamView] Syncing stream to video");
         video.srcObject = stream;
-        video.play().catch(err => console.error("[BaseWebcamView] Play error:", err));
+        video.play().catch(err => logger.error("[BaseWebcamView] Play error:", err));
       }
     } else {
       video.srcObject = null;

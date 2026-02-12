@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { config } from '@/lib/config';
+import { logger } from '@/lib/logger';
 
 interface UseVoiceRecorderProps {
   onTranscriptUpdate: (text: string) => void;
@@ -37,12 +39,11 @@ export const useVoiceRecorder = ({
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    // 使用后端主导的录音接口
+    const host = config.apiHost;
     const ws = new WebSocket(`${protocol}//${host}/medvoice/ws/record`);
     
     ws.onopen = () => {
-      console.log('Backend-driven WebSocket connected');
+      logger.info('Backend-driven WebSocket connected');
     };
 
     ws.onmessage = (event) => {
@@ -54,7 +55,7 @@ export const useVoiceRecorder = ({
           onTranscriptComplete(data.text || '');
           setIsRecording(false);
         } else if (data.status === 'started') {
-          console.log('Recording started successfully');
+          logger.info('Recording started successfully');
           setIsRecording(true);
           setRecordTime(0);
           if (timerRef.current) clearInterval(timerRef.current);
@@ -64,22 +65,22 @@ export const useVoiceRecorder = ({
         } else if (data.status === 'power') {
           onWaveformUpdate(data.power || 0);
         } else if (data.status === 'error') {
-          console.error('ASR Error:', data.message);
+          logger.error('ASR Error:', data.message);
           alert(`录音错误: ${data.message}`);
           setIsRecording(false);
         }
       } catch (err) {
-        console.error('Failed to parse WS message', err);
+        logger.error('Failed to parse WS message', err);
       }
     };
 
     ws.onerror = (err) => {
-      console.error('WebSocket Error:', err);
+      logger.error('WebSocket Error:', err);
       setIsRecording(false);
     };
 
     ws.onclose = (event) => {
-      console.log('Backend-driven WebSocket closed', event.code, event.reason);
+      logger.info('Backend-driven WebSocket closed', event.code, event.reason);
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
     };
@@ -101,7 +102,7 @@ export const useVoiceRecorder = ({
         retryCount++;
         setTimeout(sendStart, 100);
       } else {
-        console.error('Failed to start recording: WebSocket not open', ws.readyState);
+        logger.error('Failed to start recording: WebSocket not open', ws.readyState);
         setIsRecording(false);
       }
     };
