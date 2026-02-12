@@ -79,6 +79,12 @@ async def websocket_endpoint(websocket: WebSocket):
                 # Validate and parse using Pydantic
                 request = AnalysisRequest(**message)
                 
+                # Check if image data is present
+                if request.image:
+                    print(f"Received snapshot image for view: {request.view}")
+                    # TODO: Phase 2 - Decode and process image with geometric engine
+                    # For now, we just acknowledge receipt
+                
                 # Perform analysis
                 result = analyze_posture(
                     view=request.view,

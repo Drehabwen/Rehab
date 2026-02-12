@@ -14,6 +14,7 @@ class AnalysisRequest(BaseModel):
     width: int
     height: int
     landmarks: List[Landmark]
+    image: Optional[str] = Field(None, description="Base64 encoded image data for snapshot analysis")
 
 class PostureIssue(BaseModel):
     id: str

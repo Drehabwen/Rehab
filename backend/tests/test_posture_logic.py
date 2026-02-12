@@ -80,3 +80,8 @@ def test_analyze_posture_head_tilt():
     annotations = result["annotations"]
     labels = [a.label for a in annotations if a.label]
     assert any("头倾斜" in label for label in labels)
+
+    metrics = result["metrics"]
+    assert metrics.headRoll is not None
+    assert metrics.headPitch is not None
+    assert metrics.headYaw is not None

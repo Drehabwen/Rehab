@@ -31,10 +31,91 @@ def analyze_posture(
     annotations = []
     metrics = PostureMetrics()
 
+    def get_landmark(index: int) -> Optional[Landmark]:
+        if index >= len(landmarks):
+            return None
+        return landmarks[index]
+
     def get_point(index: int):
         if index >= len(landmarks):
             return {"x": 0, "y": 0}
         return get_pixel_coords(landmarks[index], width, height)
+
+    def get_point_3d(index: int):
+        lm = get_landmark(index)
+        if not lm:
+            return {"x": 0.0, "y": 0.0, "z": 0.0}
+        return {"x": lm.x, "y": lm.y, "z": lm.z if lm.z is not None else 0.0}
+
+    left_ear_lm = get_landmark(LANDMARKS["LEFT_EAR"])
+    right_ear_lm = get_landmark(LANDMARKS["RIGHT_EAR"])
+    nose_lm = get_landmark(LANDMARKS["NOSE"])
+
+    if left_ear_lm and right_ear_lm and nose_lm:
+        left_ear_3d = get_point_3d(LANDMARKS["LEFT_EAR"])
+        right_ear_3d = get_point_3d(LANDMARKS["RIGHT_EAR"])
+        nose_3d = get_point_3d(LANDMARKS["NOSE"])
+
+        ear_mid_3d = {
+            "x": (left_ear_3d["x"] + right_ear_3d["x"]) / 2,
+            "y": (left_ear_3d["y"] + right_ear_3d["y"]) / 2,
+            "z": (left_ear_3d["z"] + right_ear_3d["z"]) / 2
+        }
+
+        head_vec = {
+            "x": nose_3d["x"] - ear_mid_3d["x"],
+            "y": nose_3d["y"] - ear_mid_3d["y"],
+            "z": nose_3d["z"] - ear_mid_3d["z"]
+        }
+
+        if abs(head_vec["z"]) < 1e-6:
+            yaw = 0.0
+            pitch = 0.0
+        else:
+            yaw = math.degrees(math.atan2(head_vec["x"], -head_vec["z"]))
+            pitch = math.degrees(math.atan2(head_vec["y"], -head_vec["z"]))
+
+        roll = math.degrees(math.atan2(
+            left_ear_lm.y - right_ear_lm.y,
+            left_ear_lm.x - right_ear_lm.x
+        ))
+
+        metrics.headYaw = round(yaw, 1)
+        metrics.headPitch = round(pitch, 1)
+        metrics.headRoll = round(roll, 1)
+
+        left_ear_2d = get_point(LANDMARKS["LEFT_EAR"])
+        right_ear_2d = get_point(LANDMARKS["RIGHT_EAR"])
+        nose_2d = get_point(LANDMARKS["NOSE"])
+        ear_mid_2d = {
+            "x": (left_ear_2d["x"] + right_ear_2d["x"]) / 2,
+            "y": (left_ear_2d["y"] + right_ear_2d["y"]) / 2
+        }
+        ear_vec = {
+            "x": right_ear_2d["x"] - left_ear_2d["x"],
+            "y": right_ear_2d["y"] - left_ear_2d["y"]
+        }
+        ear_len = math.hypot(ear_vec["x"], ear_vec["y"]) or 1.0
+        ear_unit = {"x": ear_vec["x"] / ear_len, "y": ear_vec["y"] / ear_len}
+        nose_vec = {
+            "x": nose_2d["x"] - ear_mid_2d["x"],
+            "y": nose_2d["y"] - ear_mid_2d["y"]
+        }
+        nose_len = math.hypot(nose_vec["x"], nose_vec["y"]) or 1.0
+        nose_unit = {"x": nose_vec["x"] / nose_len, "y": nose_vec["y"] / nose_len}
+        axis_len = max(width, height) * 0.08
+
+        metrics.head_axes = [
+            {"x": ear_mid_2d["x"], "y": ear_mid_2d["y"]},
+            {
+                "x": ear_mid_2d["x"] + ear_unit["x"] * axis_len,
+                "y": ear_mid_2d["y"] + ear_unit["y"] * axis_len
+            },
+            {
+                "x": ear_mid_2d["x"] + nose_unit["x"] * axis_len,
+                "y": ear_mid_2d["y"] + nose_unit["y"] * axis_len
+            }
+        ]
 
     # --- Side View Analysis ---
     if view == 'side':

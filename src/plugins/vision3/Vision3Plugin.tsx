@@ -1,31 +1,26 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Results, POSE_CONNECTIONS } from '@mediapipe/holistic';
-import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
+import { Results } from '@mediapipe/holistic';
 import { 
-  Camera as CameraIcon, 
-  CheckCircle, 
   AlertTriangle, 
   Play, 
   RefreshCw, 
-  FileDown, 
   Video, 
   VideoOff,
-  ChevronRight,
   Maximize2,
   Activity,
   History,
   Settings2,
   TrendingUp,
-  FileText,
   Square,
   RotateCcw,
-  Save,
   ArrowRight,
   Scan,
   Zap,
-  Dna
+  Dna,
+  CheckCircle,
+  Save
 } from 'lucide-react';
-import { usePostureWS, VisualAnnotation, PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
+import { usePostureWS, PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
 import { cn } from '@/lib/utils';
 import BaseWebcamView from '@/components/shared/BaseWebcamView';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
@@ -51,8 +46,7 @@ export const Vision3Plugin: React.FC = () => {
   
   // Posture States
   const [result, setResult] = useState<{ issues: PostureIssue[]; metrics: PostureMetrics; image: string } | null>(null);
-  const [landmarks, setLandmarks] = useState<any[] | null>(null);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const capturedImage = useRef<string | null>(null);
   const reportCanvasRef = useRef<HTMLCanvasElement>(null);
   
   // ROM States (from store)
@@ -61,6 +55,18 @@ export const Vision3Plugin: React.FC = () => {
   } = useMeasurementStore();
 
   const { result: wsResult, analyze } = usePostureWS();
+
+  // Sync WebSocket result to local state
+  useEffect(() => {
+    if (wsResult) {
+      setResult(prev => ({
+        ...prev,
+        issues: wsResult.issues,
+        metrics: wsResult.metrics,
+        image: prev?.image || ''
+      }));
+    }
+  }, [wsResult]);
 
   // Auto-capture states
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown' | 'analyzing'>('idle');
@@ -90,8 +96,8 @@ export const Vision3Plugin: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Reference box
-  const BOX = { xMin: 0.25, xMax: 0.75, yMin: 0.1, yMax: 0.9 };
+  // Reference box (Used for visual positioning check)
+  // const BOX = { xMin: 0.25, xMax: 0.75, yMin: 0.1, yMax: 0.9 };
 
   const checkUserPosition = (landmarks: any[]) => {
     if (!landmarks || landmarks.length < 33) return false;
@@ -101,7 +107,7 @@ export const Vision3Plugin: React.FC = () => {
     return visible;
   };
 
-  const onResults = useCallback((results: Results, video: HTMLVideoElement) => {
+  const onResults = useCallback((results: Results) => {
     if (results.poseLandmarks) {
       landmarksBufferRef.current.push(results.poseLandmarks);
       if (landmarksBufferRef.current.length > 30) landmarksBufferRef.current.shift();
@@ -111,12 +117,6 @@ export const Vision3Plugin: React.FC = () => {
           const inPos = checkUserPosition(results.poseLandmarks);
           setIsInPosition(inPos);
           if (inPos) {
-             // Start countdown automatically if in position? 
-             // Or user clicked button -> enters scanning -> checks pos -> starts countdown.
-             // Let's make it start countdown immediately after button press for now as per user request logic simplification
-             // Wait, user said "Click start -> countdown 5s -> capture".
-             // So we might skip 'scanning' phase or make it very short/implicit.
-             // But existing code uses scanning. Let's keep scanning but auto-transition if stable.
              setCaptureStatus('countdown');
           }
         }
@@ -139,7 +139,7 @@ export const Vision3Plugin: React.FC = () => {
           canvas.height = video.videoHeight;
           canvas.getContext('2d')?.drawImage(video, 0, 0);
           const imageData = canvas.toDataURL('image/jpeg');
-          setCapturedImage(imageData);
+          capturedImage.current = imageData;
           
           // Send to backend via WS
           // We need landmarks for the analyze call. 
@@ -157,7 +157,7 @@ export const Vision3Plugin: React.FC = () => {
       }
     }
     return () => clearTimeout(timer);
-  }, [captureStatus, countdown, analyze]);
+  }, [captureStatus, countdown, analyze, view]);
 
   // Reset countdown when entering countdown state
   useEffect(() => {
@@ -440,24 +440,25 @@ export const Vision3Plugin: React.FC = () => {
             ))}
           </div>
 
-          {/* Analysis Overlays */}
-          {activeTab === 'posture' && captureStatus !== 'idle' && (
+          {/* Analysis Overlays - Always show when in countdown, regardless of 'activeTab' or 'isInPosition' for immediate feedback */}
+          {captureStatus === 'countdown' && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xl">
+              <div className="relative">
+                <span className="text-[12rem] font-black text-white leading-none tracking-tighter animate-pulse drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">
+                  {countdown}
+                </span>
+                <div className="absolute -inset-16 border border-white/10 rounded-full animate-spin-slow" />
+                <div className="absolute -inset-24 border border-white/5 rounded-full animate-reverse-spin-slow" />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'posture' && captureStatus === 'scanning' && (
             <div className="absolute inset-0 pointer-events-none">
               <div className={cn(
                 "absolute inset-10 border-[1px] transition-all duration-700 rounded-[2.5rem]",
                 isInPosition ? "border-antey-primary/60 bg-antey-primary/5" : "border-rose-500/40 bg-rose-500/5"
               )} />
-              {captureStatus === 'countdown' && (
-                <div className="absolute inset-0 flex items-center justify-center bg-slate-900/60 backdrop-blur-xl">
-                  <div className="relative">
-                    <span className="text-[12rem] font-black text-white leading-none tracking-tighter animate-pulse drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">
-                      {countdown}
-                    </span>
-                    <div className="absolute -inset-16 border border-white/10 rounded-full animate-spin-slow" />
-                    <div className="absolute -inset-24 border border-white/5 rounded-full animate-reverse-spin-slow" />
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -482,7 +483,7 @@ export const Vision3Plugin: React.FC = () => {
             {activeTab === 'posture' ? (
               <div className="flex items-center gap-6">
                 <button 
-                  onClick={() => setCaptureStatus('scanning')}
+                  onClick={() => setCaptureStatus('countdown')}
                   disabled={captureStatus !== 'idle'}
                   className={cn(
                     "px-10 h-16 rounded-[1.5rem] flex items-center gap-4 font-black text-sm uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl",
@@ -492,7 +493,7 @@ export const Vision3Plugin: React.FC = () => {
                   )}
                 >
                   <Scan size={24} className={cn(captureStatus === 'scanning' && "animate-spin")} />
-                  {captureStatus === 'idle' ? '开始全维度扫描' : '扫描中...'}
+                  {captureStatus === 'idle' ? '开始全维度扫描' : captureStatus === 'countdown' ? '准备拍照...' : '分析中...'}
                 </button>
                 
                 <button 
@@ -645,6 +646,32 @@ export const Vision3Plugin: React.FC = () => {
                           <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-slate-300 z-10" />
                         </div>
                       </div>
+
+                      {/* Head Pose Metrics (New) */}
+                      {result.metrics.headYaw !== undefined && (
+                        <div className="p-6 bg-slate-900 text-white rounded-[2.5rem] shadow-2xl animate-in slide-in-from-bottom-4 duration-700">
+                          <div className="flex items-center justify-between mb-4">
+                            <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">3D 头部位姿 (实验性)</span>
+                            <div className="px-2 py-0.5 bg-emerald-500/20 rounded-lg">
+                              <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Backend Core</span>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="flex flex-col">
+                              <span className="text-[8px] font-black text-white/40 uppercase mb-1">Yaw (偏航)</span>
+                              <span className="text-xl font-black">{result.metrics.headYaw.toFixed(1)}°</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[8px] font-black text-white/40 uppercase mb-1">Pitch (俯仰)</span>
+                              <span className="text-xl font-black">{result.metrics.headPitch?.toFixed(1)}°</span>
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[8px] font-black text-white/40 uppercase mb-1">Roll (翻滚)</span>
+                              <span className="text-xl font-black">{result.metrics.headRoll?.toFixed(1)}°</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Head Forwardness Gauge */}
                       <div className="grid grid-cols-2 gap-4">
