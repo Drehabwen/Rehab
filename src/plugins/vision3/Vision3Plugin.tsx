@@ -42,7 +42,8 @@ import {
   getShoulderStatus,
   getHeadStatus,
   getHipStatus,
-  getSeverityLabel
+  getSeverityLabel,
+  drawAnnotations
 } from './vision3-utils';
 
 export const Vision3Plugin: React.FC = () => {
@@ -63,6 +64,12 @@ export const Vision3Plugin: React.FC = () => {
   } = useVision3Camera();
 
   const { result: wsResult, analyze } = usePostureWS();
+  const wsResultRef = useRef(wsResult);
+
+  // Sync wsResult to ref for stable onResults callback
+  useEffect(() => {
+    wsResultRef.current = wsResult;
+  }, [wsResult]);
 
   const {
     captureStatus,
@@ -106,14 +113,23 @@ export const Vision3Plugin: React.FC = () => {
       handleLandmarks(results.poseLandmarks);
     }
     
-    // 2. 仅绘制业务图层（如头部轴线）
-    // 基础骨骼点已由 BaseWebcamView (showSkeleton={true}) 绘制
-    if (!canvas || !showHeadAxes) return;
+    // 2. 仅绘制业务图层
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // --- CRITICAL FIX: BaseWebcamView clears the canvas but we need to ensure our drawings don't conflict ---
+    // Note: BaseWebcamView draws the skeleton BEFORE calling this onResults.
+    
+    // A. 绘制后端同步的视觉标注 (New!)
+    const currentWsResult = wsResultRef.current;
+    if (currentWsResult?.annotations) {
+      drawAnnotations(ctx, currentWsResult.annotations, canvas.width, canvas.height, isMirrored);
+    }
+
+    // B. 绘制原有的头部轴线（如有）
     const axes = headAxesRef.current;
-    if (axes) {
+    if (axes && showHeadAxes) {
       const smoothed = smoothHeadAxes(smoothedAxesRef.current, axes, 0.35);
       smoothedAxesRef.current = smoothed;
       const scaled = scaleHeadAxes(smoothed, axesScale);

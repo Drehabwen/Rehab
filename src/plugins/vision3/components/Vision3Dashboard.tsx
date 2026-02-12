@@ -12,6 +12,19 @@ import { cn } from '@/lib/utils';
 import JointSelector from '@/components/JointSelector';
 import MeasurementChart from '@/components/MeasurementChart';
 
+const MetricValue: React.FC<{ value: number; unit?: string; className?: string }> = ({ value, unit, className }) => {
+  return (
+    <div className="flex flex-col items-end">
+      <div className="flex items-baseline gap-1">
+        <span className={cn("text-2xl font-black tabular-nums transition-all duration-300", className)}>
+          {value.toFixed(1)}
+        </span>
+        {unit && <span className="text-[10px] font-bold text-slate-400 uppercase">{unit}</span>}
+      </div>
+    </div>
+  );
+};
+
 interface Vision3DashboardProps {
   activeTab: 'posture' | 'rom';
   result: {
@@ -139,7 +152,11 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                         </div>
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="text-xl font-black text-slate-900">{result.metrics.shoulderAngle?.toFixed(1) || '0.0'}°</span>
+                        <MetricValue 
+                          value={result.metrics.shoulderAngle || 0} 
+                          unit="deg" 
+                          className="text-slate-900"
+                        />
                         <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Deviated Angle</span>
                       </div>
                     </div>
@@ -199,15 +216,15 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                       <div className="grid grid-cols-3 gap-2">
                         <div className="flex flex-col">
                           <span className="text-[8px] font-black text-white/40 uppercase mb-1">Yaw (偏航)</span>
-                          <span className="text-xl font-black">{result.metrics.headYaw.toFixed(1)}°</span>
+                          <MetricValue value={result.metrics.headYaw} className="text-white text-lg" />
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[8px] font-black text-white/40 uppercase mb-1">Pitch (俯仰)</span>
-                          <span className="text-xl font-black">{result.metrics.headPitch?.toFixed(1)}°</span>
+                          <MetricValue value={result.metrics.headPitch || 0} className="text-white text-lg" />
                         </div>
                         <div className="flex flex-col">
                           <span className="text-[8px] font-black text-white/40 uppercase mb-1">Roll (翻滚)</span>
-                          <span className="text-xl font-black">{result.metrics.headRoll?.toFixed(1)}°</span>
+                          <MetricValue value={result.metrics.headRoll || 0} className="text-white text-lg" />
                         </div>
                       </div>
                     </div>
@@ -217,10 +234,11 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-6 bg-slate-50/80 rounded-[2.5rem] border border-slate-100 group hover:border-antey-primary/30 hover:bg-white hover:shadow-xl transition-all duration-500">
                       <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">头颈前倾</div>
-                      <div className="flex items-baseline gap-1 mb-4">
-                        <span className="text-3xl font-black text-slate-800">{result.metrics.headForward?.toFixed(1) || '0.0'}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">deg</span>
-                      </div>
+                      <MetricValue 
+                        value={result.metrics.headForward || 0} 
+                        unit="deg" 
+                        className="text-slate-800 text-3xl"
+                      />
                       <div className={cn(
                         "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all duration-500",
                         getHeadStatus(result.metrics.headForward || 0).bgColor,
@@ -234,10 +252,11 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                     </div>
                     <div className="p-6 bg-slate-50/80 rounded-[2.5rem] border border-slate-100 group hover:border-antey-primary/30 hover:bg-white hover:shadow-xl transition-all duration-500">
                       <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">骨盆倾斜</div>
-                      <div className="flex items-baseline gap-1 mb-4">
-                        <span className="text-3xl font-black text-slate-800">{result.metrics.hipAngle?.toFixed(1) || '0.0'}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">deg</span>
-                      </div>
+                      <MetricValue 
+                        value={result.metrics.hipAngle || 0} 
+                        unit="deg" 
+                        className="text-slate-800 text-3xl"
+                      />
                       <div className={cn(
                         "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all duration-500",
                         getHipStatus(result.metrics.hipAngle || 0).bgColor,
