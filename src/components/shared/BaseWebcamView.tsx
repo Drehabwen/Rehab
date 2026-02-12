@@ -88,11 +88,13 @@ export default function BaseWebcamView({
     }
   }, [onResults, isMirrored, showSkeleton]);
 
-  const { isLoading: isModelLoading } = useMediaPipe(
+  const { isLoading: isModelLoading, error: modelError } = useMediaPipe(
     videoRef.current,
     handleResults,
     isCameraOn && !!stream
   );
+
+  const error = cameraError || modelError;
 
   const aspectRatioClass = {
     '4/3': 'aspect-[4/3]',
@@ -118,15 +120,17 @@ export default function BaseWebcamView({
             </div>
           )}
 
-          {/* Camera Error */}
-          {cameraError && (
+          {/* Error State */}
+          {error && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 text-white z-40 p-6 text-center">
               <VideoOff className="h-12 w-12 text-red-500 mb-4" />
-              <h3 className="text-xl font-bold mb-2">摄像头访问失败</h3>
+              <h3 className="text-xl font-bold mb-2">{cameraError ? '摄像头访问失败' : 'AI 模型加载失败'}</h3>
               <p className="text-gray-400 max-w-xs mb-6 text-sm">
-                {cameraError.message.includes("NotReadableError") || cameraError.message.includes("Device in use") 
-                  ? "摄像头被其他程序占用，请关闭后重试。" 
-                  : "请检查浏览器摄像头权限设置。"}
+                {cameraError 
+                  ? (cameraError.message.includes("NotReadableError") || cameraError.message.includes("Device in use") 
+                    ? "摄像头被其他程序占用，请关闭后重试。" 
+                    : "请检查浏览器摄像头权限设置。")
+                  : "无法加载 Mediapipe 模型，请检查网络连接或刷新页面。"}
               </p>
               <button 
                 onClick={() => window.location.reload()}

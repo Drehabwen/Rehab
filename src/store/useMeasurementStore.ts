@@ -24,6 +24,7 @@ export interface PostureReport {
   date: number;
   view: string;
   html: string;
+  timeSeries?: any[];
 }
 
 interface MeasurementState {
@@ -47,7 +48,7 @@ interface MeasurementState {
   resetMeasurement: () => void;
   saveMeasurement: () => void;
   deleteSavedMeasurement: (id: string) => void;
-  savePostureReport: (view: string, html: string) => void;
+  savePostureReport: (view: string, html: string, timeSeries?: any[]) => void;
   deletePostureReport: (id: string) => void;
 }
 
@@ -191,12 +192,13 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
     savedMeasurements: state.savedMeasurements.filter(m => m.id !== id)
   })),
 
-  savePostureReport: (view, html) => set((state) => ({
+  savePostureReport: (view, html, timeSeries) => set((state) => ({
     postureReports: [{
       id: crypto.randomUUID(),
       date: Date.now(),
       view,
-      html
+      html,
+      timeSeries
     }, ...state.postureReports]
   })),
 

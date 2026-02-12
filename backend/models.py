@@ -88,6 +88,7 @@ class TemporalAnalysisRequest(BaseModel):
     frameCount: int
     averages: PostureMetrics
     stability: TemporalStability
+    timeSeries: Optional[List[Dict[str, Any]]] = None
 
 class HTMLReportResponse(BaseModel):
     type: str = "HTML_REPORT"
