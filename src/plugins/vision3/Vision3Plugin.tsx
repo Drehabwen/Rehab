@@ -26,6 +26,11 @@ import BaseWebcamView from '@/components/shared/BaseWebcamView';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import MeasurementChart from '@/components/MeasurementChart';
 import JointSelector from '@/components/JointSelector';
+import { useVision3Camera } from './hooks/useVision3Camera';
+import { usePostureCapture } from './hooks/usePostureCapture';
+import { Vision3EntryHub } from './components/Vision3EntryHub';
+import { PostureWorkbench } from './components/PostureWorkbench';
+import { ROMWorkbench } from './components/ROMWorkbench';
 import {
   jointNameMap,
   HeadAxes,
@@ -44,14 +49,31 @@ export const Vision3Plugin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'posture' | 'rom'>('posture');
   const [isEntryMode, setIsEntryMode] = useState(true);
   const [view, setView] = useState<'front' | 'back' | 'side'>('front');
-  const [isCameraOn, setIsCameraOn] = useState(true);
   const [showHeadAxes, setShowHeadAxes] = useState(true);
   const [axesScale, setAxesScale] = useState(1);
-  const isMirrored = true;
   
+  // Custom Hooks
+  const {
+    isCameraOn,
+    setIsCameraOn,
+    isMirrored,
+    isFullscreen,
+    toggleFullscreen,
+    videoContainerRef
+  } = useVision3Camera();
+
+  const { result: wsResult, analyze } = usePostureWS();
+
+  const {
+    captureStatus,
+    setCaptureStatus,
+    countdown,
+    isInPosition,
+    handleLandmarks
+  } = usePostureCapture({ analyze, view, activeTab, isEntryMode });
+
   // Posture States
   const [result, setResult] = useState<{ issues: PostureIssue[]; metrics: PostureMetrics; image: string } | null>(null);
-  const capturedImage = useRef<string | null>(null);
   const reportCanvasRef = useRef<HTMLCanvasElement>(null);
   const headAxesRef = useRef<HeadAxes | null>(null);
   const smoothedAxesRef = useRef<HeadAxes | null>(null);
@@ -60,8 +82,6 @@ export const Vision3Plugin: React.FC = () => {
   const { 
     isMeasuring, startMeasurement, stopMeasurement, resetMeasurement, saveMeasurement, activeMeasurements
   } = useMeasurementStore();
-
-  const { result: wsResult, analyze } = usePostureWS();
 
   // Sync WebSocket result to local state
   useEffect(() => {
@@ -80,109 +100,26 @@ export const Vision3Plugin: React.FC = () => {
     }
   }, [wsResult]);
 
-  // Auto-capture states
-  const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown' | 'analyzing'>('idle');
-  const [countdown, setCountdown] = useState(5);
-  const [isInPosition, setIsInPosition] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const landmarksBufferRef = useRef<PoseLandmark[][]>([]);
-  const videoContainerRef = useRef<HTMLDivElement>(null);
-
-  // Fullscreen toggle handler
-  const toggleFullscreen = useCallback(() => {
-    if (!videoContainerRef.current) return;
-    
-    if (!document.fullscreenElement) {
-      videoContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true));
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false));
-    }
-  }, []);
-
-  // Listen for fullscreen change events (e.g. user presses Esc)
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  const checkUserPosition = useCallback((landmarks: PoseLandmark[]) => {
-    if (!landmarks || landmarks.length < 33) return false;
-    const keyPointsIndices = [0, 11, 12, 23, 24]; // Nose, Shoulders, Hips
-    const visible = keyPointsIndices.every(idx => (landmarks[idx].visibility ?? 0) > 0.5);
-    return visible;
-  }, []);
-
   const onResults = useCallback((results: Results, _video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
+    // 1. 处理地标数据供 Hook 状态机使用
     if (results.poseLandmarks) {
-      landmarksBufferRef.current.push(results.poseLandmarks);
-      if (landmarksBufferRef.current.length > 30) landmarksBufferRef.current.shift();
-      
-      if (activeTab === 'posture' && !isEntryMode) {
-        if (captureStatus === 'scanning') {
-          const inPos = checkUserPosition(results.poseLandmarks);
-          setIsInPosition(inPos);
-          if (inPos) {
-             setCaptureStatus('countdown');
-          }
-        }
-      }
+      handleLandmarks(results.poseLandmarks);
     }
-    if (!canvas) return;
-    if (!showHeadAxes) return;
-    const axes = headAxesRef.current;
-    if (!axes) return;
+    
+    // 2. 仅绘制业务图层（如头部轴线）
+    // 基础骨骼点已由 BaseWebcamView (showSkeleton={true}) 绘制
+    if (!canvas || !showHeadAxes) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const smoothed = smoothHeadAxes(smoothedAxesRef.current, axes, 0.35);
-    smoothedAxesRef.current = smoothed;
-    const scaled = scaleHeadAxes(smoothed, axesScale);
-    drawHeadAxes(ctx, scaled, isMirrored ? canvas.width : undefined);
-  }, [activeTab, isEntryMode, captureStatus, showHeadAxes, axesScale, isMirrored, checkUserPosition]);
 
-  // Countdown Logic
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (captureStatus === 'countdown' && countdown > 0) {
-      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-    } else if (captureStatus === 'countdown' && countdown === 0) {
-      setCaptureStatus('analyzing');
-      // Capture logic here
-      const canvas = document.createElement('canvas');
-      const video = document.querySelector('video') as HTMLVideoElement | null; // Typed selector
-      if (video) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          canvas.getContext('2d')?.drawImage(video, 0, 0);
-          const imageData = canvas.toDataURL('image/jpeg');
-          capturedImage.current = imageData;
-          
-          // Send to backend via WS
-          // We need landmarks for the analyze call. 
-          // Since we are inside useEffect, we should use the latest landmarks from ref or state.
-          // However, capture happens after countdown, landmarks might be in buffer.
-          const currentLandmarks = landmarksBufferRef.current[landmarksBufferRef.current.length - 1] || [];
-          
-          analyze(
-            view, 
-            currentLandmarks, 
-            video.videoWidth, 
-            video.videoHeight, 
-            imageData
-          );
-      }
+    const axes = headAxesRef.current;
+    if (axes) {
+      const smoothed = smoothHeadAxes(smoothedAxesRef.current, axes, 0.35);
+      smoothedAxesRef.current = smoothed;
+      const scaled = scaleHeadAxes(smoothed, axesScale);
+      drawHeadAxes(ctx, scaled, isMirrored ? canvas.width : undefined);
     }
-    return () => clearTimeout(timer);
-  }, [captureStatus, countdown, analyze, view]);
-
-  // Reset countdown when entering countdown state
-  useEffect(() => {
-    if (captureStatus === 'countdown') {
-      setCountdown(5);
-    }
-  }, [captureStatus]);
+  }, [handleLandmarks, showHeadAxes, axesScale, isMirrored]);
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 overflow-hidden">
@@ -265,54 +202,12 @@ export const Vision3Plugin: React.FC = () => {
 
       {/* Conditional Rendering: Entry Hub vs Active Mode */}
       {activeTab === 'posture' && isEntryMode ? (
-        <div className="flex-1 grid grid-cols-2 lg:grid-cols-3 grid-rows-2 gap-8 animate-in fade-in zoom-in-95 duration-700">
-          {[
-            { id: 'front', title: '正面体态扫描', desc: '评估 O/X 型腿、高低肩、骨盆侧倾', icon: Scan, color: 'from-blue-500 to-cyan-400', tag: '基础评估' },
-            { id: 'side', title: '侧面体态分析', desc: '诊断圆肩驼背、头颈前倾、骨盆前倾', icon: Activity, color: 'from-emerald-500 to-teal-400', tag: '关键指标' },
-            { id: 'back', title: '背面平衡测试', desc: '监测脊柱侧弯风险、足跟轴线', icon: History, color: 'from-purple-500 to-indigo-400', tag: '结构对称' },
-            { id: 'squat', title: '深蹲功能检测', desc: '评估下肢稳定性与关节联动', icon: Zap, color: 'from-orange-500 to-amber-400', tag: '动态进阶', disabled: true },
-            { id: 'scoliosis', title: '脊柱侧弯筛查', desc: '深度 3D 脊柱曲率建模与评估', icon: Dna, color: 'from-rose-500 to-pink-400', tag: '专项检测', disabled: true },
-            { id: 'custom', title: '自定义评估', desc: '灵活配置您的个性化检测流程', icon: Settings2, color: 'from-slate-500 to-slate-400', tag: '实验室', disabled: true },
-          ].map((card) => (
-            <button
-              key={card.id}
-              disabled={card.disabled}
-              onClick={() => {
-                if (card.id === 'front' || card.id === 'side' || card.id === 'back') {
-                  setView(card.id as 'front' | 'side' | 'back');
-                  setIsEntryMode(false);
-                }
-              }}
-              className={cn(
-                "group relative bento-card-glass p-10 flex flex-col items-start text-left transition-all duration-500 hover:translate-y-[-8px]",
-                card.disabled ? "opacity-40 grayscale cursor-not-allowed" : "hover:shadow-[0_40px_80px_rgba(13,148,136,0.15)] hover:ring-2 hover:ring-antey-primary/20 bg-white/40 border-white/60"
-              )}
-            >
-              <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 shadow-lg group-hover:scale-110 transition-transform duration-500 bg-gradient-to-br text-white", card.color)}>
-                <card.icon size={32} />
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500/60">{card.tag}</span>
-                  {card.disabled && <span className="px-2 py-0.5 bg-slate-200/50 text-[8px] font-black text-slate-500 rounded-md uppercase tracking-widest">即将上线</span>}
-                </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-antey-primary transition-colors">{card.title}</h3>
-                <p className="text-[13px] font-medium text-slate-600/80 leading-relaxed max-w-[240px]">
-                  {card.desc}
-                </p>
-              </div>
-
-              <div className="mt-8 flex items-center gap-2 text-antey-primary font-black text-[11px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0">
-                立即启动评估
-                <ArrowRight size={16} className="animate-pulse" />
-              </div>
-
-              {/* Decorative Mesh Background */}
-              <div className={cn("absolute -bottom-4 -right-4 w-32 h-32 bg-gradient-to-br opacity-[0.05] rounded-full blur-2xl transition-all group-hover:opacity-[0.15] group-hover:scale-150", card.color)} />
-            </button>
-          ))}
-        </div>
+        <Vision3EntryHub 
+          onSelectView={(v) => {
+            setView(v);
+            setIsEntryMode(false);
+          }} 
+        />
       ) : (
         <div className="flex-1 grid grid-cols-12 grid-rows-6 gap-8 min-h-0 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Main Camera Stage: Large Bento Card */}
@@ -330,6 +225,7 @@ export const Vision3Plugin: React.FC = () => {
             onResults={onResults} 
             isCameraOn={isCameraOn}
             isMirrored={isMirrored}
+            showSkeleton={true}
             className="w-full h-full object-cover opacity-90 transition-opacity duration-1000"
           />
 
@@ -373,83 +269,18 @@ export const Vision3Plugin: React.FC = () => {
             </div>
           </div>
 
-          {/* Floating Controls: Joint Info (ROM only) */}
-          <div className="absolute top-10 right-10 flex flex-col gap-4 z-20">
-            {activeTab === 'rom' && activeMeasurements.map((m, idx) => (
-              <div key={m.id} className="bg-black/40 backdrop-blur-3xl rounded-3xl border border-white/10 p-6 flex flex-col gap-4 shadow-2xl min-w-[240px] animate-in slide-in-from-right duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg" style={{ backgroundColor: m.color }}>
-                    <Activity size={24} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] leading-none mb-1.5">正在测量</div>
-                    <div className="text-sm font-black text-white uppercase tracking-widest leading-none">
-                      {jointNameMap[m.joint] || m.joint} {m.side ? (m.side === 'left' ? '(左)' : '(右)') : ''}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-baseline justify-between gap-4 mt-2">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">实时角度</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-5xl font-black text-white tracking-tighter tabular-nums">
-                        {m.currentAngle.toFixed(1)}
-                      </span>
-                      <span className="text-sm font-black text-white/40 uppercase">deg</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black text-white/40 uppercase tracking-widest mb-1">峰值</span>
-                    <span className="text-xl font-black text-antey-accent">
-                      {m.maxAngle === -Infinity ? '0.0' : m.maxAngle.toFixed(1)}°
-                    </span>
-                  </div>
-                </div>
-
-                {/* Mini Sparkline indicator */}
-                {isMeasuring && m.data.length > 1 && (
-                  <div className="h-10 flex items-end gap-1 px-1">
-                    {m.data.slice(-20).map((p, i) => {
-                      const height = Math.max(4, (p.angle / 180) * 40);
-                      return (
-                        <div 
-                          key={i} 
-                          className="flex-1 rounded-full opacity-60 transition-all duration-300"
-                          style={{ 
-                            height: `${height}px`, 
-                            backgroundColor: m.color,
-                            opacity: 0.3 + (i / 20) * 0.7
-                          }} 
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Analysis Overlays - Always show when in countdown, regardless of 'activeTab' or 'isInPosition' for immediate feedback */}
-          {captureStatus === 'countdown' && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xl">
-              <div className="relative">
-                <span className="text-[12rem] font-black text-white leading-none tracking-tighter animate-pulse drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">
-                  {countdown}
-                </span>
-                <div className="absolute -inset-16 border border-white/10 rounded-full animate-spin-slow" />
-                <div className="absolute -inset-24 border border-white/5 rounded-full animate-reverse-spin-slow" />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'posture' && captureStatus === 'scanning' && (
-            <div className="absolute inset-0 pointer-events-none">
-              <div className={cn(
-                "absolute inset-10 border-[1px] transition-all duration-700 rounded-[2.5rem]",
-                isInPosition ? "border-antey-primary/60 bg-antey-primary/5" : "border-rose-500/40 bg-rose-500/5"
-              )} />
-            </div>
+          {/* Floating Controls: Workbench Components */}
+          {activeTab === 'posture' ? (
+            <PostureWorkbench 
+              captureStatus={captureStatus} 
+              countdown={countdown} 
+              isInPosition={isInPosition} 
+            />
+          ) : (
+            <ROMWorkbench 
+              activeMeasurements={activeMeasurements} 
+              isMeasuring={isMeasuring} 
+            />
           )}
 
           {/* Floating Controls: Ultra Premium Glassmorphism */}
