@@ -44,8 +44,24 @@ export const MedVoicePlugin: React.FC = () => {
   const [viewMode, setViewMode] = useState<'standard' | 'soap'>('standard');
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const { structuredCase, setStructuredCase, patientInfo, setPatientInfo } = useCaseStore();
+  const { structuredCase, setStructuredCase, patientInfo, setPatientInfo, updateReportSegment } = useCaseStore();
   const [activeSection, setActiveSection] = useState<string>('主诉');
+
+  const handleSyncToReport = () => {
+    if (!structuredCase) return;
+
+    const summary = structuredCase['诊断'] 
+      ? `语音问诊完成，AI 诊断结果：${structuredCase['诊断']}`
+      : '语音问诊完成，病历已结构化处理。';
+
+    updateReportSegment('voice', {
+      moduleId: 'voice',
+      timestamp: Date.now(),
+      summary,
+      details: structuredCase,
+      status: 'confirmed'
+    });
+  };
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { activeMeasurements, savedMeasurements } = useMeasurementStore();
@@ -180,7 +196,7 @@ export const MedVoicePlugin: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm">
+        <div className="flex items-center gap-3 bg-white/40 backdrop-blur-md p-2 rounded-2xl border border-white/60 shadow-xl shadow-slate-200/50">
           <button 
             onClick={isRecording ? stopRecording : startRecording}
             className={cn(
@@ -202,7 +218,7 @@ export const MedVoicePlugin: React.FC = () => {
           
           <button 
             onClick={() => { setTranscript(''); setStructuredCase(null); }}
-            className="p-4 text-slate-400 hover:text-antey-primary hover:bg-white hover:shadow-sm rounded-xl transition-all group"
+            className="p-4 text-slate-400 hover:text-antey-primary hover:bg-white/80 hover:shadow-sm rounded-xl transition-all group"
             title="重置会话"
           >
             <RefreshCw size={20} className={cn("group-hover:rotate-180 transition-transform duration-700", isProcessing && "animate-spin")} />
@@ -214,7 +230,7 @@ export const MedVoicePlugin: React.FC = () => {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-0">
         {/* Left: Real-time Transcript */}
         <div className="lg:col-span-5 flex flex-col gap-6 min-h-0">
-          <div className="bento-card glow-border p-8 flex flex-col flex-1 min-h-0 relative overflow-hidden group">
+          <div className="bento-card-glass p-8 flex flex-col flex-1 min-h-0 relative group">
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-purple-500/10 transition-colors" />
             
             <div className="flex items-center justify-between mb-8 relative z-10">
@@ -223,11 +239,11 @@ export const MedVoicePlugin: React.FC = () => {
                 实时对话流水
               </h3>
               <div className="flex items-center gap-3">
-                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider bg-white/50 px-2 py-0.5 rounded-md border border-white/60">
                   AI 生成 · 仅供参考
                 </span>
                 {isRecording && (
-                  <div className="flex items-center gap-3 px-3 py-1 bg-rose-50 rounded-full border border-rose-100 animate-in fade-in zoom-in duration-500">
+                  <div className="flex items-center gap-3 px-3 py-1 bg-rose-50/80 backdrop-blur-md rounded-full border border-rose-100 animate-in fade-in zoom-in duration-500">
                     <div className="flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                       <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest">{formatTime(recordTime)}</span>
@@ -241,13 +257,13 @@ export const MedVoicePlugin: React.FC = () => {
             
             <div className="flex-1 overflow-y-auto custom-scrollbar pr-4 space-y-6 relative z-10">
               {transcript ? (
-                <div className="text-slate-600 leading-relaxed font-medium text-lg whitespace-pre-wrap selection:bg-purple-100">
+                <div className="text-slate-700 leading-relaxed font-medium text-lg whitespace-pre-wrap selection:bg-purple-100">
                   {transcript}
                   {isRecording && <span className="inline-block w-1.5 h-6 ml-2 bg-purple-500 animate-caret shadow-[0_0_8px_rgba(168,85,247,0.5)]" />}
                 </div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-6 opacity-40">
-                  <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center border-2 border-dashed border-slate-200">
+                  <div className="w-20 h-20 rounded-full bg-white/40 backdrop-blur-md flex items-center justify-center border-2 border-dashed border-white/60">
                     <Mic size={32} className="stroke-[1.5px]" />
                   </div>
                   <div className="space-y-2 text-center">
@@ -259,22 +275,34 @@ export const MedVoicePlugin: React.FC = () => {
             </div>
 
             {/* Waveform Visualizer */}
-            <div className="h-32 flex items-center justify-center mt-6 relative">
+            <div className="h-40 flex flex-col items-center justify-center mt-6 relative bg-white/30 backdrop-blur-sm rounded-3xl border border-white/60 overflow-hidden group/wave">
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-500/5 to-transparent opacity-0 group-hover/wave:opacity-100 transition-opacity duration-700" />
               <canvas 
                 ref={canvasRef} 
                 className={cn(
-                  "w-full h-full transition-opacity duration-500",
-                  isRecording ? "opacity-100" : "opacity-0"
+                  "w-full h-full transition-all duration-700",
+                  isRecording ? "opacity-100 scale-100" : "opacity-0 scale-95"
                 )}
               />
               {!isRecording && (
-                <div className="absolute inset-0 flex items-end gap-1.5 px-6 opacity-20">
-                  {[...Array(24)].map((_, i) => (
+                <div className="absolute inset-0 flex items-center justify-center gap-1.5 px-12 opacity-10">
+                  {[...Array(32)].map((_, i) => (
                     <div 
                       key={i} 
-                      className="flex-1 bg-slate-200 rounded-t-full h-1"
+                      className="flex-1 bg-purple-500 rounded-full h-1 animate-pulse"
+                      style={{ animationDelay: `${i * 50}ms`, height: `${Math.random() * 20 + 4}px` }}
                     />
                   ))}
+                </div>
+              )}
+              {isRecording && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <div className="w-1 h-1 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1 h-1 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1 h-1 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span className="text-[8px] font-black text-purple-500 uppercase tracking-widest">捕获中...</span>
                 </div>
               )}
             </div>
@@ -283,7 +311,7 @@ export const MedVoicePlugin: React.FC = () => {
 
         {/* Right: Structured Medical Record */}
         <div className="lg:col-span-7 flex flex-col gap-6 min-h-0">
-          <div className="bento-card p-8 flex flex-col flex-1 min-h-0 relative">
+          <div className="bento-card-glass p-8 flex flex-col flex-1 min-h-0 relative">
             <div className="flex items-center justify-between mb-10">
               <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.3em] flex items-center gap-3">
                 <span className="w-1.5 h-5 bg-gradient-to-b from-antey-primary to-blue-500 rounded-full" />
@@ -291,7 +319,7 @@ export const MedVoicePlugin: React.FC = () => {
               </h3>
               <div className="flex items-center gap-6">
                 {/* View Mode Toggle */}
-                <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
+                <div className="flex p-1 bg-white/40 backdrop-blur-md rounded-xl border border-white/60 shadow-inner">
                   <button 
                     onClick={() => setViewMode('standard')}
                     className={cn(
@@ -317,14 +345,18 @@ export const MedVoicePlugin: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center gap-4">
-                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider bg-white/50 px-2 py-0.5 rounded-md border border-white/60">
                   AI 分析结果 · 仅供参考
                 </span>
                 <div className="flex items-center gap-3">
                   <GlobalExport />
-                  <button className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 hover:bg-antey-primary hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all group shadow-sm hover:shadow-lg hover:shadow-antey-primary/20">
+                  <button 
+                    onClick={handleSyncToReport}
+                    disabled={!structuredCase}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white/60 hover:bg-antey-primary hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all group shadow-sm hover:shadow-lg hover:shadow-antey-primary/20 disabled:opacity-50"
+                  >
                     <Plus size={16} className="group-hover:rotate-90 transition-transform duration-500" />
-                    保存并同步
+                    同步至综合报告
                   </button>
                 </div>
               </div>
@@ -341,8 +373,8 @@ export const MedVoicePlugin: React.FC = () => {
                     className={cn(
                       "flex items-center gap-4 px-5 py-4 rounded-2xl transition-all text-left group relative overflow-hidden",
                       activeSection === section.id 
-                        ? "bg-white text-slate-900 shadow-[0_10px_30px_rgba(0,0,0,0.08)] ring-1 ring-slate-100" 
-                        : "text-slate-400 hover:bg-white/50 hover:text-slate-600"
+                        ? "bg-white/80 backdrop-blur-md text-slate-900 shadow-xl border border-white/60" 
+                        : "text-slate-400 hover:bg-white/40 hover:text-slate-600"
                     )}
                   >
                     {activeSection === section.id && (
@@ -350,7 +382,7 @@ export const MedVoicePlugin: React.FC = () => {
                     )}
                     <div className={cn(
                       "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500",
-                      activeSection === section.id ? section.bgColor : "bg-slate-50 group-hover:bg-white"
+                      activeSection === section.id ? section.bgColor : "bg-white/20 group-hover:bg-white/40"
                     )}>
                       <section.icon size={20} className={activeSection === section.id ? section.color : "opacity-60"} />
                     </div>
@@ -360,9 +392,9 @@ export const MedVoicePlugin: React.FC = () => {
               </div>
 
               {/* Section Content */}
-              <div className="flex-1 bg-slate-50/30 rounded-[2.5rem] p-10 border border-slate-200/50 overflow-y-auto custom-scrollbar relative group/content">
+              <div className="flex-1 bg-white/40 backdrop-blur-md rounded-[2.5rem] p-10 border border-white/60 overflow-y-auto custom-scrollbar relative group/content shadow-sm">
                 {isProcessing ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 backdrop-blur-md z-20 animate-in fade-in duration-500">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-xl z-20 animate-in fade-in duration-500">
                     <div className="relative w-20 h-20 mb-6">
                       <div className="absolute inset-0 border-4 border-antey-primary/10 rounded-full" />
                       <div className="absolute inset-0 border-4 border-antey-primary rounded-full border-t-transparent animate-spin" />
@@ -381,20 +413,20 @@ export const MedVoicePlugin: React.FC = () => {
                       <h4 className="text-2xl font-black text-slate-900 tracking-tight">{currentSectionData?.label || activeSection}</h4>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button className="p-3 text-slate-300 hover:text-antey-primary hover:bg-white rounded-xl transition-all shadow-sm">
+                      <button className="p-3 text-slate-300 hover:text-antey-primary hover:bg-white/80 rounded-xl transition-all shadow-sm">
                         <FileText size={20} />
                       </button>
                     </div>
                   </div>
                   
-                  <div className="text-slate-600 font-medium leading-[2] text-xl min-h-[200px] selection:bg-antey-primary/10">
+                  <div className="text-slate-700 font-medium leading-[2] text-xl min-h-[200px] selection:bg-antey-primary/10">
                     {structuredCase?.[activeSection] ? (
                       <div className="animate-in fade-in slide-in-from-top-2 duration-500">
                         {structuredCase[activeSection]}
                       </div>
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center py-20 text-slate-300 gap-4">
-                        <div className="w-16 h-16 rounded-full bg-white flex items-center justify-center shadow-inner">
+                        <div className="w-16 h-16 rounded-full bg-white/40 backdrop-blur-md flex items-center justify-center shadow-inner border border-white/60">
                           <ClipboardCheck size={28} className="opacity-20" />
                         </div>
                         <p className="text-[11px] font-black uppercase tracking-[0.2em]">等待录入解析</p>

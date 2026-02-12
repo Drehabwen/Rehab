@@ -23,11 +23,21 @@ export interface PatientInfo {
   visit_date: string;
 }
 
-interface CaseState {
+export interface NexusModuleData {
+  moduleId: 'vision' | 'voice' | 'fms' | 'scale';
+  timestamp: number;
+  summary: string;
+  details: any;
+  status: 'draft' | 'confirmed';
+}
+
+export interface CaseState {
   structuredCase: StructuredCase | null;
   patientInfo: PatientInfo;
+  aggregatedReport: Record<string, NexusModuleData>;
   setStructuredCase: (data: StructuredCase | null) => void;
   setPatientInfo: (info: Partial<PatientInfo>) => void;
+  updateReportSegment: (moduleId: string, data: NexusModuleData) => void;
   resetCase: () => void;
 }
 
@@ -40,9 +50,13 @@ export const useCaseStore = create<CaseState>((set) => ({
     case_id: `MV${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}001`,
     visit_date: new Date().toLocaleDateString(),
   },
+  aggregatedReport: {},
   setStructuredCase: (data) => set({ structuredCase: data }),
   setPatientInfo: (info) => set((state) => ({ 
     patientInfo: { ...state.patientInfo, ...info } 
   })),
-  resetCase: () => set({ structuredCase: null }),
+  updateReportSegment: (moduleId, data) => set((state) => ({
+    aggregatedReport: { ...state.aggregatedReport, [moduleId]: data }
+  })),
+  resetCase: () => set({ structuredCase: null, aggregatedReport: {} }),
 }));

@@ -23,12 +23,14 @@ import {
   ArrowRight,
   Scan,
   Zap,
-  Dna
+  Dna,
+  Share2
 } from 'lucide-react';
 import { usePostureWS, VisualAnnotation, PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
 import { cn } from '@/lib/utils';
 import BaseWebcamView from '@/components/shared/BaseWebcamView';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
+import { useCaseStore } from '@/store/useCaseStore';
 import MeasurementChart from '@/components/MeasurementChart';
 import JointSelector from '@/components/JointSelector';
 
@@ -42,6 +44,37 @@ const jointNameMap: Record<string, string> = {
   knee: '膝关节',
   ankle: '踝关节',
 };
+
+const DashboardCard: React.FC<{
+  title: string;
+  value: string | number;
+  unit?: string;
+  icon: React.ReactNode;
+  color: string;
+  description?: string;
+}> = ({ title, value, unit, icon, color, description }) => (
+  <div className="group bg-white/60 backdrop-blur-md rounded-3xl p-5 border border-slate-200/50 shadow-sm transition-all duration-500 hover:shadow-xl hover:shadow-slate-200/50 hover:border-antey-primary/20 hover:-translate-y-1">
+    <div className="flex items-start justify-between mb-4">
+      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg", color)}>
+        {icon}
+      </div>
+      <div className="flex flex-col items-end">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{title}</span>
+        <div className="flex items-baseline gap-1">
+          <span className="text-2xl font-black text-slate-800 tracking-tight">{value}</span>
+          {unit && <span className="text-xs font-bold text-slate-400 uppercase">{unit}</span>}
+        </div>
+      </div>
+    </div>
+    {description && (
+      <div className="mt-2 pt-3 border-t border-slate-100/50">
+        <p className="text-[10px] font-bold text-slate-500 leading-relaxed group-hover:text-slate-700 transition-colors">
+          {description}
+        </p>
+      </div>
+    )}
+  </div>
+);
 
 export const Vision3Plugin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'posture' | 'rom'>('posture');
@@ -61,6 +94,45 @@ export const Vision3Plugin: React.FC = () => {
   } = useMeasurementStore();
 
   const { result: wsResult, analyze } = usePostureWS();
+  const { updateReportSegment } = useCaseStore();
+
+  const handleSyncToReport = () => {
+    if (activeTab === 'posture' && result) {
+      const summary = result.issues.length > 0 
+        ? `体态评估完成，发现 ${result.issues.length} 项异常：${result.issues.map(i => i.title || i.type).join('、')}`
+        : '体态评估完成，各项指标处于理想范围。';
+      
+      updateReportSegment('vision', {
+        moduleId: 'vision',
+        timestamp: Date.now(),
+        summary,
+        details: {
+          metrics: result.metrics,
+          issues: result.issues,
+          type: 'posture'
+        },
+        status: 'confirmed'
+      });
+    } else if (activeTab === 'rom' && activeMeasurements.length > 0) {
+      const m = activeMeasurements[0];
+      const jointName = jointNameMap[m.joint] || m.joint;
+      const sideName = m.side ? (m.side === 'left' ? '左侧' : '右侧') : '';
+      const summary = `完成${sideName}${jointName} ROM 测量，最大角度 ${m.maxAngle.toFixed(1)}°。`;
+
+      updateReportSegment('vision', {
+        moduleId: 'vision',
+        timestamp: Date.now(),
+        summary,
+        details: {
+          joint: m.joint,
+          side: m.side,
+          maxAngle: m.maxAngle,
+          type: 'rom'
+        },
+        status: 'confirmed'
+      });
+    }
+  };
 
   // Auto-capture states
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown'>('idle');
@@ -461,7 +533,7 @@ export const Vision3Plugin: React.FC = () => {
           )}
 
           {/* Posture Dashboard / ROM Chart Card */}
-          <div className="bento-card p-8 flex-1 flex flex-col overflow-hidden bg-white/80 backdrop-blur-xl border border-white/40 shadow-2xl shadow-slate-200/50">
+          <div className="bento-card-glass p-8 flex-1 flex flex-col overflow-hidden custom-scrollbar">
             <div className="flex items-center justify-between mb-8">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-3">
                 <div className="p-2 bg-antey-primary/10 rounded-lg">
@@ -487,33 +559,36 @@ export const Vision3Plugin: React.FC = () => {
               <div className="flex-1 flex flex-col min-h-0">
                 {!result ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                    <div className="w-48 h-48 rounded-full bg-slate-50/50 flex items-center justify-center mb-10 relative">
-                      <div className="absolute inset-0 border-[3px] border-slate-100 border-t-antey-primary rounded-full animate-spin duration-[3000ms]" />
-                      <div className="absolute inset-4 border border-dashed border-slate-200 rounded-full animate-reverse-spin-slow" />
-                      <div className="absolute inset-8 bg-white rounded-full shadow-inner flex items-center justify-center">
-                        <Activity size={48} className="text-antey-primary animate-pulse" />
+                    <div className="w-56 h-56 rounded-full bg-white/40 backdrop-blur-xl border border-white/60 shadow-2xl flex items-center justify-center mb-10 relative group">
+                      <div className="absolute inset-0 border-[3px] border-slate-100/50 border-t-antey-primary rounded-full animate-spin duration-[3000ms]" />
+                      <div className="absolute inset-4 border border-dashed border-antey-primary/20 rounded-full animate-reverse-spin-slow" />
+                      <div className="absolute inset-10 bg-gradient-to-br from-white to-slate-50 rounded-full shadow-inner flex items-center justify-center border border-slate-100">
+                        <Activity size={56} className="text-antey-primary animate-pulse" />
                       </div>
                       
                       {/* Floating Particles */}
-                      <div className="absolute -top-2 left-1/2 w-2 h-2 bg-antey-primary rounded-full animate-ping" />
+                      <div className="absolute -top-2 left-1/2 w-3 h-3 bg-antey-primary rounded-full animate-ping shadow-[0_0_10px_rgba(var(--antey-primary-rgb),0.5)]" />
                       <div className="absolute top-1/2 -right-2 w-2 h-2 bg-antey-accent rounded-full animate-ping delay-300" />
+                      
+                      {/* Scanning Light Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-antey-primary/5 to-transparent rounded-full animate-pulse" />
                     </div>
                     <h4 className="text-lg font-black text-slate-900 uppercase tracking-[0.3em] mb-4">AI 核心诊断引擎</h4>
                     <div className="flex items-center gap-3 justify-center mb-6">
-                      <div className="px-3 py-1 bg-emerald-50 rounded-full border border-emerald-100">
+                      <div className="px-4 py-1.5 bg-emerald-50/80 backdrop-blur-md rounded-full border border-emerald-100 shadow-sm">
                         <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                          <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                           视觉算法就绪
                         </span>
                       </div>
-                      <div className="px-3 py-1 bg-blue-50 rounded-full border border-blue-100">
+                      <div className="px-4 py-1.5 bg-blue-50/80 backdrop-blur-md rounded-full border border-blue-100 shadow-sm">
                         <span className="text-[9px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                          <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                           深度学习加载中
                         </span>
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-400 font-bold max-w-[280px] leading-relaxed">
+                    <p className="text-[11px] text-slate-500 font-bold max-w-[320px] leading-relaxed">
                       请确保受测者全身处于镜头范围内，系统将自动识别 <span className="text-antey-primary">33个</span> 关键骨骼位点并进行实时体态建模
                     </p>
                   </div>
@@ -522,8 +597,8 @@ export const Vision3Plugin: React.FC = () => {
                     {/* Primary Metrics: Visual Gauges */}
                     <div className="space-y-6">
                       {/* Shoulder Balance Bar */}
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
+                      <div className="p-6 bg-white/40 backdrop-blur-md rounded-[2.5rem] border border-white/60 shadow-sm hover:shadow-xl transition-all duration-500">
+                        <div className="flex items-center justify-between mb-6">
                           <div className="flex flex-col">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">肩膀平衡度</span>
                             <div className="flex items-center gap-2">
@@ -534,11 +609,11 @@ export const Vision3Plugin: React.FC = () => {
                             </div>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="text-xl font-black text-slate-900">{result.metrics.shoulderAngle?.toFixed(1) || '0.0'}°</span>
+                            <span className="text-2xl font-black text-slate-900 tabular-nums">{result.metrics.shoulderAngle?.toFixed(1) || '0.0'}°</span>
                             <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Deviated Angle</span>
                           </div>
                         </div>
-                        <div className="h-4 bg-slate-100 rounded-full relative overflow-hidden ring-4 ring-slate-50">
+                        <div className="h-3 bg-slate-100/50 rounded-full relative overflow-hidden ring-4 ring-slate-50/30">
                           <div 
                             className={cn(
                               "absolute top-0 bottom-0 transition-all duration-1000 rounded-full",
@@ -552,16 +627,16 @@ export const Vision3Plugin: React.FC = () => {
                               transformOrigin: 'left'
                             }}
                           />
-                          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-slate-300 z-10" />
+                          <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-slate-300/50 z-10" />
                         </div>
                       </div>
 
                       {/* Head Forwardness Gauge */}
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="p-6 bg-slate-50/80 rounded-[2.5rem] border border-slate-100 group hover:border-antey-primary/30 hover:bg-white hover:shadow-xl transition-all duration-500">
+                        <div className="p-6 bg-white/40 backdrop-blur-md rounded-[2.5rem] border border-white/60 shadow-sm group hover:border-antey-primary/30 hover:bg-white/80 hover:shadow-xl transition-all duration-500">
                           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">头颈前倾</div>
                           <div className="flex items-baseline gap-1 mb-4">
-                            <span className="text-3xl font-black text-slate-800">{result.metrics.headForward?.toFixed(1) || '0.0'}</span>
+                            <span className="text-3xl font-black text-slate-800 tabular-nums">{result.metrics.headForward?.toFixed(1) || '0.0'}</span>
                             <span className="text-[10px] font-bold text-slate-400 uppercase">deg</span>
                           </div>
                           <div className={cn(
@@ -575,10 +650,10 @@ export const Vision3Plugin: React.FC = () => {
                             </span>
                           </div>
                         </div>
-                        <div className="p-6 bg-slate-50/80 rounded-[2.5rem] border border-slate-100 group hover:border-antey-primary/30 hover:bg-white hover:shadow-xl transition-all duration-500">
+                        <div className="p-6 bg-white/40 backdrop-blur-md rounded-[2.5rem] border border-white/60 shadow-sm group hover:border-antey-primary/30 hover:bg-white/80 hover:shadow-xl transition-all duration-500">
                           <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">骨盆倾斜</div>
                           <div className="flex items-baseline gap-1 mb-4">
-                            <span className="text-3xl font-black text-slate-800">{result.metrics.hipAngle?.toFixed(1) || '0.0'}</span>
+                            <span className="text-3xl font-black text-slate-800 tabular-nums">{result.metrics.hipAngle?.toFixed(1) || '0.0'}</span>
                             <span className="text-[10px] font-bold text-slate-400 uppercase">deg</span>
                           </div>
                           <div className={cn(
@@ -597,12 +672,12 @@ export const Vision3Plugin: React.FC = () => {
 
                     {/* Detailed Issues List */}
                     <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-4">
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2 sticky top-0 bg-white/80 backdrop-blur-md py-2 z-10">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2 sticky top-0 bg-white/40 backdrop-blur-md py-2 z-10">
                         <div className="w-1.5 h-1.5 rounded-full bg-antey-primary animate-pulse" />
                         异常风险预警 ({result.issues.length})
                       </div>
                       {result.issues.map((issue, idx) => (
-                        <div key={idx} className="p-6 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:border-antey-primary/30 transition-all group animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <div key={idx} className="p-6 bg-white/40 backdrop-blur-md rounded-[2.5rem] border border-white/60 shadow-sm hover:shadow-xl hover:border-antey-primary/30 transition-all group animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
                           <div className="flex items-start gap-5">
                             <div className={cn(
                               "w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner shrink-0 transition-transform group-hover:scale-110 duration-500",
@@ -622,15 +697,15 @@ export const Vision3Plugin: React.FC = () => {
                                   {getSeverityLabel(issue.severity)}
                                 </span>
                               </div>
-                              <p className="text-[11px] font-medium text-slate-500 leading-relaxed mb-4">
+                              <p className="text-[11px] font-medium text-slate-600 leading-relaxed mb-4">
                                 {issue.description}
                               </p>
-                              <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100/50 group-hover:bg-white transition-colors">
+                              <div className="p-4 bg-white/50 rounded-2xl border border-white/60 group-hover:bg-white transition-colors">
                                 <div className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1.5 flex items-center gap-2">
                                   <Activity size={10} className="text-antey-primary" />
                                   康复建议
                                 </div>
-                                <p className="text-[10px] font-bold text-slate-600 leading-relaxed">{issue.recommendation}</p>
+                                <p className="text-[10px] font-bold text-slate-700 leading-relaxed">{issue.recommendation}</p>
                               </div>
                             </div>
                           </div>
@@ -638,22 +713,31 @@ export const Vision3Plugin: React.FC = () => {
                       ))}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <button className="py-4 rounded-2xl bg-white border border-slate-200 text-slate-900 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
-                        <History size={14} />
-                        对比历史
+                    <div className="flex flex-col gap-3 mt-auto">
+                      <button 
+                        onClick={handleSyncToReport}
+                        className="w-full py-4 rounded-2xl bg-antey-primary text-white text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-antey-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                      >
+                        <Share2 size={16} />
+                        同步至综合报告
                       </button>
-                      <button className="py-4 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-slate-900/20 hover:bg-antey-primary hover:shadow-antey-primary/30 transition-all group flex items-center justify-center gap-2">
-                        <span>生成 PDF 报告</span>
-                        <TrendingUp size={14} />
-                      </button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button className="py-4 rounded-2xl bg-white border border-slate-200 text-slate-900 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 transition-all flex items-center justify-center gap-2">
+                          <History size={14} />
+                          对比历史
+                        </button>
+                        <button className="py-4 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-slate-900/20 hover:bg-slate-800 transition-all group flex items-center justify-center gap-2">
+                          <span>导出 PDF</span>
+                          <TrendingUp size={14} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0">
-                <div className="flex-1 min-h-[420px] bg-slate-50/30 rounded-[2.5rem] border border-slate-100/50 p-6 mb-8 relative group/chart">
+                <div className="flex-1 min-h-[420px] bg-white/40 backdrop-blur-md rounded-[2.5rem] border border-white/60 p-6 mb-8 relative group/chart shadow-xl">
                   <div className="absolute top-6 right-6 z-10 opacity-0 group-hover/chart:opacity-100 transition-opacity">
                     <button className="p-2 bg-white/80 backdrop-blur-md rounded-xl border border-slate-200 shadow-sm text-slate-400 hover:text-antey-accent hover:border-antey-accent/30 transition-all">
                       <Maximize2 size={16} />
@@ -663,7 +747,7 @@ export const Vision3Plugin: React.FC = () => {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-6 mb-8">
-                  <div className="p-8 bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/40 shadow-xl group hover:border-antey-accent/30 hover:shadow-2xl transition-all duration-500">
+                  <div className="p-8 bg-white/40 backdrop-blur-md rounded-[2.5rem] border border-white/60 shadow-xl group hover:border-antey-accent/30 hover:shadow-2xl transition-all duration-500">
                     <div className="flex items-center gap-3 mb-6">
                       <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-500 shadow-sm">
                         <Maximize2 size={18} />
@@ -678,7 +762,7 @@ export const Vision3Plugin: React.FC = () => {
                     </div>
                   </div>
                   
-                  <div className="p-8 bg-white/60 backdrop-blur-xl rounded-[2.5rem] border border-white/40 shadow-xl group hover:border-antey-accent/30 hover:shadow-2xl transition-all duration-500 relative overflow-hidden">
+                  <div className="p-8 bg-white/40 backdrop-blur-md rounded-[2.5rem] border border-white/60 shadow-xl group hover:border-antey-accent/30 hover:shadow-2xl transition-all duration-500 relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-6">
                       <div className={cn(
                         "text-[9px] font-black px-3 py-1.5 rounded-xl uppercase tracking-widest",
@@ -728,14 +812,24 @@ export const Vision3Plugin: React.FC = () => {
                     </div>
                   )}
                   
-                  <button 
-                    disabled={activeMeasurements[0]?.data.length === 0}
-                    onClick={saveMeasurement}
-                    className="w-full py-5 rounded-[2rem] border-2 border-slate-100 text-slate-400 text-[11px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
-                  >
-                    <Save size={18} />
-                    保存本次测量数据
-                  </button>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      disabled={activeMeasurements[0]?.data.length === 0}
+                      onClick={saveMeasurement}
+                      className="py-5 rounded-[2rem] border-2 border-slate-100 text-slate-400 text-[11px] font-black uppercase tracking-[0.2em] hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3"
+                    >
+                      <Save size={18} />
+                      保存数据
+                    </button>
+                    <button 
+                      disabled={activeMeasurements[0]?.data.length === 0}
+                      onClick={handleSyncToReport}
+                      className="py-5 rounded-[2rem] bg-antey-accent text-white text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-antey-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:grayscale"
+                    >
+                      <Share2 size={18} />
+                      同步报告
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
