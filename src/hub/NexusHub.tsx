@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { HubSidebar } from './components/HubSidebar';
-import { Bell, Camera, Mic, Search, Activity, ChevronRight, Calendar } from 'lucide-react';
+import { Bell, Camera, Mic, Search, Activity, ChevronRight, Calendar, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
 import { MedVoicePlugin } from '@/plugins/medvoice/MedVoicePlugin';
+import { NexusReportCenter } from './components/NexusReportCenter';
 import { GlobalExport } from '@/components/GlobalExport';
 
 export const NexusHub: React.FC = () => {
@@ -14,6 +15,7 @@ export const NexusHub: React.FC = () => {
   const plugins = [
     { id: 'dashboard', name: '总览', icon: Activity, color: 'text-antey-primary' },
     { id: 'vision3', name: '体态分析', icon: Camera, color: 'text-antey-accent' },
+    { id: 'reports', name: '报告中心', icon: FileText, color: 'text-blue-500' },
     { id: 'medvoice', name: '语音助手', icon: Mic, color: 'text-purple-500' },
   ];
 
@@ -139,6 +141,12 @@ export const NexusHub: React.FC = () => {
           {activePlugin === 'medvoice' && (
             <div className="h-full">
               <MedVoicePlugin />
+            </div>
+          )}
+
+          {activePlugin === 'reports' && (
+            <div className="h-full">
+              <NexusReportCenter />
             </div>
           )}
         </div>

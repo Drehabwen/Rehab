@@ -233,8 +233,8 @@ export const Vision3Plugin: React.FC = () => {
                 }
               }}
               className={cn(
-                "group relative bento-card p-10 flex flex-col items-start text-left transition-all duration-500 hover:translate-y-[-8px]",
-                card.disabled ? "opacity-60 grayscale cursor-not-allowed" : "hover:shadow-[0_40px_80px_rgba(0,0,0,0.1)] hover:ring-2 hover:ring-antey-primary/20"
+                "group relative bento-card-glass p-10 flex flex-col items-start text-left transition-all duration-500 hover:translate-y-[-8px]",
+                card.disabled ? "opacity-40 grayscale cursor-not-allowed" : "hover:shadow-[0_40px_80px_rgba(13,148,136,0.15)] hover:ring-2 hover:ring-antey-primary/20 bg-white/40 border-white/60"
               )}
             >
               <div className={cn("w-16 h-16 rounded-[1.5rem] flex items-center justify-center mb-8 shadow-lg group-hover:scale-110 transition-transform duration-500 bg-gradient-to-br text-white", card.color)}>
@@ -243,22 +243,22 @@ export const Vision3Plugin: React.FC = () => {
               
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{card.tag}</span>
-                  {card.disabled && <span className="px-2 py-0.5 bg-slate-100 text-[8px] font-black text-slate-500 rounded-md uppercase tracking-widest">即将上线</span>}
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500/60">{card.tag}</span>
+                  {card.disabled && <span className="px-2 py-0.5 bg-slate-200/50 text-[8px] font-black text-slate-500 rounded-md uppercase tracking-widest">即将上线</span>}
                 </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight">{card.title}</h3>
-                <p className="text-[13px] font-medium text-slate-500 leading-relaxed max-w-[240px]">
+                <h3 className="text-2xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-antey-primary transition-colors">{card.title}</h3>
+                <p className="text-[13px] font-medium text-slate-600/80 leading-relaxed max-w-[240px]">
                   {card.desc}
                 </p>
               </div>
 
               <div className="mt-8 flex items-center gap-2 text-antey-primary font-black text-[11px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0">
                 立即启动评估
-                <ArrowRight size={16} />
+                <ArrowRight size={16} className="animate-pulse" />
               </div>
 
-              {/* Background Accent */}
-              <div className={cn("absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-[0.03] rounded-bl-[100%] transition-all group-hover:opacity-[0.08]", card.color)} />
+              {/* Decorative Mesh Background */}
+              <div className={cn("absolute -bottom-4 -right-4 w-32 h-32 bg-gradient-to-br opacity-[0.05] rounded-full blur-2xl transition-all group-hover:opacity-[0.15] group-hover:scale-150", card.color)} />
             </button>
           ))}
         </div>
@@ -389,51 +389,68 @@ export const Vision3Plugin: React.FC = () => {
           )}
 
           {/* Floating Controls: Ultra Premium Glassmorphism */}
-          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-8 p-5 bg-white/5 backdrop-blur-3xl rounded-[2.5rem] border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-700 translate-y-8 group-hover:translate-y-0 shadow-[0_40px_100px_rgba(0,0,0,0.5)] ring-1 ring-white/10">
-            <button 
-              onClick={() => setIsCameraOn(!isCameraOn)}
-              className={cn(
-                "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500",
-                isCameraOn ? "bg-white/10 text-white hover:bg-white/20 hover:scale-110" : "bg-rose-500 text-white shadow-2xl shadow-rose-500/40 hover:scale-110"
-              )}
-            >
-              {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
-            </button>
+          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-8 p-6 bg-slate-900/60 backdrop-blur-3xl rounded-[3rem] border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-700 translate-y-8 group-hover:translate-y-0 shadow-[0_40px_100px_rgba(0,0,0,0.5)] ring-1 ring-white/10 z-30">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => setIsCameraOn(!isCameraOn)}
+                className={cn(
+                  "w-16 h-16 rounded-[1.5rem] flex flex-col items-center justify-center gap-1.5 transition-all duration-500 relative group/btn",
+                  isCameraOn ? "bg-white/10 text-white hover:bg-white/20 hover:scale-110" : "bg-rose-500/80 text-white shadow-2xl shadow-rose-500/40 hover:scale-110"
+                )}
+              >
+                {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
+                <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">{isCameraOn ? '关闭' : '开启'}</span>
+                {isCameraOn && <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />}
+              </button>
+            </div>
             
-            <div className="w-px h-12 bg-white/10" />
+            <div className="w-px h-14 bg-white/10" />
             
             {activeTab === 'posture' ? (
-              <>
+              <div className="flex items-center gap-6">
                 <button 
                   onClick={() => setCaptureStatus('scanning')}
                   disabled={captureStatus !== 'idle'}
-                  className="px-12 py-4 bg-gradient-to-br from-antey-primary to-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl shadow-antey-primary/40 hover:scale-105 hover:shadow-antey-primary/60 active:scale-95 transition-all duration-500 disabled:opacity-30 disabled:scale-100"
+                  className={cn(
+                    "px-10 h-16 rounded-[1.5rem] flex items-center gap-4 font-black text-sm uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl",
+                    captureStatus === 'idle' 
+                      ? "bg-antey-primary text-white hover:bg-antey-primary/80 hover:scale-105 hover:shadow-antey-primary/40" 
+                      : "bg-white/10 text-white/40 cursor-not-allowed"
+                  )}
                 >
-                  启动 AI 智能识别
+                  <Scan size={24} className={cn(captureStatus === 'scanning' && "animate-spin")} />
+                  {captureStatus === 'idle' ? '开始全维度扫描' : '扫描中...'}
                 </button>
-              </>
+                
+                <button 
+                  onClick={() => setView(view === 'front' ? 'side' : view === 'side' ? 'back' : 'front')}
+                  className="w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110"
+                >
+                  <RotateCcw size={20} className="rotate-180" />
+                  <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">切换视图</span>
+                </button>
+              </div>
             ) : (
               <div className="flex items-center gap-6">
-                {!isMeasuring ? (
-                  <button 
-                    onClick={startMeasurement}
-                    className="px-12 py-4 bg-antey-accent text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] shadow-2xl shadow-antey-accent/40 hover:scale-105 hover:shadow-antey-accent/60 transition-all duration-500"
-                  >
-                    启动实时追踪测量
-                  </button>
-                ) : (
-                  <button 
-                    onClick={stopMeasurement}
-                    className="px-12 py-4 bg-rose-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.3em] animate-pulse shadow-2xl shadow-rose-500/40 hover:scale-105 transition-all duration-500"
-                  >
-                    停止当前追踪
-                  </button>
-                )}
                 <button 
-                  onClick={resetMeasurement}
-                  className="w-14 h-14 bg-white/5 text-white rounded-2xl flex items-center justify-center hover:bg-white/10 hover:scale-110 transition-all duration-500 ring-1 ring-white/10"
+                  onClick={() => isMeasuring ? stopMeasurement() : startMeasurement()}
+                  className={cn(
+                    "px-10 h-16 rounded-[1.5rem] flex items-center gap-4 font-black text-sm uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl",
+                    isMeasuring 
+                      ? "bg-rose-500 text-white hover:bg-rose-500/80 hover:scale-105" 
+                      : "bg-antey-accent text-white hover:bg-antey-accent/80 hover:scale-105 shadow-antey-accent/40"
+                  )}
                 >
-                  <RotateCcw size={22} />
+                  {isMeasuring ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
+                  {isMeasuring ? '结束测量任务' : '启动关节采集'}
+                </button>
+
+                <button 
+                  onClick={() => resetMeasurement()}
+                  className="w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110"
+                >
+                  <RefreshCw size={20} />
+                  <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">重置</span>
                 </button>
               </div>
             )}
