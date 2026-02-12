@@ -6,7 +6,7 @@ export interface PluginManifest {
   description: string;
   icon: string; // SVG path or Lucide icon name
   category: 'analysis' | 'communication' | 'records' | 'utility';
-  entry: React.ComponentType<any>;
+  entry: React.ComponentType<unknown>;
   accentColor?: string;
 }
 

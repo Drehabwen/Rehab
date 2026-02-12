@@ -77,7 +77,7 @@ export default function JointSelector() {
       if (current.side) setLocalSide(current.side);
       setLocalDirection(current.direction);
     }
-  }, []); // Run only on mount
+  }, [activeMeasurements]);
 
   // Helper to check if side is needed
   const isSpinal = localJoint === 'cervical' || localJoint === 'thoracolumbar';

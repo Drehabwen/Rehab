@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-interface Landmark {
+export interface Landmark {
   x: number;
   y: number;
   z?: number;

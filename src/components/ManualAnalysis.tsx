@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { X, Save, MousePointer2, Move, Pen, Type, Circle, ArrowRight, Eraser, ZoomIn, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { X, Save, Move, Pen, Type, ArrowRight, Eraser, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 
@@ -32,16 +32,14 @@ interface ManualAnalysisProps {
   imageUrl: string;
   onClose: () => void;
   onSave: (annotatedImage: string) => void;
-  initialLandmarks?: any[]; // For snapping (future)
 }
 
 export default function ManualAnalysis({ imageUrl, onClose, onSave }: ManualAnalysisProps) {
   const [activeTool, setActiveTool] = useState<ToolType>('goniometer-3');
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom] = useState(1);
   const [showMagnifier, setShowMagnifier] = useState(false);
   const [magnifierPos, setMagnifierPos] = useState({ x: 0, y: 0 });
-  const [magnifierContent, setMagnifierContent] = useState<string>('');
   
   // Goniometer State
   const [goniometer, setGoniometer] = useState<GoniometerState | null>(null);
@@ -72,7 +70,7 @@ export default function ManualAnalysis({ imageUrl, onClose, onSave }: ManualAnal
         ]
       });
     }
-  }, [imageSize]);
+  }, [imageSize, goniometer]);
 
   // Handle Image Load
   const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -193,7 +191,6 @@ export default function ManualAnalysis({ imageUrl, onClose, onSave }: ManualAnal
     // Draw source image section
     // Source: pos.x - 25, pos.y - 25 (50x50 area)
     // Dest: 0, 0, 150, 150 (3x zoom)
-    const zoomLevel = 3;
     const sourceSize = 50;
     const destSize = 150;
     

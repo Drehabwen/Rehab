@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, FileText, FileCode, FileType, ChevronDown, Check, Loader2, ChevronRight } from 'lucide-react';
+import { Download, FileText, FileCode, FileType, ChevronDown, Loader2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCaseStore } from '@/store/useCaseStore';
 

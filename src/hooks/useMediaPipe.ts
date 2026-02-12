@@ -1,11 +1,11 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { Holistic, Results, Options } from '@mediapipe/holistic';
 
 /**
  * Singleton MediaPipe Holistic instance management
  */
 let globalHolistic: Holistic | null = null;
-let activeListeners: Set<(results: Results) => void> = new Set();
+const activeListeners: Set<(results: Results) => void> = new Set();
 let isProcessing = false;
 let requestRef: number | null = null;
 

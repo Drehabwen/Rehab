@@ -25,25 +25,34 @@ vi.mock('@mediapipe/pose', () => ({
 describe('WebcamView', () => {
   const mockAnalyzeJoint = vi.fn();
   const mockUpdateMeasurementData = vi.fn();
+  const mockedUseMeasurementStore = vi.mocked(useMeasurementStore);
+  const mockedUsePostureWS = vi.mocked(usePostureWS);
+  const mockedUseCameraStream = vi.mocked(useCameraStream);
 
   beforeEach(() => {
     vi.clearAllMocks();
     
-    (useMeasurementStore as any).mockReturnValue({
+    mockedUseMeasurementStore.mockReturnValue({
       activeMeasurements: [],
       updateMeasurementData: mockUpdateMeasurementData,
       isMeasuring: false
     });
 
-    (usePostureWS as any).mockReturnValue({
+    mockedUsePostureWS.mockReturnValue({
+      result: null,
+      status: 'connected',
+      analyze: vi.fn(),
       analyzeJoint: mockAnalyzeJoint,
       jointResult: null
     });
 
-    (useCameraStream as any).mockReturnValue({
-      stream: {},
+    mockedUseCameraStream.mockReturnValue({
+      stream: new MediaStream(),
       isLoading: false,
-      error: null
+      error: new Error(''),
+      startStream: vi.fn(async () => {}),
+      stopStream: vi.fn(),
+      trackInfo: { label: 'Mock Camera', muted: false, readyState: 'live' }
     });
   });
 
@@ -58,7 +67,7 @@ describe('WebcamView', () => {
   });
 
   it('displays active measurements and angles', () => {
-    (useMeasurementStore as any).mockReturnValue({
+    mockedUseMeasurementStore.mockReturnValue({
       activeMeasurements: [
         { id: '1', joint: 'elbow', direction: 'flexion', currentAngle: 45.5, maxAngle: 90, side: 'left' }
       ],

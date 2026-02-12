@@ -26,28 +26,35 @@ import BaseWebcamView from '@/components/shared/BaseWebcamView';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import MeasurementChart from '@/components/MeasurementChart';
 import JointSelector from '@/components/JointSelector';
-
-const jointNameMap: Record<string, string> = {
-  cervical: '颈椎',
-  shoulder: '肩关节',
-  thoracolumbar: '胸腰椎',
-  elbow: '肘关节',
-  wrist: '腕关节',
-  hip: '髋关节',
-  knee: '膝关节',
-  ankle: '踝关节',
-};
+import {
+  jointNameMap,
+  HeadAxes,
+  normalizeHeadAxes,
+  scaleHeadAxes,
+  smoothHeadAxes,
+  drawHeadAxes,
+  PoseLandmark,
+  getShoulderStatus,
+  getHeadStatus,
+  getHipStatus,
+  getSeverityLabel
+} from './vision3-utils';
 
 export const Vision3Plugin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'posture' | 'rom'>('posture');
   const [isEntryMode, setIsEntryMode] = useState(true);
   const [view, setView] = useState<'front' | 'back' | 'side'>('front');
   const [isCameraOn, setIsCameraOn] = useState(true);
+  const [showHeadAxes, setShowHeadAxes] = useState(true);
+  const [axesScale, setAxesScale] = useState(1);
+  const isMirrored = true;
   
   // Posture States
   const [result, setResult] = useState<{ issues: PostureIssue[]; metrics: PostureMetrics; image: string } | null>(null);
   const capturedImage = useRef<string | null>(null);
   const reportCanvasRef = useRef<HTMLCanvasElement>(null);
+  const headAxesRef = useRef<HeadAxes | null>(null);
+  const smoothedAxesRef = useRef<HeadAxes | null>(null);
   
   // ROM States (from store)
   const { 
@@ -65,6 +72,11 @@ export const Vision3Plugin: React.FC = () => {
         metrics: wsResult.metrics,
         image: prev?.image || ''
       }));
+      const normalized = normalizeHeadAxes(wsResult.metrics.head_axes);
+      headAxesRef.current = normalized;
+      if (!normalized) {
+        smoothedAxesRef.current = null;
+      }
     }
   }, [wsResult]);
 
@@ -73,7 +85,7 @@ export const Vision3Plugin: React.FC = () => {
   const [countdown, setCountdown] = useState(5);
   const [isInPosition, setIsInPosition] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const landmarksBufferRef = useRef<any[][]>([]);
+  const landmarksBufferRef = useRef<PoseLandmark[][]>([]);
   const videoContainerRef = useRef<HTMLDivElement>(null);
 
   // Fullscreen toggle handler
@@ -96,18 +108,14 @@ export const Vision3Plugin: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Reference box (Used for visual positioning check)
-  // const BOX = { xMin: 0.25, xMax: 0.75, yMin: 0.1, yMax: 0.9 };
-
-  const checkUserPosition = (landmarks: any[]) => {
+  const checkUserPosition = useCallback((landmarks: PoseLandmark[]) => {
     if (!landmarks || landmarks.length < 33) return false;
-    // Simplified check for now - just check if essential points are visible
     const keyPointsIndices = [0, 11, 12, 23, 24]; // Nose, Shoulders, Hips
     const visible = keyPointsIndices.every(idx => landmarks[idx].visibility > 0.5);
     return visible;
-  };
+  }, []);
 
-  const onResults = useCallback((results: Results) => {
+  const onResults = useCallback((results: Results, _video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
     if (results.poseLandmarks) {
       landmarksBufferRef.current.push(results.poseLandmarks);
       if (landmarksBufferRef.current.length > 30) landmarksBufferRef.current.shift();
@@ -122,7 +130,17 @@ export const Vision3Plugin: React.FC = () => {
         }
       }
     }
-  }, [activeTab, isEntryMode, captureStatus]);
+    if (!canvas) return;
+    if (!showHeadAxes) return;
+    const axes = headAxesRef.current;
+    if (!axes) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const smoothed = smoothHeadAxes(smoothedAxesRef.current, axes, 0.35);
+    smoothedAxesRef.current = smoothed;
+    const scaled = scaleHeadAxes(smoothed, axesScale);
+    drawHeadAxes(ctx, scaled, isMirrored ? canvas.width : undefined);
+  }, [activeTab, isEntryMode, captureStatus, showHeadAxes, axesScale, isMirrored, checkUserPosition]);
 
   // Countdown Logic
   useEffect(() => {
@@ -133,7 +151,7 @@ export const Vision3Plugin: React.FC = () => {
       setCaptureStatus('analyzing');
       // Capture logic here
       const canvas = document.createElement('canvas');
-      const video = document.querySelector('video'); // Simplified selector
+      const video = document.querySelector('video') as HTMLVideoElement | null; // Typed selector
       if (video) {
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
@@ -165,35 +183,6 @@ export const Vision3Plugin: React.FC = () => {
       setCountdown(5);
     }
   }, [captureStatus]);
-
-  const getShoulderStatus = (angle: number) => {
-    const absAngle = Math.abs(angle);
-    if (absAngle < 1.5) return { text: '姿态端正', color: 'text-emerald-500', bgColor: 'bg-emerald-50' };
-    if (absAngle < 3.5) return { text: '轻微高低肩', color: 'text-amber-500', bgColor: 'bg-amber-50' };
-    return { text: '显著高低肩', color: 'text-rose-500', bgColor: 'bg-rose-50' };
-  };
-
-  const getHeadStatus = (angle: number) => {
-    if (angle < 12) return { text: '理想体态', color: 'text-emerald-500', bgColor: 'bg-emerald-50' };
-    if (angle < 22) return { text: '轻度前倾', color: 'text-amber-500', bgColor: 'bg-amber-50' };
-    return { text: '严重前倾', color: 'text-rose-500', bgColor: 'bg-rose-50' };
-  };
-
-  const getHipStatus = (angle: number) => {
-    const absAngle = Math.abs(angle);
-    if (absAngle < 2.5) return { text: '结构稳定', color: 'text-emerald-500', bgColor: 'bg-emerald-50' };
-    if (absAngle < 5) return { text: '轻微倾斜', color: 'text-amber-500', bgColor: 'bg-amber-50' };
-    return { text: '骨盆失衡', color: 'text-rose-500', bgColor: 'bg-rose-50' };
-  };
-
-  const getSeverityLabel = (severity: string) => {
-    switch (severity) {
-      case 'severe': return '严重';
-      case 'moderate': return '中度';
-      case 'mild': return '轻微';
-      default: return '观察';
-    }
-  };
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 overflow-hidden">
@@ -290,7 +279,7 @@ export const Vision3Plugin: React.FC = () => {
               disabled={card.disabled}
               onClick={() => {
                 if (card.id === 'front' || card.id === 'side' || card.id === 'back') {
-                  setView(card.id as any);
+                  setView(card.id as 'front' | 'side' | 'back');
                   setIsEntryMode(false);
                 }
               }}
@@ -340,6 +329,7 @@ export const Vision3Plugin: React.FC = () => {
           <BaseWebcamView 
             onResults={onResults} 
             isCameraOn={isCameraOn}
+            isMirrored={isMirrored}
             className="w-full h-full object-cover opacity-90 transition-opacity duration-1000"
           />
 
@@ -654,6 +644,32 @@ export const Vision3Plugin: React.FC = () => {
                             <span className="text-[9px] font-black text-white/40 uppercase tracking-widest">3D 头部位姿 (实验性)</span>
                             <div className="px-2 py-0.5 bg-emerald-500/20 rounded-lg">
                               <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Backend Core</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mb-4">
+                            <button
+                              type="button"
+                              onClick={() => setShowHeadAxes(prev => !prev)}
+                              className={cn(
+                                "px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all",
+                                showHeadAxes
+                                  ? "bg-emerald-500/20 border-emerald-400 text-emerald-300"
+                                  : "bg-white/10 border-white/20 text-white/60"
+                              )}
+                            >
+                              {showHeadAxes ? '3D 轴开启' : '3D 轴关闭'}
+                            </button>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8px] font-black text-white/40 uppercase tracking-widest">轴长度</span>
+                              <input
+                                type="range"
+                                min={0.6}
+                                max={1.6}
+                                step={0.1}
+                                value={axesScale}
+                                onChange={(event) => setAxesScale(Number(event.target.value))}
+                                className="h-1 w-20 accent-emerald-400"
+                              />
                             </div>
                           </div>
                           <div className="grid grid-cols-3 gap-2">

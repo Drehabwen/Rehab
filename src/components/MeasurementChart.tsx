@@ -1,7 +1,7 @@
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { getStandardRange } from '@/constants/standard-ranges';
 import { Activity } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const JOINT_NAMES: Record<string, string> = {
   'cervical': '颈椎',
@@ -53,7 +53,7 @@ export default function MeasurementChart() {
   // Use the first measurement as the time base
   const primaryMeasurement = activeMeasurements[0];
   const chartData = primaryMeasurement.data.map((point, index) => {
-    const merged: any = { timestamp: point.timestamp };
+    const merged: { timestamp: number; [key: string]: number } = { timestamp: point.timestamp };
     activeMeasurements.forEach(m => {
       if (m.data[index]) {
         merged[m.id] = m.data[index].angle;

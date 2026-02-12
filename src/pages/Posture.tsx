@@ -1,15 +1,28 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Results, POSE_CONNECTIONS } from '@mediapipe/holistic';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
-import { Camera as CameraIcon, CheckCircle, AlertTriangle, User, Play, RefreshCw, FileDown, Video, VideoOff } from 'lucide-react';
-import { usePostureWS, VisualAnnotation, PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
+import { Camera as CameraIcon, CheckCircle, AlertTriangle, User, RefreshCw, FileDown } from 'lucide-react';
+import { usePostureWS, VisualAnnotation, PostureIssue, PostureMetrics, Landmark } from '@/hooks/usePostureWS';
 import { cn } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import BaseWebcamView from '@/components/shared/BaseWebcamView';
 
+const BOX = {
+  xMin: 0.25,
+  xMax: 0.75,
+  yMin: 0.1,
+  yMax: 0.9
+};
+
+type PostureResult = { issues: PostureIssue[]; metrics: PostureMetrics; image: string };
+
 export default function Posture() {
+  const viewOptions = [
+    { id: 'front', label: '正视图' },
+    { id: 'side', label: '侧视图' },
+    { id: 'back', label: '背视图' }
+  ] as const;
   const [view, setView] = useState<'front' | 'back' | 'side'>('front');
   const [isCameraOn, setIsCameraOn] = useState(() => {
     const saved = localStorage.getItem('vision3_camera_enabled');
@@ -20,38 +33,13 @@ export default function Posture() {
     localStorage.setItem('vision3_camera_enabled', String(isCameraOn));
   }, [isCameraOn]);
 
-  const [result, setResult] = useState<{ issues: PostureIssue[]; metrics: PostureMetrics; image: string } | null>(null);
-  const [landmarks, setLandmarks] = useState<any[] | null>(null);
+  const [result, setResult] = useState<PostureResult | null>(null);
+  const [landmarks, setLandmarks] = useState<Landmark[] | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const reportCanvasRef = useRef<HTMLCanvasElement>(null);
   
   // WebSocket for posture analysis
   const { result: wsResult, analyze } = usePostureWS();
-
-  // Handle analysis results from WebSocket
-  useEffect(() => {
-    if (wsResult && capturedImage && landmarks) {
-      setResult({
-        issues: wsResult.issues,
-        metrics: wsResult.metrics,
-        image: capturedImage,
-        // @ts-ignore
-        headPoseAxes: wsResult.metrics.head_axes
-      });
-
-      setTimeout(() => drawResultCanvas(
-        capturedImage, 
-        landmarks, 
-        wsResult.issues, 
-        wsResult.annotations || [], 
-        // @ts-ignore
-        wsResult.metrics.head_axes
-      ), 100);
-
-      setCaptureStatus('idle');
-      setIsInPosition(false);
-    }
-  }, [wsResult, capturedImage, landmarks, view]);
 
   // Auto-capture states
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown'>('idle');
@@ -60,17 +48,9 @@ export default function Posture() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // We need to keep track of latest landmarks for snapshot
-  const landmarksBufferRef = useRef<any[][]>([]);
+  const landmarksBufferRef = useRef<Landmark[][]>([]);
 
-  // Define reference box (normalized coordinates 0-1)
-  const BOX = {
-    xMin: 0.25,
-    xMax: 0.75,
-    yMin: 0.1,
-    yMax: 0.9
-  };
-
-  const checkUserPosition = (landmarks: any[]) => {
+  const checkUserPosition = useCallback((landmarks: Landmark[]) => {
     if (!landmarks || landmarks.length < 33) return false;
 
     // Check visibility of key points (Nose, Shoulders, Hips, Ankles)
@@ -81,7 +61,6 @@ export default function Posture() {
     // Check bounds
     const nose = landmarks[0];
     const leftAnkle = landmarks[27];
-    const rightAnkle = landmarks[28];
     const leftShoulder = landmarks[11];
     const rightShoulder = landmarks[12];
 
@@ -94,14 +73,13 @@ export default function Posture() {
       leftAnkle.y > 0.6 && leftAnkle.y < BOX.yMax; // Feet in lower section
 
     return inX && inY;
-  };
+  }, []);
 
-  const drawResultCanvas = (
+  const drawResultCanvas = useCallback((
     imageSrc: string, 
-    landmarks: any[], 
+    landmarks: Landmark[], 
     issues: PostureIssue[], 
-    annotations: VisualAnnotation[] = [],
-    headPoseAxes?: any[]
+    annotations: VisualAnnotation[] = []
   ) => {
       const img = new Image();
       img.src = imageSrc;
@@ -165,7 +143,27 @@ export default function Posture() {
           // Update result image with annotations
           setResult(prev => prev ? { ...prev, image: canvas.toDataURL() } : null);
       };
-  };
+  }, [view]);
+
+  useEffect(() => {
+    if (wsResult && capturedImage && landmarks) {
+      setResult({
+        issues: wsResult.issues,
+        metrics: wsResult.metrics,
+        image: capturedImage
+      });
+
+      setTimeout(() => drawResultCanvas(
+        capturedImage, 
+        landmarks, 
+        wsResult.issues, 
+        wsResult.annotations || []
+      ), 100);
+
+      setCaptureStatus('idle');
+      setIsInPosition(false);
+    }
+  }, [wsResult, capturedImage, landmarks, drawResultCanvas]);
 
   const handleCapture = useCallback((video: HTMLVideoElement) => {
     if (landmarksBufferRef.current.length === 0) return;
@@ -184,7 +182,7 @@ export default function Posture() {
     if (buffer.length === 0) return;
     
     // Initialize with first frame
-    const avgLandmarks = buffer[0].map(lm => ({ ...lm, x: 0, y: 0, z: 0, visibility: 0 }));
+    const avgLandmarks = buffer[0].map(() => ({ x: 0, y: 0, z: 0, visibility: 0 }));
     
     // Sum up
     for (const frame of buffer) {
@@ -192,15 +190,15 @@ export default function Posture() {
             if (avgLandmarks[idx]) {
                 avgLandmarks[idx].x += lm.x;
                 avgLandmarks[idx].y += lm.y;
-                avgLandmarks[idx].z += lm.z;
-                avgLandmarks[idx].visibility += lm.visibility;
+                avgLandmarks[idx].z += lm.z ?? 0;
+                avgLandmarks[idx].visibility += lm.visibility ?? 0;
             }
         });
     }
     
     // Divide
     const count = buffer.length;
-    let currentLandmarks = avgLandmarks.map(lm => ({
+    let currentLandmarks: Landmark[] = avgLandmarks.map(lm => ({
         x: lm.x / count,
         y: lm.y / count,
         z: lm.z / count,
@@ -209,7 +207,7 @@ export default function Posture() {
     
     // Fix alignment for mirrored front view
     if (view === 'front') {
-        currentLandmarks = currentLandmarks.map((lm: any) => ({
+        currentLandmarks = currentLandmarks.map((lm) => ({
             ...lm,
             x: 1 - lm.x
         }));
@@ -228,10 +226,11 @@ export default function Posture() {
     captureStatusRef.current = captureStatus;
   }, [captureStatus]);
 
-  const onResults = useCallback((results: Results, video: HTMLVideoElement) => {
+  const onResults = useCallback((results: Results) => {
     if (results.poseLandmarks) {
       // Update buffer
-      landmarksBufferRef.current.push(results.poseLandmarks);
+      const poseLandmarks = results.poseLandmarks as Landmark[];
+      landmarksBufferRef.current.push(poseLandmarks);
       
       // Keep last 30 frames (~1 second)
       if (landmarksBufferRef.current.length > 30) {
@@ -241,7 +240,7 @@ export default function Posture() {
       // Auto-capture logic
       const status = captureStatusRef.current;
       if (status === 'scanning' || status === 'countdown') {
-        const inPos = checkUserPosition(results.poseLandmarks);
+        const inPos = checkUserPosition(poseLandmarks);
         setIsInPosition(inPos);
 
         if (status === 'scanning' && inPos) {
@@ -254,7 +253,7 @@ export default function Posture() {
         }
       }
     }
-  }, []);
+  }, [checkUserPosition]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -263,8 +262,6 @@ export default function Posture() {
         setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(countdownIntervalRef.current!);
-            // We need a way to get the video element here or use a ref
-            // For now, we'll rely on the next onResults call to trigger handleCapture if countdown is 0
             return 0;
           }
           return prev - 1;
@@ -283,7 +280,7 @@ export default function Posture() {
   useEffect(() => {
     if (captureStatus === 'countdown' && countdown === 0) {
         // Find the video element and capture
-        const video = document.querySelector('video');
+        const video = document.querySelector('video') as HTMLVideoElement | null;
         if (video) handleCapture(video);
     }
   }, [countdown, captureStatus, handleCapture]);
@@ -331,14 +328,10 @@ export default function Posture() {
         </div>
         
         <div className="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm self-start md:self-auto">
-          {[
-            { id: 'front', label: '正视图' },
-            { id: 'side', label: '侧视图' },
-            { id: 'back', label: '背视图' }
-          ].map((v) => (
+          {viewOptions.map((v) => (
             <button
               key={v.id}
-              onClick={() => { setView(v.id as any); resetAnalysis(); }}
+              onClick={() => { setView(v.id); resetAnalysis(); }}
               className={cn(
                 "px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300",
                 view === v.id 
@@ -544,11 +537,12 @@ export default function Posture() {
           <div className="space-y-6">
             <h3 className="text-2xl font-black border-l-4 border-blue-600 pl-4">关键指标</h3>
             <div className="grid grid-cols-1 gap-4">
-              {result && Object.entries(result.metrics).map(([key, value]: [string, any]) => {
+              {result && (Object.entries(result.metrics) as Array<[keyof PostureMetrics, PostureMetrics[keyof PostureMetrics]]>).map(([key, value]) => {
                 if (typeof value !== 'number') return null;
+                const label = String(key).replace(/_/g, ' ');
                 return (
                   <div key={key} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex justify-between items-center">
-                    <span className="font-bold text-slate-500 uppercase tracking-wider text-xs">{key.replace(/_/g, ' ')}</span>
+                    <span className="font-bold text-slate-500 uppercase tracking-wider text-xs">{label}</span>
                     <span className="text-2xl font-black text-slate-900">{value.toFixed(1)}°</span>
                   </div>
                 );

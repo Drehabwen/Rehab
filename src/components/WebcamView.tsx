@@ -1,8 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Results } from '@mediapipe/holistic';
-import { Video, VideoOff } from 'lucide-react';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
-import { usePostureWS } from '@/hooks/usePostureWS';
+import { usePostureWS, Landmark } from '@/hooks/usePostureWS';
 import BaseWebcamView from './shared/BaseWebcamView';
 
 const JOINT_NAMES: Record<string, string> = {
@@ -38,6 +37,8 @@ const SIDE_NAMES: Record<string, string> = {
   'right': '右'
 };
 
+type PoseResults = Results & { poseWorldLandmarks?: Landmark[] };
+
 export default function WebcamView() {
   const [isCameraOn, setIsCameraOn] = useState(() => {
     const saved = localStorage.getItem('vision3_camera_enabled');
@@ -72,11 +73,12 @@ export default function WebcamView() {
     }
   }, [jointResult, updateMeasurementData]);
 
-  const onResults = useCallback((results: Results, video: HTMLVideoElement, canvas: HTMLCanvasElement) => {
+  const onResults = useCallback((results: Results, video: HTMLVideoElement) => {
     if (!results.poseLandmarks) return;
 
     // Send ORIGINAL landmarks to backend for analysis
     if (activeMeasurementsRef.current.length > 0) {
+      const worldLandmarks = (results as PoseResults).poseWorldLandmarks;
       analyzeJoint(
         activeMeasurementsRef.current.map(m => ({
           id: m.id,
@@ -87,12 +89,9 @@ export default function WebcamView() {
         results.poseLandmarks,
         video.videoWidth,
         video.videoHeight,
-        (results as any).poseWorldLandmarks
+        worldLandmarks
       );
     }
-
-    // Capture image if measuring and angle increased significantly (simplified for now)
-    // In a real scenario, we might want to capture the max angle image
   }, [analyzeJoint]);
 
   return (

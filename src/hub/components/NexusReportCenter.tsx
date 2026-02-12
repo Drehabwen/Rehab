@@ -5,7 +5,6 @@ import {
   Filter, 
   Download, 
   Trash2, 
-  ChevronRight, 
   Calendar, 
   User, 
   Activity,
@@ -20,7 +19,6 @@ import { useMeasurementStore } from '@/store/useMeasurementStore';
 export const NexusReportCenter: React.FC = () => {
   const { savedMeasurements, deleteSavedMeasurement } = useMeasurementStore();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'vision' | 'voice'>('all');
 
   const stats = [
     { label: '总报告数', value: savedMeasurements.length, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },

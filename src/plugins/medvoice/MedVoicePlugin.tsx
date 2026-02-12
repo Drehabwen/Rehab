@@ -1,8 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { 
   Mic, 
-  MicOff, 
-  Play, 
   Square, 
   FileText, 
   Save, 
@@ -11,10 +9,7 @@ import {
   History,
   MessageSquare,
   Activity,
-  ChevronRight,
   Plus,
-  Layout,
-  Stethoscope
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
@@ -22,46 +17,39 @@ import { useCaseStore, StructuredCase } from '@/store/useCaseStore';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { GlobalExport } from '@/components/GlobalExport';
 
+const standardSections = [
+  { id: '主诉', icon: MessageSquare, color: 'text-blue-500', bgColor: 'bg-blue-50' },
+  { id: '现病史', icon: Activity, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
+  { id: '既往史', icon: History, color: 'text-amber-500', bgColor: 'bg-amber-50' },
+  { id: '体格检查', icon: ClipboardCheck, color: 'text-purple-500', bgColor: 'bg-purple-50' },
+  { id: '诊断', icon: FileText, color: 'text-rose-500', bgColor: 'bg-rose-50' },
+  { id: '处理意见', icon: Save, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
+  { id: 'ai_suggestions', icon: Activity, color: 'text-purple-600', bgColor: 'bg-purple-50', label: 'AI 临床建议' },
+];
+
+const soapSections = [
+  { id: 'S', label: 'S (Subjective) 主观资料', icon: MessageSquare, color: 'text-blue-500', bgColor: 'bg-blue-50' },
+  { id: 'O', label: 'O (Objective) 客观检查', icon: Activity, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
+  { id: 'A', label: 'A (Assessment) 评估诊断', icon: ClipboardCheck, color: 'text-purple-500', bgColor: 'bg-purple-50' },
+  { id: 'P', label: 'P (Plan) 治疗计划', icon: Save, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
+  { id: 'ai_suggestions', label: 'AI 跨维度推理', icon: Activity, color: 'text-purple-600', bgColor: 'bg-purple-50' },
+];
+
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 export const MedVoicePlugin: React.FC = () => {
-  const standardSections = [
-    { id: '主诉', icon: MessageSquare, color: 'text-blue-500', bgColor: 'bg-blue-50' },
-    { id: '现病史', icon: Activity, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
-    { id: '既往史', icon: History, color: 'text-amber-500', bgColor: 'bg-amber-50' },
-    { id: '体格检查', icon: ClipboardCheck, color: 'text-purple-500', bgColor: 'bg-purple-50' },
-    { id: '诊断', icon: FileText, color: 'text-rose-500', bgColor: 'bg-rose-50' },
-    { id: '处理意见', icon: Save, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
-    { id: 'ai_suggestions', icon: Activity, color: 'text-purple-600', bgColor: 'bg-purple-50', label: 'AI 临床建议' },
-  ];
-
-  const soapSections = [
-    { id: 'S', label: 'S (Subjective) 主观资料', icon: MessageSquare, color: 'text-blue-500', bgColor: 'bg-blue-50' },
-    { id: 'O', label: 'O (Objective) 客观检查', icon: Activity, color: 'text-emerald-500', bgColor: 'bg-emerald-50' },
-    { id: 'A', label: 'A (Assessment) 评估诊断', icon: ClipboardCheck, color: 'text-purple-500', bgColor: 'bg-purple-50' },
-    { id: 'P', label: 'P (Plan) 治疗计划', icon: Save, color: 'text-indigo-500', bgColor: 'bg-indigo-50' },
-    { id: 'ai_suggestions', label: 'AI 跨维度推理', icon: Activity, color: 'text-purple-600', bgColor: 'bg-purple-50' },
-  ];
-
   const [viewMode, setViewMode] = useState<'standard' | 'soap'>('standard');
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const { structuredCase, setStructuredCase, patientInfo, setPatientInfo } = useCaseStore();
+  const { structuredCase, setStructuredCase } = useCaseStore();
   const [activeSection, setActiveSection] = useState<string>('主诉');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { activeMeasurements, savedMeasurements } = useMeasurementStore();
-
-  // 当切换视图模式时，重置激活的章节
-  useEffect(() => {
-    const currentSections = viewMode === 'standard' ? standardSections : soapSections;
-    setActiveSection(currentSections[0].id);
-  }, [viewMode]);
-
-  // 格式化时间
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   // 绘制波形
   const drawWaveform = useCallback((power: number) => {
@@ -141,7 +129,7 @@ export const MedVoicePlugin: React.FC = () => {
           mode: viewMode
         }),
       });
-      const result = await response.json();
+      const result: { status: string; data: { structured_case: StructuredCase } } = await response.json();
       if (result.status === 'success') {
         setStructuredCase(result.data.structured_case);
         // 如果切换到 SOAP 模式且当前选中的 section 不在 SOAP 中，则重置 activeSection
@@ -410,24 +398,4 @@ export const MedVoicePlugin: React.FC = () => {
     </div>
   );
 };
-
-const Calendar: React.FC<{ size?: number, className?: string }> = ({ size = 20, className }) => (
-  <svg 
-    width={size} 
-    height={size} 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-    <line x1="16" y1="2" x2="16" y2="6"></line>
-    <line x1="8" y1="2" x2="8" y2="6"></line>
-    <line x1="3" y1="10" x2="21" y2="10"></line>
-  </svg>
-);
-
 export default MedVoicePlugin;

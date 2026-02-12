@@ -9,7 +9,13 @@ export default function RawCameraTest() {
   const [status, setStatus] = useState<string>('等待启动...');
   const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [trackInfo, setTrackInfo] = useState<any>(null);
+  const [trackInfo, setTrackInfo] = useState<{
+    label: string;
+    enabled: boolean;
+    muted: boolean;
+    readyState: MediaStreamTrackState;
+    settings: MediaTrackSettings;
+  } | null>(null);
   const [resolution, setResolution] = useState<string>('未知');
 
   const checkDevices = async () => {
@@ -35,7 +41,7 @@ export default function RawCameraTest() {
       { video: { width: 640, height: 480 }, audio: false } // 低分辨率尝试
     ];
 
-    let lastErr = null;
+    let lastErr: Error | null = null;
     for (const constraint of constraints) {
       try {
         console.log('Trying constraint:', constraint);
@@ -64,22 +70,24 @@ export default function RawCameraTest() {
           setStatus('摄像头已连接');
           return;
         }
-      } catch (err: any) {
-        lastErr = err;
-        console.warn('Constraint failed:', constraint, err);
+      } catch (err) {
+        const errorObj = err instanceof Error ? err : new Error('Unknown getUserMedia error');
+        lastErr = errorObj;
+        console.warn('Constraint failed:', constraint, errorObj);
       }
     }
 
-    setError(`${lastErr?.name}: ${lastErr?.message}`);
+    setError(lastErr ? `${lastErr.name}: ${lastErr.message}` : '未知错误');
     setStatus('所有尝试均失败');
   };
 
   useEffect(() => {
     checkDevices().then(() => startCamera());
+    const videoElement = videoRef.current;
     
     return () => {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
+      if (videoElement && videoElement.srcObject) {
+        const stream = videoElement.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
     };

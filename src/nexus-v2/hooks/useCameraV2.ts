@@ -7,7 +7,7 @@ export interface CameraState {
   trackInfo: {
     label: string;
     muted: boolean;
-    readyState: string;
+    readyState: MediaStreamTrackState;
   } | null;
 }
 
@@ -74,11 +74,12 @@ export function useCameraV2(enabled: boolean = true) {
       
       updateTrackState();
 
-    } catch (err: any) {
-      console.error('[useCameraV2] Error:', err);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Unknown camera error');
+      console.error('[useCameraV2] Error:', error);
       setState({
         stream: null,
-        error: err,
+        error,
         isLoading: false,
         trackInfo: null
       });

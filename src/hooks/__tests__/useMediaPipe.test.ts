@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { Results } from '@mediapipe/holistic';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useMediaPipe } from '../useMediaPipe';
 
@@ -30,11 +31,12 @@ describe('useMediaPipe', () => {
       return 1;
     });
 
-    mockVideo = {
+    const videoStub: Partial<HTMLVideoElement> = {
       readyState: 4, // HAVE_ENOUGH_DATA
       play: vi.fn(),
       pause: vi.fn(),
-    } as any;
+    };
+    mockVideo = videoStub as HTMLVideoElement;
     
     vi.clearAllMocks();
   });
@@ -79,7 +81,7 @@ describe('useMediaPipe', () => {
     await vi.advanceTimersByTimeAsync(100);
 
     // Simulate result from MediaPipe
-    const mockResult = { poseLandmarks: [] } as any;
+    const mockResult = { poseLandmarks: [] } as Results;
     const callback = mockOnResults.mock.calls[0][0];
     callback(mockResult);
 

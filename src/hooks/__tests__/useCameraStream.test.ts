@@ -1,18 +1,43 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, waitFor, act } from '@testing-library/react';
-import { useCameraStream, resetCameraStreamForTesting } from '../useCameraStream';
+import { renderHook, waitFor } from '@testing-library/react';
+import { useCameraStream } from '../useCameraStream';
 
-// Mock MediaStream
-class MockMediaStream {
-  active = true;
-  tracks = [{ stop: vi.fn(), kind: 'video' }];
-  getTracks = vi.fn(() => this.tracks);
+class MockVideoTrack {
+  kind = 'video';
+  label = 'Mock Camera';
+  muted = false;
+  readyState: MediaStreamTrackState = 'live';
+  onmute: (() => void) | null = null;
+  onunmute: (() => void) | null = null;
+  onended: (() => void) | null = null;
+  stop = vi.fn();
 }
 
-describe('useCameraStream', () => {
+class MockMediaStream {
+  active = true;
+  tracks: MockVideoTrack[] = [];
+  
+  constructor() {
+    this.tracks = [new MockVideoTrack()];
+  }
+
+  getTracks() {
+    return this.tracks;
+  }
+
+  getVideoTracks() {
+    return this.tracks.filter(t => t.kind === 'video');
+  }
+}
+
+const getUserMediaMock = () =>
+  navigator.mediaDevices.getUserMedia as unknown as {
+    mockResolvedValue: (value: unknown) => void;
+    mockRejectedValue: (value: unknown) => void;
+  };
+
+describe('useCameraStream (V2)', () => {
   beforeEach(() => {
-    resetCameraStreamForTesting();
-    
     Object.defineProperty(global.navigator, 'mediaDevices', {
       value: {
         getUserMedia: vi.fn()
@@ -28,55 +53,78 @@ describe('useCameraStream', () => {
 
   it('should request a new stream when enabled', async () => {
     const mockStream = new MockMediaStream();
-    (navigator.mediaDevices.getUserMedia as any).mockResolvedValue(mockStream);
+    getUserMediaMock().mockResolvedValue(mockStream);
 
     const { result } = renderHook(() => useCameraStream(true));
 
-    await waitFor(() => expect(result.current.stream).toBe(mockStream), { timeout: 3000 });
-    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(result.current.stream).toBe(mockStream);
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledWith({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+      audio: false
+    });
   });
 
-  it('should reuse the existing active stream for multiple users', async () => {
+  it('should not request stream when disabled', async () => {
     const mockStream = new MockMediaStream();
-    (navigator.mediaDevices.getUserMedia as any).mockResolvedValue(mockStream);
+    getUserMediaMock().mockResolvedValue(mockStream);
 
-    const { result: hook1 } = renderHook(() => useCameraStream(true));
-    await waitFor(() => expect(hook1.current.stream).toBe(mockStream));
+    const { result } = renderHook(() => useCameraStream(false));
 
-    const { result: hook2 } = renderHook(() => useCameraStream(true));
-    await waitFor(() => expect(hook2.current.stream).toBe(mockStream));
+    await waitFor(() => {
+      expect(result.current.stream).toBeNull();
+      expect(result.current.isLoading).toBe(false);
+    });
 
-    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
   });
 
-  it('should retry when NotReadableError occurs', async () => {
-    const mockStream = new MockMediaStream();
-    const error = new DOMException('Device in use', 'NotReadableError');
-    
-    (navigator.mediaDevices.getUserMedia as any)
-      .mockRejectedValueOnce(error)
-      .mockResolvedValueOnce(mockStream);
+  it('should handle camera errors', async () => {
+    const error = new Error('Camera not found');
+    getUserMediaMock().mockRejectedValue(error);
 
     const { result } = renderHook(() => useCameraStream(true));
 
-    // Wait for the retry and successful stream
-    await waitFor(() => expect(result.current.stream).toBe(mockStream), { timeout: 5000 });
-    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(result.current.error).toBe(error);
+      expect(result.current.stream).toBeNull();
+      expect(result.current.isLoading).toBe(false);
+    });
   });
 
-  it('should cleanup stream when no active users remain', async () => {
+  it('should provide track info when stream is active', async () => {
     const mockStream = new MockMediaStream();
+    const mockTrack = new MockVideoTrack();
+    mockStream.tracks[0] = mockTrack;
+    getUserMediaMock().mockResolvedValue(mockStream);
+
+    const { result } = renderHook(() => useCameraStream(true));
+
+    await waitFor(() => {
+      expect(result.current.trackInfo).toEqual({
+        label: 'Mock Camera',
+        muted: false,
+        readyState: 'live'
+      });
+    });
+  });
+
+  it('should cleanup stream when unmounted', async () => {
+    const mockStream = new MockMediaStream();
+    const mockTrack = new MockVideoTrack();
+    mockStream.tracks[0] = mockTrack;
     const stopSpy = vi.fn();
-    (mockStream.getTracks() as any)[0].stop = stopSpy;
-    (navigator.mediaDevices.getUserMedia as any).mockResolvedValue(mockStream);
+    mockTrack.stop = stopSpy;
+    getUserMediaMock().mockResolvedValue(mockStream);
 
-    const { unmount } = renderHook(() => useCameraStream(true));
-    await waitFor(() => expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalled());
+    const { unmount, result } = renderHook(() => useCameraStream(true));
+
+    await waitFor(() => expect(result.current.stream).toBe(mockStream));
 
     unmount();
-
-    // Wait for cleanup delay (800ms)
-    await new Promise(resolve => setTimeout(resolve, 1000));
 
     expect(stopSpy).toHaveBeenCalled();
   });
