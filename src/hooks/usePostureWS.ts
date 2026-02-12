@@ -37,6 +37,7 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
   const reconnectTimeout = useRef<NodeJS.Timeout>();
   const savePostureReport = useMeasurementStore(state => state.savePostureReport);
   const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
+  const lastBatchTimeSeriesRef = useRef<any[]>([]);
 
   const connect = useCallback(() => {
     try {
@@ -57,7 +58,7 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
             setJointResult(data);
           } else if (data.type === 'HTML_REPORT') {
             setHtmlReport(data.html);
-            savePostureReport(currentViewRef.current, data.html);
+            savePostureReport(currentViewRef.current, data.html, lastBatchTimeSeriesRef.current);
           }
         } catch (e) {
           console.error('Failed to parse analysis result:', e);
@@ -125,6 +126,7 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
   const analyzeBatch = useCallback((analysis: TemporalAnalysis) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       currentViewRef.current = analysis.view;
+      lastBatchTimeSeriesRef.current = analysis.timeSeries;
       ws.current.send(JSON.stringify({
         type: 'POSTURE_BATCH_ANALYSIS',
         ...analysis

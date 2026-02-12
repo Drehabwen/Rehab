@@ -45,9 +45,11 @@ export default function Posture() {
   const { result: wsResult, htmlReport, analyze, analyzeBatch } = usePostureWS();
 
   // Auto-capture states
-  const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown' | 'recording'>('idle');
+  const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown' | 'recording' | 'analyzing' | 'completed'>('idle');
   const [countdown, setCountdown] = useState(3);
   const [recordingProgress, setRecordingProgress] = useState(0);
+  const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [showQualityWarning, setShowQualityWarning] = useState(false);
   const recordingStartTimeRef = useRef<number>(0);
   const [isInPosition, setIsInPosition] = useState(false);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -150,6 +152,26 @@ export default function Posture() {
       };
   }, [view]);
 
+  // Analysis progress simulation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (captureStatus === 'analyzing') {
+      setAnalysisProgress(0);
+      interval = setInterval(() => {
+        setAnalysisProgress(prev => {
+          if (prev >= 92) return prev + 0.1; // Slow down near the end
+          if (prev >= 70) return prev + 0.5;
+          return prev + 1.5;
+        });
+      }, 100);
+    } else if (captureStatus === 'completed') {
+      setAnalysisProgress(100);
+    } else {
+      setAnalysisProgress(0);
+    }
+    return () => clearInterval(interval);
+  }, [captureStatus]);
+
   useEffect(() => {
     if (wsResult && capturedImage && landmarks) {
       setResult({
@@ -165,18 +187,25 @@ export default function Posture() {
         wsResult.annotations || []
       ), 100);
 
-      setCaptureStatus('idle');
-      setIsInPosition(false);
+      // 仅在非批量分析模式下重置状态
+      if (captureStatus !== 'analyzing' && captureStatus !== 'completed') {
+        setCaptureStatus('idle');
+        setIsInPosition(false);
+      }
     }
-  }, [wsResult, capturedImage, landmarks, drawResultCanvas]);
+  }, [wsResult, capturedImage, landmarks, drawResultCanvas, captureStatus]);
 
   useEffect(() => {
     if (htmlReport) {
-      // Show success message or redirect to report center
-      if (confirm('体态分析报告已生成，是否前往报告中心查看？')) {
-        navigate('/report');
-      }
-      setCaptureStatus('idle');
+      setCaptureStatus('completed');
+      
+      // 延迟显示跳转提示，让用户看到“完成”状态
+      setTimeout(() => {
+        if (confirm('体态分析报告已生成，是否前往报告中心查看？')) {
+          navigate('/report');
+        }
+        setCaptureStatus('idle');
+      }, 1500);
     }
   }, [htmlReport, navigate]);
 
@@ -272,9 +301,24 @@ export default function Posture() {
         const progress = Math.min((elapsed / 2000) * 100, 100);
         setRecordingProgress(progress);
 
+        // 优化：仅在录制期间收集有效帧
+        if (poseLandmarks && checkUserPosition(poseLandmarks)) {
+          landmarksBufferRef.current.push(poseLandmarks);
+        }
+
         if (elapsed >= 2000) {
-          setCaptureStatus('idle');
-          // Trigger Batch Analysis
+            setCaptureStatus('analyzing');
+            
+            // 检查是否有足够的有效帧 (目标至少 20 帧以保证分析质量)
+            if (landmarksBufferRef.current.length < 15) {
+               setCaptureStatus('idle');
+               setShowQualityWarning(true);
+               setTimeout(() => setShowQualityWarning(false), 5000);
+               landmarksBufferRef.current = [];
+               return;
+            }
+
+            // Trigger Batch Analysis
           const analysis = PostureProcessor.process(
             landmarksBufferRef.current,
             view,
@@ -457,13 +501,87 @@ export default function Posture() {
                 </div>
               )}
 
+              {/* Analyzing & Completed Overlay */}
+              {(captureStatus === 'analyzing' || captureStatus === 'completed') && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 backdrop-blur-2xl z-50">
+                  <div className="flex flex-col md:flex-row items-center gap-12 max-w-2xl w-full px-8">
+                    {/* Vertical Progress Bar */}
+                    <div className="relative w-4 h-64 bg-white/10 rounded-full overflow-hidden border border-white/5 shadow-inner">
+                      <div 
+                        className={cn(
+                          "absolute bottom-0 left-0 right-0 w-full transition-all duration-500 ease-out rounded-t-full",
+                          captureStatus === 'completed' ? "bg-green-500 shadow-[0_0_20px_rgba(34,197,94,0.5)]" : "bg-blue-500 shadow-[0_0_20px_rgba(59,130,246,0.5)]"
+                        )}
+                        style={{ height: `${analysisProgress}%` }}
+                      >
+                        <div className="absolute top-0 left-0 right-0 h-full w-full bg-gradient-to-t from-transparent via-white/20 to-white/40 animate-pulse" />
+                      </div>
+                    </div>
+
+                    <div className="flex-1 text-center md:text-left">
+                      {captureStatus === 'analyzing' ? (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                          <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/20 rounded-full border border-blue-500/30">
+                            <RefreshCw className="w-3 h-3 text-blue-400 animate-spin" />
+                            <span className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Processing Data</span>
+                          </div>
+                          <h3 className="text-4xl font-black text-white uppercase tracking-tight leading-none">
+                            智能 AI 分析中
+                          </h3>
+                          <p className="text-slate-400 text-sm font-medium leading-relaxed max-w-sm">
+                            正在解析 20 帧关键点数据，计算重心偏移与骨骼角度。由于报告深度包含医学建议，可能需要 5-10 秒...
+                          </p>
+                          <div className="flex items-center gap-4 mt-8">
+                            <div className="text-3xl font-black text-blue-500 tabular-nums">
+                              {Math.round(analysisProgress)}%
+                            </div>
+                            <div className="flex-1 h-[1px] bg-gradient-to-r from-blue-500/50 to-transparent" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 animate-in zoom-in duration-500">
+                          <div className="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center shadow-[0_0_40px_rgba(34,197,94,0.4)] mb-6 mx-auto md:mx-0">
+                            <CheckCircle className="text-white w-10 h-10" />
+                          </div>
+                          <h3 className="text-4xl font-black text-white uppercase tracking-tight leading-none">
+                            评估已完成
+                          </h3>
+                          <p className="text-green-400/80 text-sm font-bold uppercase tracking-widest">
+                            深度报告已生成并存入档案
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Quality Warning */}
+              {showQualityWarning && (
+                <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-4 duration-300">
+                  <div className="px-6 py-3 bg-rose-500 text-white rounded-2xl shadow-xl flex items-center gap-3 border border-rose-400">
+                    <AlertTriangle size={20} />
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-tight">采集质量较低</p>
+                      <p className="text-[10px] font-bold text-rose-100 uppercase tracking-widest">请确保身体在框内并保持稳定，请重试</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Status Indicator */}
               {isCameraOn && (
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 flex items-center gap-4">
                   {captureStatus === 'idle' ? (
                     <button
                       onClick={startScanning}
-                      className="px-8 py-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-xl shadow-blue-500/20 active:scale-95 flex items-center gap-3 cursor-pointer pointer-events-auto"
+                      disabled={!isCameraOn}
+                      className={cn(
+                        "px-8 py-3.5 rounded-2xl font-bold transition-all shadow-xl active:scale-95 flex items-center gap-3 cursor-pointer pointer-events-auto",
+                        isCameraOn 
+                          ? "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20" 
+                          : "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
+                      )}
                     >
                       <CameraIcon className="h-5 w-5" />
                       开始评估
@@ -472,12 +590,20 @@ export default function Posture() {
                     <div className="px-6 py-3 bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 flex items-center gap-3">
                       <div className={cn(
                         "h-3 w-3 rounded-full animate-pulse",
-                        captureStatus === 'recording' ? "bg-red-500" : (isInPosition ? "bg-green-500" : "bg-yellow-500")
+                        captureStatus === 'recording' ? "bg-red-500" : 
+                        (captureStatus === 'analyzing' ? "bg-blue-500" : 
+                        (captureStatus === 'completed' ? "bg-green-500" : 
+                        (isInPosition ? "bg-green-500" : "bg-yellow-500")))
                       )} />
                       <span className="text-sm font-bold text-white uppercase tracking-wider">
-                        {captureStatus === 'recording' ? "正在录制时序数据" : (isInPosition ? "准备就绪" : "正在寻找体态...")}
+                        {captureStatus === 'scanning' && "正在寻找体态..."}
+                        {captureStatus === 'countdown' && `准备开始 (${countdown})`}
+                        {captureStatus === 'recording' && "正在录制时序数据"}
+                        {captureStatus === 'analyzing' && "正在智能分析"}
+                        {captureStatus === 'completed' && "分析完成"}
+                        {((captureStatus as string) === 'idle') && isInPosition && "准备就绪"}
                       </span>
-                      {captureStatus !== 'recording' && (
+                      {(captureStatus === 'scanning' || captureStatus === 'countdown') && (
                         <button 
                           onClick={resetAnalysis}
                           className="ml-4 p-1.5 hover:bg-white/10 rounded-lg transition-colors cursor-pointer pointer-events-auto"

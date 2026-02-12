@@ -35,5 +35,6 @@ export interface PostureMetrics {
   headPitch?: number;
   headYaw?: number;
   headRoll?: number;
+  swayOffset?: number;
   head_axes?: { x: number; y: number }[];
 }
