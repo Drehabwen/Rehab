@@ -37,7 +37,7 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
   const reconnectTimeout = useRef<NodeJS.Timeout>();
   const savePostureReport = useMeasurementStore(state => state.savePostureReport);
   const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
-  const lastBatchTimeSeriesRef = useRef<any[]>([]);
+  const lastBatchTimeSeriesRef = useRef<TemporalAnalysis['timeSeries']>([]);
 
   const connect = useCallback(() => {
     try {
