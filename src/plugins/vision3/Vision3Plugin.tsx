@@ -63,29 +63,42 @@ export const Vision3Plugin: React.FC = () => {
   const { result: wsResult, analyze } = usePostureWS();
 
   // Auto-capture states
-  const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown'>('idle');
-  const [countdown, setCountdown] = useState(3);
+  const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown' | 'analyzing'>('idle');
+  const [countdown, setCountdown] = useState(5);
   const [isInPosition, setIsInPosition] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const landmarksBufferRef = useRef<any[][]>([]);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
+
+  // Fullscreen toggle handler
+  const toggleFullscreen = useCallback(() => {
+    if (!videoContainerRef.current) return;
+    
+    if (!document.fullscreenElement) {
+      videoContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true));
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false));
+    }
+  }, []);
+
+  // Listen for fullscreen change events (e.g. user presses Esc)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // Reference box
   const BOX = { xMin: 0.25, xMax: 0.75, yMin: 0.1, yMax: 0.9 };
 
   const checkUserPosition = (landmarks: any[]) => {
     if (!landmarks || landmarks.length < 33) return false;
-    const keyPointsIndices = [0, 11, 12, 23, 24, 27, 28];
-    const visible = keyPointsIndices.every(idx => landmarks[idx].visibility > 0.6);
-    if (!visible) return false;
-
-    const nose = landmarks[0];
-    const leftAnkle = landmarks[27];
-    const leftShoulder = landmarks[11];
-    const rightShoulder = landmarks[12];
-
-    const inX = nose.x > BOX.xMin && nose.x < BOX.xMax && leftShoulder.x > BOX.xMin && rightShoulder.x < BOX.xMax;
-    const inY = nose.y > BOX.yMin && nose.y < 0.4 && leftAnkle.y > 0.6 && leftAnkle.y < BOX.yMax;
-
-    return inX && inY;
+    // Simplified check for now - just check if essential points are visible
+    const keyPointsIndices = [0, 11, 12, 23, 24]; // Nose, Shoulders, Hips
+    const visible = keyPointsIndices.every(idx => landmarks[idx].visibility > 0.5);
+    return visible;
   };
 
   const onResults = useCallback((results: Results, video: HTMLVideoElement) => {
@@ -93,16 +106,65 @@ export const Vision3Plugin: React.FC = () => {
       landmarksBufferRef.current.push(results.poseLandmarks);
       if (landmarksBufferRef.current.length > 30) landmarksBufferRef.current.shift();
       
-      if (activeTab === 'posture' && !isEntryMode && (captureStatus === 'scanning' || captureStatus === 'countdown')) {
-        const inPos = checkUserPosition(results.poseLandmarks);
-        setIsInPosition(inPos);
-        if (captureStatus === 'scanning' && inPos) {
-          setCaptureStatus('countdown');
-          setCountdown(3);
+      if (activeTab === 'posture' && !isEntryMode) {
+        if (captureStatus === 'scanning') {
+          const inPos = checkUserPosition(results.poseLandmarks);
+          setIsInPosition(inPos);
+          if (inPos) {
+             // Start countdown automatically if in position? 
+             // Or user clicked button -> enters scanning -> checks pos -> starts countdown.
+             // Let's make it start countdown immediately after button press for now as per user request logic simplification
+             // Wait, user said "Click start -> countdown 5s -> capture".
+             // So we might skip 'scanning' phase or make it very short/implicit.
+             // But existing code uses scanning. Let's keep scanning but auto-transition if stable.
+             setCaptureStatus('countdown');
+          }
         }
       }
     }
-  }, [captureStatus, activeTab, isEntryMode]);
+  }, [activeTab, isEntryMode, captureStatus]);
+
+  // Countdown Logic
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (captureStatus === 'countdown' && countdown > 0) {
+      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+    } else if (captureStatus === 'countdown' && countdown === 0) {
+      setCaptureStatus('analyzing');
+      // Capture logic here
+      const canvas = document.createElement('canvas');
+      const video = document.querySelector('video'); // Simplified selector
+      if (video) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          canvas.getContext('2d')?.drawImage(video, 0, 0);
+          const imageData = canvas.toDataURL('image/jpeg');
+          setCapturedImage(imageData);
+          
+          // Send to backend via WS
+          // We need landmarks for the analyze call. 
+          // Since we are inside useEffect, we should use the latest landmarks from ref or state.
+          // However, capture happens after countdown, landmarks might be in buffer.
+          const currentLandmarks = landmarksBufferRef.current[landmarksBufferRef.current.length - 1] || [];
+          
+          analyze(
+            view, 
+            currentLandmarks, 
+            video.videoWidth, 
+            video.videoHeight, 
+            imageData
+          );
+      }
+    }
+    return () => clearTimeout(timer);
+  }, [captureStatus, countdown, analyze]);
+
+  // Reset countdown when entering countdown state
+  useEffect(() => {
+    if (captureStatus === 'countdown') {
+      setCountdown(5);
+    }
+  }, [captureStatus]);
 
   const getShoulderStatus = (angle: number) => {
     const absAngle = Math.abs(angle);
@@ -265,7 +327,10 @@ export const Vision3Plugin: React.FC = () => {
       ) : (
         <div className="flex-1 grid grid-cols-12 grid-rows-6 gap-8 min-h-0 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
           {/* Main Camera Stage: Large Bento Card */}
-        <div className="col-span-12 lg:col-span-8 row-span-4 lg:row-span-6 bento-card glow-border !rounded-[3.5rem] group bg-black overflow-hidden relative">
+        <div ref={videoContainerRef} className={cn(
+          "bento-card glow-border !rounded-[3.5rem] group bg-black overflow-hidden relative transition-all duration-700",
+          isFullscreen ? "fixed inset-0 z-50 !rounded-none" : "col-span-12 lg:col-span-8 row-span-4 lg:row-span-6"
+        )}>
           {/* Subtle Grid Background */}
           <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ 
             backgroundImage: 'radial-gradient(circle, #0d948a 1px, transparent 1px)', 
@@ -277,6 +342,14 @@ export const Vision3Plugin: React.FC = () => {
             isCameraOn={isCameraOn}
             className="w-full h-full object-cover opacity-90 transition-opacity duration-1000"
           />
+
+          {/* Fullscreen Toggle Button */}
+          <button 
+            onClick={toggleFullscreen}
+            className="absolute top-6 right-6 p-3 bg-black/40 backdrop-blur-md text-white/60 hover:text-white hover:bg-black/60 rounded-2xl border border-white/10 transition-all z-40 opacity-0 group-hover:opacity-100"
+          >
+            {isFullscreen ? <Maximize2 size={20} className="rotate-180" /> : <Maximize2 size={20} />}
+          </button>
           
           {/* AI Scanning Effect */}
           {isCameraOn && (

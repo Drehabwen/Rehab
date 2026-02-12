@@ -107,14 +107,15 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
     };
   }, [connect]);
 
-  const analyze = useCallback((view: string, landmarks: Landmark[], width: number, height: number) => {
+  const analyze = useCallback((view: string, landmarks: Landmark[], width: number, height: number, imageData?: string) => {
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(JSON.stringify({
         type: 'POSTURE_SYNC',
         view,
         width,
         height,
-        landmarks
+        landmarks,
+        image: imageData // Optional image data for backend processing
       }));
     }
   }, []);
