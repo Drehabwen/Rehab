@@ -45,13 +45,30 @@ def generate_posture_report(analysis_data: Dict[str, Any]) -> str:
         稳定性指标:
         {json.dumps(analysis_data.get('stability'), indent=2, ensure_ascii=False)}
         
-        要求：
-        1. 使用纯 HTML 和内置 CSS (或者使用 Tailwind CDN)。
-        2. 包含一个清晰的结论：体态是否稳定，有哪些潜在风险。
-        3. 报告应包含：标题、用户信息摘要、稳定性分析、各维度详细评估、康复建议。
-        4. 风格要现代、专业、易读（类似医疗机构的电子报告）。
-        5. 请直接返回 HTML 代码，不要包含 Markdown 的包裹符号。
-        6. 可以在报告中引用 Chart.js 来绘制稳定性趋势（假设你有一组模拟的趋势数据）。
+        时序趋势数据 (用于绘图):
+        {json.dumps(analysis_data.get('timeSeries'), indent=2, ensure_ascii=False)}
+        
+        报告要求：
+        1. 结构与样式：
+           - 使用纯 HTML 和内置 CSS (支持 Tailwind CDN)。
+           - **必须包含一个或多个趋势图表**。请使用以下特殊的占位符 DIV 语法，前端会自动将其替换为交互式图表：
+             `<div class="rehab-chart" data-type="sway" data-title="重心偏移趋势" data-key="swayOffset" data-unit="mm" data-color="#3b82f6"></div>`
+           - 可用的 data-key 包括：
+             - `swayOffset`: 重心偏移量 (通用)
+             - `shoulderAngle`: 双肩倾斜角 (正面/背面)
+             - `hipAngle`: 骨盆倾斜角 (正面/背面)
+             - `headDeviation`: 头部侧偏 (正面/背面)
+             - `headForward`: 头部前倾 (侧面)
+             - `shoulderRounded`: 圆肩程度 (侧面)
+           - data-type 可选: `sway` (带阴影面积图), `angle` (折线图)。
+        2. 内容深度：
+           - 结论部分：基于稳定性指标（SD, Max Deviation, Velocity）给出明确的平衡等级评估。
+           - 风险预警：识别潜在的肌肉失衡或关节压力风险。
+           - 康复建议：提供 2-3 个针对性的拉伸或强化动作建议。
+        3. 语言：必须使用中文。
+        4. 禁用：不要在 HTML 中包含任何 <script> 标签，图表渲染由前端占位符处理。
+        5. 输出格式：
+           - 直接返回 <html> 标签内的完整代码，不要包含任何 Markdown 包裹符。
         """
 
         response = client.chat.completions.create(

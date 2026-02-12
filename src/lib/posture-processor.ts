@@ -38,29 +38,68 @@ export class PostureProcessor {
       throw new Error('Empty buffer provided for analysis');
     }
 
-    // 1. Filter out low-visibility frames (already done in Posture.tsx but double check)
+    // 1. Filter out low-visibility frames
     const validFrames = buffer.filter(frame => 
       frame.length >= 33 && (frame[0].visibility ?? 0) > 0.5
     );
 
-    // 2. Extract metrics for each frame
-    const frameMetrics = validFrames.map((frame, index) => ({
-      timestamp: (index / validFrames.length) * durationMs,
-      metrics: this.extractFrameMetrics(frame, view)
+    // 2. Sample frames to ~10fps to reduce data size (20 frames for 2s)
+    const targetFps = 10;
+    const totalFramesNeeded = Math.round((durationMs / 1000) * targetFps);
+    const step = Math.max(1, Math.floor(validFrames.length / totalFramesNeeded));
+    
+    const sampledFrames: Landmark[][] = [];
+    for (let i = 0; i < validFrames.length; i += step) {
+      sampledFrames.push(validFrames[i]);
+      if (sampledFrames.length >= totalFramesNeeded) break;
+    }
+
+    // 3. Calculate stability once to get average CoM
+    const stability = this.calculateStability(sampledFrames, durationMs);
+    const comPath = sampledFrames.map(frame => ({
+      x: (frame[23].x + frame[24].x) / 2,
+      y: (frame[23].y + frame[24].y) / 2
     }));
+    const avgX = comPath.reduce((a, b) => a + b.x, 0) / comPath.length;
+    const avgY = comPath.reduce((a, b) => a + b.y, 0) / comPath.length;
 
-    // 3. Calculate Averages (Static State)
+    // 4. Extract metrics with EMA Smoothing
+    let smoothedMetrics: PostureMetrics | null = null;
+    const frameMetrics = sampledFrames.map((frame, index) => {
+      const raw = this.extractFrameMetrics(frame, view);
+      
+      // Add sway offset for this frame
+      const currentCom = comPath[index];
+      const swayOffset = Math.sqrt(Math.pow(currentCom.x - avgX, 2) + Math.pow(currentCom.y - avgY, 2)) * 100;
+      raw.swayOffset = swayOffset;
+
+      if (!smoothedMetrics) {
+        smoothedMetrics = { ...raw };
+      } else {
+        // Apply EMA: S_t = alpha * Y_t + (1 - alpha) * S_{t-1}
+        Object.keys(raw).forEach(key => {
+          const k = key as keyof PostureMetrics;
+          if (typeof raw[k] === 'number') {
+            (smoothedMetrics![k] as number) = 
+              this.ALPHA * (raw[k] as number) + (1 - this.ALPHA) * (smoothedMetrics![k] as number);
+          }
+        });
+      }
+      return {
+        timestamp: (index / sampledFrames.length) * durationMs,
+        metrics: { ...smoothedMetrics }
+      };
+    });
+
+    // 5. Calculate Averages (Static State)
     const averages = this.calculateAverages(frameMetrics.map(f => f.metrics));
-
-    // 4. Calculate Stability (Dynamic State)
-    const stability = this.calculateStability(validFrames, durationMs);
 
     return {
       view,
       averages,
       stability,
       timeSeries: frameMetrics,
-      frameCount: validFrames.length,
+      frameCount: sampledFrames.length,
       duration: durationMs
     };
   }

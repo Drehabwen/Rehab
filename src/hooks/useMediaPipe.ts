@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { Holistic, Results, Options } from '@mediapipe/holistic';
 
 /**
@@ -6,8 +6,9 @@ import { Holistic, Results, Options } from '@mediapipe/holistic';
  */
 let globalHolistic: Holistic | null = null;
 const activeListeners: Set<(results: Results) => void> = new Set();
-let isProcessing = false;
-let requestRef: number | null = null;
+let globalIsProcessing = false;
+let globalRequestRef: number | null = null;
+let globalVideoElement: HTMLVideoElement | null = null;
 
 const DEFAULT_OPTIONS: Options = {
   modelComplexity: 1,
@@ -27,6 +28,12 @@ export const useMediaPipe = (
 ) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const onResultsRef = useRef(onResults);
+
+  // Update listener ref
+  useEffect(() => {
+    onResultsRef.current = onResults;
+  }, [onResults]);
 
   // Initialize holistic model if not exists
   const initHolistic = useCallback(async () => {
@@ -60,32 +67,44 @@ export const useMediaPipe = (
 
   // Frame processing loop
   const processFrame = useCallback(async () => {
-    if (!globalHolistic || !videoElement || !enabled) {
-      isProcessing = false;
-      if (requestRef) cancelAnimationFrame(requestRef);
+    if (!globalHolistic || !globalVideoElement || activeListeners.size === 0) {
+      console.log("[MediaPipe] Stopping loop: no model, no video, or no listeners");
+      globalIsProcessing = false;
+      if (globalRequestRef) cancelAnimationFrame(globalRequestRef);
+      globalRequestRef = null;
       return;
     }
 
-    if (videoElement.readyState >= 2) { // HAVE_CURRENT_DATA
+    if (globalVideoElement.readyState >= 2) { // HAVE_CURRENT_DATA
       try {
-        await globalHolistic.send({ image: videoElement });
+        await globalHolistic.send({ image: globalVideoElement });
       } catch (err) {
         console.error("[MediaPipe] Frame processing error:", err);
       }
     }
     
-    requestRef = requestAnimationFrame(processFrame);
-  }, [videoElement, enabled]);
+    globalRequestRef = requestAnimationFrame(processFrame);
+  }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !videoElement) {
+      if (videoElement === globalVideoElement) {
+         // If this was the active video element and it's now disabled, stop
+         // But wait, other listeners might still be active.
+      }
+      return;
+    }
 
-    activeListeners.add(onResults);
+    // Wrap the onResults to use the latest ref
+    const listener = (results: Results) => onResultsRef.current(results);
+    activeListeners.add(listener);
+    globalVideoElement = videoElement;
     
     const start = async () => {
       const instance = await initHolistic();
-      if (instance && !isProcessing && videoElement) {
-        isProcessing = true;
+      if (instance && !globalIsProcessing && globalVideoElement) {
+        console.log("[MediaPipe] Starting processing loop...");
+        globalIsProcessing = true;
         processFrame();
       }
     };
@@ -93,18 +112,18 @@ export const useMediaPipe = (
     start();
 
     return () => {
-      activeListeners.delete(onResults);
+      activeListeners.delete(listener);
       if (activeListeners.size === 0) {
         console.log("[MediaPipe] No active listeners, stopping loop...");
-        isProcessing = false;
-        if (requestRef) {
-          cancelAnimationFrame(requestRef);
-          requestRef = null;
+        globalIsProcessing = false;
+        if (globalRequestRef) {
+          cancelAnimationFrame(globalRequestRef);
+          globalRequestRef = null;
         }
-        // We keep the model instance warm but stop processing
+        globalVideoElement = null;
       }
     };
-  }, [enabled, onResults, initHolistic, processFrame, videoElement]);
+  }, [enabled, videoElement, initHolistic, processFrame]);
 
   return { isLoading, error };
 };
