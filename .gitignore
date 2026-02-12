@@ -1,0 +1,13 @@
+node_modules
+dist
+.vscode
+.trae
+__pycache__
+*.pyc
+.env
+*.log
+.DS_Store
+
+# Medical Config (Crucial for privacy)
+Deeprehab-MedVoice-AI--/config.json
+Deeprehab-MedVoice-AI--/src/core/config.json

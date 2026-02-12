@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+python-multipart
+mediapipe
+numpy
+opencv-python
+python-docx
+reportlab
+fpdf2
+jinja2
