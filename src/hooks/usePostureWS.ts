@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PostureMetrics, PostureIssue, Landmark } from '@/types/posture';
 import { TemporalAnalysis } from '@/lib/posture-processor';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
@@ -134,5 +134,13 @@ export function usePostureWS(url: string = 'ws://localhost:8000/ws/analyze') {
     }
   }, []);
 
-  return { result, jointResult, htmlReport, status, analyze, analyzeJoint, analyzeBatch };
+  return useMemo(() => ({ 
+    result, 
+    jointResult, 
+    htmlReport, 
+    status, 
+    analyze, 
+    analyzeJoint, 
+    analyzeBatch 
+  }), [result, jointResult, htmlReport, status, analyze, analyzeJoint, analyzeBatch]);
 }
