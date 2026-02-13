@@ -78,15 +78,18 @@ class AnalysisResponse(BaseModel):
 class TemporalStability(BaseModel):
     swayArea: float
     maxDeviation: float
-    stdDev: float
+    sd: float = Field(..., alias="sd") # Map sd from frontend to sd in backend
     velocity: float
+
+    class Config:
+        allow_population_by_field_name = True
 
 class TemporalAnalysisRequest(BaseModel):
     type: str = "POSTURE_BATCH_ANALYSIS"
     view: str
     duration: float
     frameCount: int
-    averages: PostureMetrics
+    averages: Dict[str, Any] # Use Dict to be more flexible with dynamic metrics
     stability: TemporalStability
     timeSeries: Optional[List[Dict[str, Any]]] = None
 

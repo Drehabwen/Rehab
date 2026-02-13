@@ -6,6 +6,25 @@ import { DataProcessor } from './DataProcessor';
  * 负责：ROI 检查、运动稳定性监测 (A+B)、采样控制、状态流转
  */
 class GlobalMonitor {
+  private static instance: GlobalMonitor;
+  private onAnalysisReady: ((data: any) => void) | null = null;
+
+  private constructor() {}
+
+  public static getInstance(): GlobalMonitor {
+    if (!GlobalMonitor.instance) {
+      GlobalMonitor.instance = new GlobalMonitor();
+    }
+    return GlobalMonitor.instance;
+  }
+
+  /**
+   * 注册分析就绪回调
+   */
+  public registerAnalysisCallback(callback: (data: any) => void) {
+    this.onAnalysisReady = callback;
+  }
+
   private stabilityBuffer: Landmark[][] = [];
   private readonly STABILITY_WINDOW = 15; // 15帧滑动窗口
   private readonly STABILITY_THRESHOLD = 0.008; // 稳定性阈值（归一化坐标标准差）
@@ -117,19 +136,25 @@ class GlobalMonitor {
     else addLowerFrame(frame);
 
     if (elapsed >= this.CAPTURE_DURATION) {
-      // 采样完成，自动切换到下一阶段
       if (side === 'upper') {
         setStep('prep_lower');
         this.stabilityBuffer = [];
       } else {
         setStep('stitching');
-        // 触发后续计算逻辑
+        // 异步执行计算密集型任务
         setTimeout(() => {
-          const result = DataProcessor.process(
-            usePostureAssessmentStore.getState().upperFrames,
-            usePostureAssessmentStore.getState().lowerFrames
-          );
+          const { upperFrames, lowerFrames } = usePostureAssessmentStore.getState();
+          
+          // 1. 生成对齐结果 (用于前端展示骨骼)
+          const result = DataProcessor.process(upperFrames, lowerFrames);
           setResult(result);
+
+          // 2. 生成语义分析数据并发送给 LLM
+          if (this.onAnalysisReady) {
+            setStep('analyzing');
+            const analysisData = DataProcessor.prepareAnalysisData(upperFrames, lowerFrames);
+            this.onAnalysisReady(analysisData);
+          }
         }, 100);
       }
     }
@@ -138,16 +163,31 @@ class GlobalMonitor {
   /**
    * ROI 校验逻辑
    * 上半身：肩部 (11, 12) 和 胯部 (23, 24) 必须可见
-   * 下半身：胯部 (23, 24) 和 踝部 (27, 28) 必须可见
+   * 下半身：胯部 (23, 24) 必须可见，且膝盖 (25, 26) 或 踝部 (27, 28) 至少有一组可见
    */
   private checkROI(landmarks: Landmark[], side: 'upper' | 'lower'): boolean {
-    const requiredPoints = side === 'upper' 
-      ? [11, 12, 23, 24] 
-      : [23, 24, 27, 28];
-    
-    return requiredPoints.every(idx => 
-      landmarks[idx] && (landmarks[idx].visibility || 0) > 0.7
-    );
+    if (side === 'upper') {
+      const upperPoints = [11, 12, 23, 24];
+      return upperPoints.every(idx => 
+        landmarks[idx] && (landmarks[idx].visibility || 0) > 0.75
+      );
+    } else {
+      // 下半身 ROI 优化：
+      // 1. 胯部 (23, 24) 是对齐桥梁，必须极其清晰
+      const hipsVisible = [23, 24].every(idx => 
+        landmarks[idx] && (landmarks[idx].visibility || 0) > 0.8
+      );
+      
+      // 2. 膝盖或踝部至少有一对可见，增加容错性（防止脚部超出画面）
+      const kneesVisible = [25, 26].every(idx => 
+        landmarks[idx] && (landmarks[idx].visibility || 0) > 0.6
+      );
+      const anklesVisible = [27, 28].every(idx => 
+        landmarks[idx] && (landmarks[idx].visibility || 0) > 0.5
+      );
+
+      return hipsVisible && (kneesVisible || anklesVisible);
+    }
   }
 
   /**
@@ -175,6 +215,16 @@ class GlobalMonitor {
   public start() {
     const { reset, setStep } = usePostureAssessmentStore.getState();
     reset();
+    
+    // 重置内部状态
+    this.stabilityBuffer = [];
+    this.isStabilizing = false;
+    if (this.stabilityTimer) {
+      clearTimeout(this.stabilityTimer);
+      this.stabilityTimer = null;
+    }
+    this.captureStartTime = 0;
+
     setStep('prep_upper');
   }
 
@@ -184,4 +234,4 @@ class GlobalMonitor {
   }
 }
 
-export const globalMonitor = new GlobalMonitor();
+export const globalMonitor = GlobalMonitor.getInstance();
