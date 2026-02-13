@@ -31,6 +31,8 @@ import { usePostureCapture } from './hooks/usePostureCapture';
 import { Vision3EntryHub } from './components/Vision3EntryHub';
 import { PostureWorkbench } from './components/PostureWorkbench';
 import { ROMWorkbench } from './components/ROMWorkbench';
+import { AssessmentOverlay } from './components/AssessmentOverlay';
+import { globalMonitor } from './services/GlobalMonitor';
 import {
   jointNameMap,
   HeadAxes,
@@ -111,9 +113,12 @@ export const Vision3Plugin: React.FC = () => {
     // 1. 处理地标数据供 Hook 状态机使用
     if (results.poseLandmarks) {
       handleLandmarks(results.poseLandmarks);
+      
+      // 2. 将数据泵入 Phase 4 全局监听器
+      globalMonitor.onFrame(results.poseLandmarks as any);
     }
     
-    // 2. 仅绘制业务图层
+    // 3. 仅绘制业务图层
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -245,6 +250,9 @@ export const Vision3Plugin: React.FC = () => {
             className="w-full h-full object-cover opacity-90 transition-opacity duration-1000"
           />
 
+          {/* Phase 4: 评估交互层 */}
+          <AssessmentOverlay />
+
           {/* Fullscreen Toggle Button */}
           <button 
             onClick={toggleFullscreen}
@@ -319,6 +327,14 @@ export const Vision3Plugin: React.FC = () => {
             
             {activeTab === 'posture' ? (
               <div className="flex items-center gap-6">
+                <button 
+                  onClick={() => globalMonitor.start()}
+                  className="px-10 h-16 rounded-[1.5rem] bg-emerald-500 text-white flex items-center gap-4 font-black text-sm uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl hover:bg-emerald-600 hover:scale-105"
+                >
+                  <Scan size={24} />
+                  分段评估
+                </button>
+
                 <button 
                   onClick={() => setCaptureStatus('countdown')}
                   disabled={captureStatus !== 'idle'}
