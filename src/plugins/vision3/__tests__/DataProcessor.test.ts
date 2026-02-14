@@ -3,6 +3,10 @@ import { DataProcessor } from '../services/DataProcessor';
 import { PostureFrame, Landmark } from '../store/usePostureAssessmentStore';
 
 describe('DataProcessor', () => {
+  const privateProcessor = DataProcessor as unknown as {
+    medianFilter: (frames: PostureFrame[]) => Landmark[];
+    alignLowerBody: (upper: Landmark[], lower: Landmark[]) => Landmark[];
+  };
   const createMockLandmarks = (offset = 0): Landmark[] => {
     return Array.from({ length: 33 }, (_, i) => ({
       x: i * 0.01 + offset,
@@ -26,7 +30,7 @@ describe('DataProcessor', () => {
 
   it('should correctly perform median filtering', () => {
     // 中值滤波测试：三个点的中值应该是中间那个点 (createMockLandmarks(0.01))
-    const result = (DataProcessor as any).medianFilter(mockUpperFrames);
+    const result = privateProcessor.medianFilter(mockUpperFrames);
     
     expect(result.length).toBe(33);
     expect(result[0].x).toBeCloseTo(0.01);
@@ -37,7 +41,7 @@ describe('DataProcessor', () => {
     const upper = createMockLandmarks(0);
     const lower = createMockLandmarks(0.1); // 偏移 0.1
     
-    const aligned = (DataProcessor as any).alignLowerBody(upper, lower);
+    const aligned = privateProcessor.alignLowerBody(upper, lower);
     
     // 检查胯部中心点 (23, 24) 是否对齐
     const u23 = upper[23], u24 = upper[24];
@@ -65,7 +69,8 @@ describe('DataProcessor', () => {
     expect(analysisData.view).toBe('front');
     expect(analysisData.frameCount).toBe(3);
     expect(analysisData.timeSeries.length).toBe(3);
+    expect(analysisData.timeSeries[0]).toHaveProperty('metrics');
     expect(analysisData.averages).toHaveProperty('swayOffset');
-    expect(analysisData.stability).toHaveProperty('sd');
+    expect(analysisData.stability).toHaveProperty('standardDev');
   });
 });

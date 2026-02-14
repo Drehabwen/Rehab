@@ -1,16 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HubSidebar } from './components/HubSidebar';
-import { Bell, Camera, Mic, Search, Activity, ChevronRight, Calendar, FileText } from 'lucide-react';
+import { Bell, Camera, Mic, Search, Activity, ChevronRight, Calendar, FileText, Stethoscope, Users, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
 import { MedVoicePlugin } from '@/plugins/medvoice/MedVoicePlugin';
 import { NexusReportCenter } from './components/NexusReportCenter';
 import { GlobalExport } from '@/components/GlobalExport';
+import { NewSessionModal } from './components/NewSessionModal';
+import { PatientSearchModal } from './components/PatientSearchModal';
+import { DataSettingsModal } from './components/DataSettingsModal';
+import { usePatientStore } from '@/store/usePatientStore';
+import { useSessionStore } from '@/store/useSessionStore';
+import { getRelativeTime } from '@/lib/session-utils';
 
 export const NexusHub: React.FC = () => {
   const [activePlugin, setActivePlugin] = useState('dashboard');
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showNewSessionModal, setShowNewSessionModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showDataSettings, setShowDataSettings] = useState(false);
+  
+  const { patients, loadPatients } = usePatientStore();
+  const { sessions, loadRecentSessions } = useSessionStore();
+  
+  useEffect(() => {
+    loadPatients();
+    loadRecentSessions(5);
+  }, []);
+  
+  const handleStartSession = (sessionId: string) => {
+    setActivePlugin('vision3');
+  };
+  
+  const handleSelectPatient = (session: any) => {
+    useSessionStore.getState().setCurrentSession(session);
+    setActivePlugin('vision3');
+  };
   
   const plugins = [
     { id: 'dashboard', name: '总览', icon: Activity, color: 'text-antey-primary' },
@@ -25,7 +51,8 @@ export const NexusHub: React.FC = () => {
         activeId={activePlugin} 
         onSelect={setActivePlugin} 
         isCollapsed={isCollapsed} 
-        onToggle={() => setIsCollapsed(!isCollapsed)} 
+        onToggle={() => setIsCollapsed(!isCollapsed)}
+        onSettingsClick={() => setShowDataSettings(true)}
       />
       
       <main className="flex-1 flex flex-col min-w-0 relative">
@@ -102,6 +129,87 @@ export const NexusHub: React.FC = () => {
 
               {/* Main Content Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Quick Actions */}
+                <div className="lg:col-span-12">
+                  <div className="flex items-center gap-6 mb-8">
+                    <button 
+                      onClick={() => setShowNewSessionModal(true)}
+                      className="group flex items-center gap-4 px-8 py-5 bg-gradient-to-r from-antey-primary to-teal-600 text-white rounded-[2rem] shadow-lg shadow-antey-primary/20 hover:shadow-xl hover:shadow-antey-primary/30 transition-all hover:scale-[1.02]"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                        <Stethoscope size={24} />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[13px] font-black uppercase tracking-[0.2em]">接诊新患者</div>
+                        <div className="text-[10px] font-medium text-white/70">创建新的接诊记录</div>
+                      </div>
+                    </button>
+                    
+                    <button 
+                      onClick={() => setShowSearchModal(true)}
+                      className="group flex items-center gap-4 px-8 py-5 bg-white border border-slate-200 text-slate-900 rounded-[2rem] shadow-sm hover:shadow-lg hover:border-antey-primary/20 transition-all"
+                    >
+                      <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center">
+                        <Users size={24} className="text-purple-500" />
+                      </div>
+                      <div className="text-left">
+                        <div className="text-[13px] font-black uppercase tracking-[0.2em]">查找患者</div>
+                        <div className="text-[10px] font-medium text-slate-400">搜索历史记录</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Recent Sessions */}
+                {sessions.length > 0 && (
+                  <div className="lg:col-span-12">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Clock size={18} className="text-slate-400" />
+                      <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">最近接诊</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {sessions.slice(0, 6).map(session => {
+                        const patient = patients.find(p => p.id === session.patientId);
+                        return (
+                          <button
+                            key={session.id}
+                            onClick={() => {
+                              useSessionStore.getState().setCurrentSession(session);
+                              setActivePlugin('vision3');
+                            }}
+                            className="bento-card p-6 text-left hover:border-antey-primary/30 transition-all group"
+                          >
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-[10px] font-black tracking-wider">
+                                {session.id}
+                              </div>
+                              <div className="text-[10px] font-medium text-slate-400">
+                                第 {session.sequence} 次接诊
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                                  <Users size={18} className="text-slate-500" />
+                                </div>
+                                <div>
+                                  <div className="text-sm font-black text-slate-900">
+                                    {patient?.name || '匿名患者'}
+                                  </div>
+                                  <div className="text-[10px] font-medium text-slate-400">
+                                    {getRelativeTime(session.createdAt)}
+                                  </div>
+                                </div>
+                              </div>
+                              <ChevronRight size={18} className="text-slate-300 group-hover:text-antey-primary transition-colors" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Tools Selector */}
                 <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {plugins.slice(1).map(plugin => (
@@ -150,6 +258,23 @@ export const NexusHub: React.FC = () => {
             </div>
           )}
         </div>
+
+        <NewSessionModal 
+          isOpen={showNewSessionModal}
+          onClose={() => setShowNewSessionModal(false)}
+          onStartSession={handleStartSession}
+        />
+        
+        <PatientSearchModal 
+          isOpen={showSearchModal}
+          onClose={() => setShowSearchModal(false)}
+          onSelectPatient={handleSelectPatient}
+        />
+        
+        <DataSettingsModal 
+          isOpen={showDataSettings}
+          onClose={() => setShowDataSettings(false)}
+        />
       </main>
     </div>
   );

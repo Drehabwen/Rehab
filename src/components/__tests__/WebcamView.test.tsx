@@ -44,6 +44,7 @@ describe('WebcamView', () => {
       analyze: vi.fn(),
       analyzeJoint: mockAnalyzeJoint,
       analyzeBatch: vi.fn(),
+      analyzeStepped: vi.fn(),
       jointResult: null,
       htmlReport: null
     });

@@ -7,6 +7,7 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  onSettingsClick?: () => void;
 }
 
 const navItems = [
@@ -77,9 +78,12 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
 
       {/* Footer Actions */}
       <div className="p-4 space-y-3 border-t border-white/5">
-        <button className={cn(
-          "w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-white/40 hover:bg-white/5 hover:text-white transition-all duration-500 group"
-        )}>
+        <button 
+          onClick={onSettingsClick}
+          className={cn(
+            "w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-white/40 hover:bg-white/5 hover:text-white transition-all duration-500 group"
+          )}
+        >
           <Settings size={24} className="group-hover:rotate-90 transition-transform duration-700" />
           {!isCollapsed && <span className="font-black text-[11px] uppercase tracking-[0.2em]">系统设置</span>}
         </button>

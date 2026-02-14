@@ -5,6 +5,12 @@ import { Video, VideoOff, Loader2 } from 'lucide-react';
 import { useCameraStream } from '@/hooks/useCameraStream';
 import { useMediaPipe } from '@/hooks/useMediaPipe';
 import { cn } from '@/lib/utils';
+import { 
+  VisualAnnotation, 
+  HeadAxes, 
+  drawAnnotations, 
+  drawHeadAxes 
+} from '@/plugins/vision3/vision3-utils';
 
 interface BaseWebcamViewProps {
   isCameraOn: boolean;
@@ -12,9 +18,11 @@ interface BaseWebcamViewProps {
   onResults?: (results: Results, videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement) => void;
   isMirrored?: boolean;
   className?: string;
-  children?: React.ReactNode; // For overlays like measurement info
+  children?: React.ReactNode;
   showSkeleton?: boolean;
   aspectRatio?: '4/3' | '16/9' | 'square';
+  annotations?: VisualAnnotation[];
+  headAxes?: HeadAxes | null;
 }
 
 /**
@@ -29,7 +37,9 @@ export default function BaseWebcamView({
   className,
   children,
   showSkeleton = true,
-  aspectRatio = '4/3'
+  aspectRatio = '4/3',
+  annotations = [],
+  headAxes = null
 }: BaseWebcamViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -82,11 +92,21 @@ export default function BaseWebcamView({
       drawLandmarks(ctx, landmarksToDraw, { color: '#FF0000', lineWidth: 2, radius: 2 });
     }
 
+    // Drawing annotations from business logic
+    if (annotations && annotations.length > 0) {
+      drawAnnotations(ctx, annotations, canvas.width, canvas.height, isMirrored);
+    }
+
+    // Drawing head axes if provided
+    if (headAxes) {
+      drawHeadAxes(ctx, headAxes, isMirrored ? canvas.width : undefined);
+    }
+
     // Pass results to parent for business logic
     if (onResults) {
       onResults(results, video, canvas);
     }
-  }, [onResults, isMirrored, showSkeleton]);
+  }, [onResults, isMirrored, showSkeleton, annotations, headAxes]);
 
   const { isLoading: isModelLoading, error: modelError } = useMediaPipe(
     videoRef.current,

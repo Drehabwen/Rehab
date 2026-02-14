@@ -12,7 +12,8 @@ export type AssessmentStep =
   | 'stitching'        // 拼图与去噪计算
   | 'analyzing'        // 语义指标提取
   | 'completed'        // 完成
-  | 'error';           // 错误
+  | 'error'            // 错误
+  | 'stepped_guide';   // 分步模式指引状态
 
 export interface Landmark {
   x: number;

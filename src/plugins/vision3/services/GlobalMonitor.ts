@@ -7,7 +7,7 @@ import { DataProcessor } from './DataProcessor';
  */
 class GlobalMonitor {
   private static instance: GlobalMonitor;
-  private onAnalysisReady: ((data: any) => void) | null = null;
+  private onAnalysisReady: ((data: ReturnType<typeof DataProcessor.prepareAnalysisData>) => void) | null = null;
 
   private constructor() {}
 
@@ -21,7 +21,7 @@ class GlobalMonitor {
   /**
    * 注册分析就绪回调
    */
-  public registerAnalysisCallback(callback: (data: any) => void) {
+  public registerAnalysisCallback(callback: (data: ReturnType<typeof DataProcessor.prepareAnalysisData>) => void) {
     this.onAnalysisReady = callback;
   }
 
@@ -121,7 +121,7 @@ class GlobalMonitor {
    * 处理采样阶段：记录 2s 数据
    */
   private handleCapture(landmarks: Landmark[], side: 'upper' | 'lower') {
-    const { addUpperFrame, addLowerFrame, setCaptureProgress, setStep, upperFrames, lowerFrames, setResult } = usePostureAssessmentStore.getState();
+    const { addUpperFrame, addLowerFrame, setCaptureProgress, setStep, setResult } = usePostureAssessmentStore.getState();
     
     const elapsed = Date.now() - this.captureStartTime;
     const progress = Math.min(100, (elapsed / this.CAPTURE_DURATION) * 100);

@@ -1,4 +1,5 @@
 import { PostureFrame, Landmark, PostureResult } from '../store/usePostureAssessmentStore';
+import { PostureMetrics } from '@/hooks/usePostureWS';
 
 /**
  * DataProcessor: 负责最硬核的数学计算
@@ -146,20 +147,24 @@ export class DataProcessor {
     });
 
     // 2. 计算时序指标
-    const timeSeries = alignedFrames.map(frame => {
-      const metrics = this.extractMetrics(frame.landmarks);
-      return {
-        timestamp: frame.timestamp,
-        ...metrics
-      };
-    });
+    const timeSeries = alignedFrames.map(frame => ({
+      timestamp: frame.timestamp,
+      metrics: this.extractMetrics(frame.landmarks)
+    }));
 
     // 3. 计算平均值
-    const averages: Record<string, number> = {};
+    const averages: PostureMetrics = {};
     if (timeSeries.length > 0) {
-      const keys = Object.keys(timeSeries[0]).filter(k => k !== 'timestamp');
-      keys.forEach(key => {
-        averages[key] = timeSeries.reduce((sum, item) => sum + (item[key] as number), 0) / timeSeries.length;
+      const sums: Record<string, number> = {};
+      timeSeries.forEach(item => {
+        Object.entries(item.metrics).forEach(([key, value]) => {
+          if (typeof value === 'number') {
+            sums[key] = (sums[key] || 0) + value;
+          }
+        });
+      });
+      Object.entries(sums).forEach(([key, value]) => {
+        (averages[key as keyof PostureMetrics] as number) = value / timeSeries.length;
       });
     }
 
@@ -206,10 +211,10 @@ export class DataProcessor {
   /**
    * 计算稳定性指标
    */
-  private static calculateStability(timeSeries: any[]) {
-    const offsets = timeSeries.map(t => t.swayOffset);
+  private static calculateStability(timeSeries: Array<{ timestamp: number; metrics: PostureMetrics }>) {
+    const offsets = timeSeries.map(t => (t.metrics.swayOffset ?? 0));
     const mean = offsets.reduce((a, b) => a + b, 0) / offsets.length;
-    const sd = Math.sqrt(offsets.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / offsets.length);
+    const standardDev = Math.sqrt(offsets.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / offsets.length);
     const maxDev = Math.max(...offsets.map(v => Math.abs(v - mean)));
     
     // 简易速度计算
@@ -221,10 +226,10 @@ export class DataProcessor {
     const velocity = durationSec > 0 ? totalDist / durationSec : 0;
 
     return {
-      sd,
+      standardDev,
       maxDeviation: maxDev,
       velocity,
-      swayArea: sd * maxDev // 粗略估算面积
+      swayArea: standardDev * maxDev // 粗略估算面积
     };
   }
 }

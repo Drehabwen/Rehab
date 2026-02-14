@@ -1,7 +1,8 @@
 import os
 import json
 import logging
-from typing import Dict, Any
+import re
+from typing import Dict, Any, List, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -17,95 +18,150 @@ api_key = os.getenv("DEEPSEEK_API_KEY")
 if api_key:
     client = OpenAI(
         api_key=api_key,
-        base_url="https://api.deepseek.com"
+        base_url="https://api.deepseek.com",
+        timeout=30.0
     )
+
+class PostureAgent:
+    """
+    Manages the LLM-based posture analysis with memory retention across views.
+    """
+    def __init__(self):
+        self.observations = [] # Stores narrations and stats from previous views
+
+    def clear(self):
+        self.observations = []
+
+    def analyze_view(self, narration: str, stats: Dict[str, Any]) -> str:
+        """
+        Feeds a single view's data to the LLM, keeping context of previous views.
+        Returns a critical observation for the current view.
+        """
+        self.observations.append({
+            "narration": narration,
+            "stats": stats
+        })
+        
+        # In a real "agent" flow, we might call the LLM here to get a per-view thought.
+        # For now, we'll collect them all for the final summary to save tokens and simplify.
+        return f"已记录视角数据，当前累计视角数: {len(self.observations)}"
+
+    def generate_final_report(self) -> str:
+        """
+        Generates the holistic final report based on all accumulated observations.
+        """
+        if not client:
+            return "Deepseek API key not found."
+
+        history_context = ""
+        for i, obs in enumerate(self.observations):
+            history_context += f"\n--- 视角 {i+1} 数据 ---\n{obs['narration']}\n"
+
+        prompt = f"""
+        你是一位极其挑剔且专业的康复评估专家。你正在对一位患者进行多视角（正面、侧面、背面）的体态汇总分析。
+        
+        ### 历史观测记录 (数值与自然语言描述)
+        {history_context}
+        
+        ### 时序稳定性参考标准（仅作参考，不要死板套用）：
+        - 标准差 < 0.05cm：高度稳定（可视为习惯性体态）
+        - 标准差 0.05~0.15cm：轻度波动（可能是疲劳/不稳）
+        - 标准差 > 0.15cm：明显不稳（数据可信度低，建议谨慎解读）
+        
+        ### 置信度评分标准：
+        - A级（95%以上）：数值稳定，多视角一致，推理链完整
+        - B级（70-95%）：数值较稳定，存在轻微矛盾，推理链较完整
+        - C级（50-70%）：数值波动，存在明显矛盾，推理链不完整
+        - D级（<50%）：数据质量差，建议重拍
+        
+        ### 你的任务：
+        1. **交叉校验 (Critical Analysis)**：
+           - 严禁盲目信任单一视角。
+           - 寻找不同视角之间的矛盾点（例如：正面看肩膀平衡，背面看却明显倾斜）。
+           - 识别代偿模式（例如：为了纠正头前倾而产生的胸椎过度后突）。
+        
+        2. **深度生物力学推导**：
+           - 不要只描述现象，要推导出根本原因（Root Cause）。
+           - 结合时序稳定性指标（标准差、斜率），判断该体态是习惯性的还是由于疲劳/不稳导致的动态代偿。
+        
+        3. **生成 HTML 报告**（必须严格遵循以下结构）：
+           - 使用 Tailwind CSS。
+           - 【顶部警告栏】：显眼的黄色警告框，内容为「⚠️ 本报告由 AI 生成，仅供参考，不构成医疗诊断或治疗建议。如有不适，请及时就医。」
+           - 【原始数据 vs 专家推论对比】（核心，必须放在最前面）：每个关键发现必须展示【原始数值】→【LLM 推理】→【结论权重】的完整链条
+           - 【交叉矛盾点汇总】：列出所有视角之间的矛盾，说明每个矛盾的"发现过程"和"最终判断"
+           - 【核心代偿分析】：深度分析代偿机制和根本原因
+           - 【康复方案】：提供 3-4 个高度针对性的康复方案
+           - 【趋势图表】：包含 reahab-chart 占位符
+        
+        ### 推理链可视化强制格式：
+        对于每个关键发现，必须按以下格式输出：
+        【原始数值】XXX cm（标准差：XXX cm，斜率：XXX）
+        【LLM 推理】因为YYY原因，判断这是ZZZ类型的问题
+        【结论权重】高/中/低（说明为什么这样分级）
+        【置信度】A/B/C/D（说明理由）
+        
+        ### 强制要求：
+        - 保持批判性，不要给出千篇一律的建议。
+        - 必须包含具体的数值引用以增强说服力。
+        - 严禁直接给出结论而省略推理过程。
+        - 每个发现必须标注置信度并说明理由。
+        - 只返回 HTML 代码，不要任何额外解释。
+        """
+
+        try:
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "你是一个具有批判性思维的医疗专家。你的目标是揭示体态问题背后的深层代偿逻辑，而非简单描述。你必须严格遵循推理链可视化的要求，展示从原始数值到最终结论的完整推导过程。严禁省略推理步骤或降低数值的重要性。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.4
+            )
+            
+            raw_content = response.choices[0].message.content
+            return extract_html(raw_content)
+        except Exception as e:
+            logger.error(f"Error in generate_final_report: {e}")
+            return f"生成报告失败: {str(e)}"
+
+# Global instance for the session (simplified)
+posture_agent = PostureAgent()
+
+def extract_html(text: str) -> str:
+    """Extracts HTML content from LLM response."""
+    html_match = re.search(r'```html\s*(.*?)\s*```', text, re.DOTALL | re.IGNORECASE)
+    if html_match:
+        return html_match.group(1).strip()
+    generic_match = re.search(r'```\s*(.*?)\s*```', text, re.DOTALL)
+    if generic_match:
+        content = generic_match.group(1).strip()
+        if "<div" in content or "<html" in content:
+            return content
+    return text.strip()
 
 def generate_posture_report(analysis_data: Dict[str, Any]) -> str:
     """
-    Generates an HTML posture assessment report using Deepseek LLM.
+    Compatibility wrapper for existing calls.
+    Now uses the PostureAgent to generate a report.
     """
-    if not client:
-        logger.warning("Deepseek API key not found. Returning mock report.")
-        return get_mock_report(analysis_data)
-
-    try:
-        view_map = {"front": "正视图", "side": "侧视图", "back": "背视图"}
-        view_name = view_map.get(analysis_data.get("view", "front"), "未知视图")
+    # If it's a batch/stepped request, it usually comes with multiple frames.
+    # We should clear the agent and feed it everything.
+    posture_agent.clear()
+    
+    # In the new flow, analysis_data might contain the narration and stats directly.
+    # Or it might be the old format. Let's handle both.
+    
+    if "frames" in analysis_data:
+        # New stepped flow
+        from utils.narrator import process_time_series
+        for frame in analysis_data["frames"]:
+            # frame is a dict from model_dump()
+            res = process_time_series(frame["view"], frame["timeSeriesLandmarks"])
+            posture_agent.analyze_view(res["narration"], res["stats"])
+    else:
+        # Single view or fallback
+        narration = analysis_data.get("narration", "未知视角描述")
+        stats = analysis_data.get("stats", {})
+        posture_agent.analyze_view(narration, stats)
         
-        prompt = f"""
-        你是一位专业的康复理疗师和人体工学专家。请根据以下 2 秒时序采集的体态评估数据，生成一份专业的 HTML 格式评估报告。
-        
-        评估视图: {view_name}
-        采集时长: {analysis_data.get('duration')}ms
-        帧数: {analysis_data.get('frameCount')}
-        
-        关键指标 (平均值):
-        {json.dumps(analysis_data.get('averages'), indent=2, ensure_ascii=False)}
-        
-        稳定性指标:
-        {json.dumps(analysis_data.get('stability'), indent=2, ensure_ascii=False)}
-        
-        时序趋势数据 (用于绘图):
-        {json.dumps(analysis_data.get('timeSeries'), indent=2, ensure_ascii=False)}
-        
-        报告要求：
-        1. 结构与样式：
-           - 使用纯 HTML 和内置 CSS (支持 Tailwind CDN)。
-           - **必须包含一个或多个趋势图表**。请使用以下特殊的占位符 DIV 语法，前端会自动将其替换为交互式图表：
-             `<div class="rehab-chart" data-type="sway" data-title="重心偏移趋势" data-key="swayOffset" data-unit="mm" data-color="#3b82f6"></div>`
-           - 可用的 data-key 包括：
-             - `swayOffset`: 重心偏移量 (通用)
-             - `shoulderAngle`: 双肩倾斜角 (正面/背面)
-             - `hipAngle`: 骨盆倾斜角 (正面/背面)
-             - `headDeviation`: 头部侧偏 (正面/背面)
-             - `headForward`: 头部前倾 (侧面)
-             - `shoulderRounded`: 圆肩程度 (侧面)
-           - data-type 可选: `sway` (带阴影面积图), `angle` (折线图)。
-        2. 内容深度：
-           - 结论部分：基于稳定性指标（SD, Max Deviation, Velocity）给出明确的平衡等级评估。
-           - 风险预警：识别潜在的肌肉失衡或关节压力风险。
-           - 康复建议：提供 2-3 个针对性的拉伸或强化动作建议。
-        3. 语言：必须使用中文。
-        4. 禁用：不要在 HTML 中包含任何 <script> 标签，图表渲染由前端占位符处理。
-        5. 输出格式：
-           - 直接返回 <html> 标签内的完整代码，不要包含任何 Markdown 包裹符。
-        """
-
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[
-                {"role": "system", "content": "你是一个专业的医疗体态分析助手，擅长生成精美的 HTML 报告。"},
-                {"role": "user", "content": prompt}
-            ],
-            stream=False
-        )
-
-        html_content = response.choices[0].message.content
-        # Strip markdown code blocks if present
-        if html_content.startswith("```html"):
-            html_content = html_content[7:]
-        if html_content.endswith("```"):
-            html_content = html_content[:-3]
-        
-        return html_content.strip()
-
-    except Exception as e:
-        logger.error(f"Error generating LLM report: {e}")
-        return get_mock_report(analysis_data)
-
-def get_mock_report(data: Dict[str, Any]) -> str:
-    """Fallback mock report when LLM fails or API key is missing."""
-    return f"""
-    <div style="font-family: sans-serif; padding: 20px; color: #333;">
-        <h1 style="color: #2563eb;">体态评估报告 (预览版)</h1>
-        <p>视图: {data.get('view')}</p>
-        <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-top: 20px;">
-            <h3 style="margin-top: 0;">稳定性分析</h3>
-            <p>重心偏移: {data.get('stability', {}).get('maxDeviation', 0):.2f}</p>
-            <p>晃动面积: {data.get('stability', {}).get('swayArea', 0):.2f}</p>
-        </div>
-        <div style="margin-top: 20px; color: #64748b; font-size: 0.9em;">
-            注：此报告为系统自动生成的预览版。配置 Deepseek API 后可获得 AI 深度分析。
-        </div>
-    </div>
-    """
+    return posture_agent.generate_final_report()

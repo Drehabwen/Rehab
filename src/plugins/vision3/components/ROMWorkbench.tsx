@@ -1,9 +1,10 @@
 import React from 'react';
 import { Activity } from 'lucide-react';
 import { jointNameMap } from '../vision3-utils';
+import { ActiveMeasurement, MeasurementDataPoint } from '@/store/useMeasurementStore';
 
 interface ROMWorkbenchProps {
-  activeMeasurements: any[];
+  activeMeasurements: ActiveMeasurement[];
   isMeasuring: boolean;
 }
 
@@ -52,7 +53,7 @@ export const ROMWorkbench: React.FC<ROMWorkbenchProps> = ({
           {/* Mini Sparkline indicator */}
           {isMeasuring && m.data.length > 1 && (
             <div className="h-10 flex items-end gap-1 px-1">
-              {m.data.slice(-20).map((p: any, i: number) => {
+              {m.data.slice(-20).map((p: MeasurementDataPoint, i: number) => {
                 const height = Math.max(4, (p.angle / 180) * 40);
                 return (
                   <div 

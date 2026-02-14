@@ -2,7 +2,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface PostureWorkbenchProps {
-  captureStatus: 'idle' | 'scanning' | 'countdown' | 'analyzing';
+  captureStatus: 'idle' | 'scanning' | 'countdown' | 'analyzing' | 'completed' | 'error';
   countdown: number;
   isInPosition: boolean;
 }
