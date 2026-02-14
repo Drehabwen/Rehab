@@ -26,7 +26,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
   
   setCurrentPatient: (patient) => set({ currentPatient: patient }),
   
-  addPatient: async (name) => {
+  addPatient: async (name?: string): Promise<Patient> => {
     set({ isLoading: true, error: null });
     
     let patientId = generatePatientId();
@@ -61,7 +61,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     return patient;
   },
   
-  updatePatient: async (id, updates) => {
+  updatePatient: async (id: string, updates: Partial<Patient>): Promise<void> => {
     set({ isLoading: true, error: null });
     
     const existing = await db.patients.get(id);
@@ -84,7 +84,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     }));
   },
   
-  deletePatient: async (id) => {
+  deletePatient: async (id: string): Promise<void> => {
     set({ isLoading: true, error: null });
     
     await db.patients.delete(id);
@@ -108,7 +108,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     set({ patients, isLoading: false });
   },
   
-  searchPatients: (query) => {
+  searchPatients: (query: string): Patient[] => {
     const { patients } = get();
     if (!query.trim()) return patients;
     

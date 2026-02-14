@@ -13,6 +13,7 @@ import { DataSettingsModal } from './components/DataSettingsModal';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { getRelativeTime } from '@/lib/session-utils';
+import type { Session } from '@/types/session';
 
 export const NexusHub: React.FC = () => {
   const [activePlugin, setActivePlugin] = useState('dashboard');
@@ -27,13 +28,14 @@ export const NexusHub: React.FC = () => {
   useEffect(() => {
     loadPatients();
     loadRecentSessions(5);
-  }, []);
+  }, [loadPatients, loadRecentSessions]);
   
-  const handleStartSession = (sessionId: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleStartSession = (_sessionId: string) => {
     setActivePlugin('vision3');
   };
   
-  const handleSelectPatient = (session: any) => {
+  const handleSelectPatient = (session: Session) => {
     useSessionStore.getState().setCurrentSession(session);
     setActivePlugin('vision3');
   };

@@ -60,7 +60,7 @@ export async function readBackupFile(file: File): Promise<BackupData> {
           return;
         }
         resolve(data);
-      } catch (err) {
+      } catch {
         reject(new Error('文件解析失败'));
       }
     };

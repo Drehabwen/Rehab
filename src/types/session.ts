@@ -10,5 +10,3 @@ export interface Session {
   assessments: Assessment[];
   status: 'active' | 'completed' | 'archived';
 }
-
-export type { Session };

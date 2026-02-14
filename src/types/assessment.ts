@@ -4,8 +4,8 @@ export interface Assessment {
   type: 'posture' | 'rom' | 'combined';
   createdAt: number;
   data: {
-    posture?: any;
-    rom?: any;
+    posture?: Record<string, unknown>;
+    rom?: Record<string, unknown>;
   };
   notes?: string;
 }

@@ -5,13 +5,15 @@ import { exportAllData, downloadBackup, importData, readBackupFile, clearAllData
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 
+type SettingsTab = 'backup' | 'restore' | 'privacy';
+
 interface DataSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
 export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'backup' | 'restore' | 'privacy'>('backup');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('backup');
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -36,8 +38,8 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
     try {
       const data = await exportAllData();
       downloadBackup(data);
-    } catch (error) {
-      console.error('Export failed:', error);
+    } catch (err) {
+      console.error('Export failed:', err);
     } finally {
       setIsExporting(false);
     }
@@ -61,8 +63,9 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
       await useSessionStore.getState().loadRecentSessions();
       await loadStats();
       setImportResult({ success: true, message: `成功导入 ${data.patients.length} 条患者记录` });
-    } catch (error: any) {
-      setImportResult({ success: false, message: error.message || '导入失败' });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '导入失败';
+      setImportResult({ success: false, message });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -77,8 +80,8 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
       await useSessionStore.getState().loadRecentSessions();
       await loadStats();
       setShowConfirmClear(false);
-    } catch (error) {
-      console.error('Clear failed:', error);
+    } catch (err) {
+      console.error('Clear failed:', err);
     } finally {
       setIsClearing(false);
     }
@@ -117,7 +120,7 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as SettingsTab)}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 py-4 text-[11px] font-black uppercase tracking-wider transition-all relative",
                 activeTab === tab.id ? "text-antey-primary" : "text-slate-400 hover:text-slate-600"

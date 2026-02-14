@@ -23,8 +23,8 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({
   const [patientSessions, setPatientSessions] = useState<Session[]>([]);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   
-  const { patients, searchPatients, loadPatients } = usePatientStore();
-  const { sessions, loadSessions, startSession } = useSessionStore();
+  const { searchPatients, loadPatients } = usePatientStore();
+  const { loadSessions, startSession } = useSessionStore();
 
   useEffect(() => {
     if (isOpen) {
@@ -33,6 +33,7 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({
       setSelectedPatient(null);
       setPatientSessions([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({
         setPatientSessions(allSessions.filter(s => s.patientId === selectedPatient.id));
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPatient]);
 
   const filteredPatients = searchPatients(query);
@@ -221,7 +223,10 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({
               )}
 
               <button
-                onClick={() => handleContinueSession(patientSessions[0] || { id: '', patientId: selectedPatient.id, sequence: 0 } as any)}
+                onClick={() => {
+                  const newSession = { id: '', patientId: selectedPatient.id, sequence: 0 } as Session;
+                  handleContinueSession(patientSessions[0] || newSession);
+                }}
                 disabled={isCreatingSession}
                 className={cn(
                   "w-full flex items-center justify-center gap-3 py-5 bg-gradient-to-r from-antey-primary to-teal-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all hover:shadow-lg hover:shadow-antey-primary/20",

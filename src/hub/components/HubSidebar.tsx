@@ -16,7 +16,7 @@ const navItems = [
   { id: 'medvoice', icon: Mic, label: '语音接诊' },
 ];
 
-export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isCollapsed, onToggle }) => {
+export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isCollapsed, onToggle, onSettingsClick }) => {
   return (
     <aside className={cn(
       "h-screen bg-slate-900 text-white transition-all duration-500 flex flex-col border-r border-white/5 relative z-20 shadow-2xl",
@@ -79,7 +79,7 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
       {/* Footer Actions */}
       <div className="p-4 space-y-3 border-t border-white/5">
         <button 
-          onClick={onSettingsClick}
+          onClick={onSettingsClick || (() => {})}
           className={cn(
             "w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-white/40 hover:bg-white/5 hover:text-white transition-all duration-500 group"
           )}
