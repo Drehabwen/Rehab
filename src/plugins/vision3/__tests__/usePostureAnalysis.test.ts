@@ -151,8 +151,7 @@ describe('usePostureAnalysis', () => {
 
     expect(result.current.steppedResults).toHaveProperty('side');
     expect(result.current.steppedResults.side).toEqual({
-      image: mockFrame.imageData,
-      landmarks: mockFrame.currentLandmarks,
+      timeSeriesLandmarks: [mockFrame.currentLandmarks],
       width: 640,
       height: 480,
       timestamp: mockFrame.timestamp
@@ -358,8 +357,8 @@ describe('usePostureAnalysis', () => {
     });
 
     expect(result.current.steppedResults).toHaveProperty('side');
-    expect(result.current.steppedResults.front?.image).toBe('front-image');
-    expect(result.current.steppedResults.side?.image).toBe('side-image');
+    expect(result.current.steppedResults.front?.timeSeriesLandmarks).toBeDefined();
+    expect(result.current.steppedResults.side?.timeSeriesLandmarks).toBeDefined();
   });
 
   it('should return annotations from WebSocket result', () => {

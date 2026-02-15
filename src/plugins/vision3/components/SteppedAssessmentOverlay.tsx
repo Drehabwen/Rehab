@@ -17,7 +17,7 @@ interface SteppedAssessmentOverlayProps {
   countdown: number;
   recordingProgress: number;
   isInPosition: boolean;
-  steppedResults: Record<string, { timeSeriesLandmarks: PoseLandmark[]; width: number; height: number; timestamp: number }>;
+  steppedResults: Record<string, { timeSeriesLandmarks: PoseLandmark[][]; width: number; height: number; timestamp: number }>;
   onStartCapture: () => void;
   onNextView: () => void;
   onRetake: () => void;

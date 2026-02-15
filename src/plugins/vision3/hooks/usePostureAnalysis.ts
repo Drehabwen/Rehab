@@ -52,9 +52,7 @@ export function usePostureAnalysis({
     assessmentMode,
     onCapture: useCallback((data) => {
       if (assessmentMode === 'realtime') {
-        // 实时模式依然可以按批次分析，这里暂时传入最后一帧或者做特殊处理
-        // 但根据讨论，主要重构的是 stepped 模式
-        analyze(view, data.timeSeriesLandmarks[data.timeSeriesLandmarks.length - 1], data.width, data.height);
+        analyze(view, [data.timeSeriesLandmarks[data.timeSeriesLandmarks.length - 1]], data.width, data.height);
       } else {
         setSteppedResults(prev => ({
           ...prev,

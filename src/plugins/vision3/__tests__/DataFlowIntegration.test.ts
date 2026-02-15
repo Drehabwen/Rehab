@@ -37,9 +37,9 @@ describe('DataFlowIntegration', () => {
     vi.useFakeTimers();
     mockAnalysisData = null;
     
-    globalMonitor.onAnalysisReady = (data) => {
+    globalMonitor.registerAnalysisCallback((data) => {
       mockAnalysisData = data;
-    };
+    });
   });
 
   afterEach(() => {

@@ -236,7 +236,7 @@ export default function Posture() {
     if (imageSrc) {
         setCapturedImage(imageSrc);
         setLandmarks(currentLandmarks);
-        analyze(view, currentLandmarks, video.videoWidth, video.videoHeight);
+        analyze(view, [currentLandmarks], video.videoWidth, video.videoHeight);
     }
   }, [view, analyze]);
 

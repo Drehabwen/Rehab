@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { usePostureWS } from '../usePostureWS';
-import { PoseLandmark } from '../plugins/vision3/vision3-utils';
+import { PoseLandmark } from '../../plugins/vision3/vision3-utils';
 
 interface AnalysisResult {
   angles: Array<{ name: string; value: number }>;
@@ -263,7 +263,8 @@ describe('usePostureWS', () => {
             [{ x: 0.5, y: 0.5, z: 0.5, visibility: 1.0 } as PoseLandmark]
           ],
           width: 640,
-          height: 480
+          height: 480,
+          timestamp: Date.now()
         },
         {
           view: 'side' as const,
@@ -271,7 +272,8 @@ describe('usePostureWS', () => {
             [{ x: 0.5, y: 0.5, z: 0.5, visibility: 1.0 } as PoseLandmark]
           ],
           width: 640,
-          height: 480
+          height: 480,
+          timestamp: Date.now()
         }
       ];
 
@@ -310,7 +312,8 @@ describe('usePostureWS', () => {
             [{ x: 0.5, y: 0.5, z: 0.5, visibility: 1.0 } as PoseLandmark]
           ],
           width: 640,
-          height: 480
+          height: 480,
+          timestamp: Date.now()
         }
       ];
 
@@ -332,14 +335,15 @@ describe('usePostureWS', () => {
             [{ x: 0.5, y: 0.5, z: 0.5, visibility: 1.0 } as PoseLandmark]
           ],
           width: 640,
-          height: 480
+          height: 480,
+          timestamp: Date.now()
         }
       ];
 
       act(() => {
         result.current.analyzeStepped(frames);
       });
-
+      
       expect(mockWebSocket.send).not.toHaveBeenCalled();
 
       const openCallback = mockWebSocket.addEventListener.mock.calls.find(
@@ -374,7 +378,8 @@ describe('usePostureWS', () => {
           view: 'front' as const,
           timeSeriesLandmarks: [createLandmarks(), createLandmarks()],
           width: 640,
-          height: 480
+          height: 480,
+          timestamp: Date.now()
         }
       ];
 
@@ -406,19 +411,22 @@ describe('usePostureWS', () => {
           view: 'front' as const,
           timeSeriesLandmarks: [createLandmarks()],
           width: 640,
-          height: 480
+          height: 480,
+          timestamp: Date.now()
         },
         {
           view: 'side' as const,
           timeSeriesLandmarks: [createLandmarks()],
           width: 640,
-          height: 480
+          height: 480,
+          timestamp: Date.now()
         },
         {
           view: 'back' as const,
           timeSeriesLandmarks: [createLandmarks()],
           width: 640,
-          height: 480
+          height: 480,
+          timestamp: Date.now()
         }
       ];
 
