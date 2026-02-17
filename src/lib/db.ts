@@ -11,10 +11,10 @@ export class RehabDatabase extends Dexie {
   constructor() {
     super('RehabDatabase');
     
-    this.version(1).stores({
+    this.version(2).stores({
       patients: 'id, name, createdAt',
       sessions: 'id, patientId, sequence, createdAt, [patientId+createdAt]',
-      assessments: 'id, sessionId, type, createdAt, [sessionId+createdAt]'
+      assessments: 'id, sessionId, patientId, type, mode, status, createdAt, [patientId+createdAt], [patientId+status]'
     });
   }
 }

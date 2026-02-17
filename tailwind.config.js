@@ -10,16 +10,42 @@ export default {
     extend: {
       colors: {
         antey: {
-          primary: "#0D9488", // 医疗绿
-          secondary: "#0F172A", // 深色背景
-          accent: "#3B82F6", // 蓝色点缀
-          surface: "#F8FAFC", // 浅色表面
+          primary: "#0D9488",
+          secondary: "#0F172A",
+          accent: "#3B82F6",
+          surface: "#F8FAFC",
           border: "#E2E8F0",
           gradient: {
             start: "#0D9488",
             end: "#3B82F6",
           }
         }
+      },
+      spacing: {
+        'xs': '4px',
+        'sm': '8px',
+        'md': '16px',
+        'lg': '24px',
+        'xl': '32px',
+        '2xl': '48px',
+      },
+      fontSize: {
+        '2xs': ['9px', { lineHeight: '1.4' }],
+        'xs': ['10px', { lineHeight: '1.4' }],
+        'sm': ['11px', { lineHeight: '1.5' }],
+        'base': ['14px', { lineHeight: '1.5' }],
+        'lg': ['16px', { lineHeight: '1.4' }],
+        'xl': ['20px', { lineHeight: '1.3' }],
+        '2xl': ['24px', { lineHeight: '1.3' }],
+        '3xl': ['30px', { lineHeight: '1.2' }],
+        '4xl': ['40px', { lineHeight: '1.1' }],
+      },
+      borderRadius: {
+        'sm': '6px',
+        'md': '8px',
+        'lg': '12px',
+        'xl': '16px',
+        '2xl': '24px',
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",

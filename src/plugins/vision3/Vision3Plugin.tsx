@@ -22,6 +22,9 @@ import { PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
 import { cn } from '@/lib/utils';
 import BaseWebcamView from '@/components/shared/BaseWebcamView';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
+import { useAssessmentStore } from '@/store/useAssessmentStore';
+import { usePatientStore } from '@/store/usePatientStore';
+import { useSessionStore } from '@/store/useSessionStore';
 import MeasurementChart from '@/components/MeasurementChart';
 import JointSelector from '@/components/JointSelector';
 import { useVision3Camera } from './hooks/useVision3Camera';
@@ -64,6 +67,10 @@ export const Vision3Plugin: React.FC = () => {
     step,
     setStep 
   } = usePostureAssessmentStore();
+  
+  const { addAssessment } = useAssessmentStore();
+  const { currentPatient } = usePatientStore();
+  const { sessions, startSession } = useSessionStore();
 
   const {
     wsResult,
@@ -149,6 +156,72 @@ export const Vision3Plugin: React.FC = () => {
       });
     }
   }, [wsResult]);
+
+  // Auto-save assessment when completed
+  const hasSavedRef = useRef(false);
+  useEffect(() => {
+    const saveAssessment = async () => {
+      if (step === 'completed' && wsResult && !hasSavedRef.current) {
+        hasSavedRef.current = true;
+        
+        try {
+          let patientId = currentPatient?.id;
+          
+          if (!patientId) {
+            const { patients } = usePatientStore.getState();
+            if (patients.length > 0) {
+              patientId = patients[0].id;
+            }
+          }
+          
+          if (!patientId) {
+            console.log('No patient found, skipping assessment save');
+            return;
+          }
+          
+          let sessionId: string | undefined;
+          const patientSessions = sessions.filter(s => s.patientId === patientId);
+          if (patientSessions.length > 0) {
+            sessionId = patientSessions[0].id;
+          }
+          
+          if (!sessionId) {
+            const newSession = await startSession(patientId);
+            sessionId = newSession.id;
+          }
+          
+          await addAssessment({
+            sessionId,
+            patientId,
+            type: 'posture',
+            mode: assessmentMode,
+            data: {
+              posture: {
+                mode: assessmentMode,
+                view: view,
+                metrics: wsResult.metrics,
+                issues: wsResult.issues,
+                confidence: 0.85
+              }
+            }
+          });
+          
+          console.log('Assessment saved successfully');
+        } catch (error) {
+          console.error('Failed to save assessment:', error);
+        }
+      }
+    };
+    
+    saveAssessment();
+  }, [step, wsResult, currentPatient, sessions, startSession, addAssessment, assessmentMode, view]);
+  
+  // Reset save flag when starting new assessment
+  useEffect(() => {
+    if (step !== 'completed') {
+      hasSavedRef.current = false;
+    }
+  }, [step]);
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 overflow-hidden relative">
@@ -348,7 +421,7 @@ export const Vision3Plugin: React.FC = () => {
               onResults={onResults} 
               isCameraOn={isCameraOn}
               isMirrored={isMirrored}
-              showSkeleton={captureStatus !== 'completed' && step !== 'completed'}
+              showSkeleton={isCameraOn}
               annotations={annotations}
               headAxes={showHeadAxes ? headAxes : null}
               className="w-full h-full object-cover transition-opacity duration-1000"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Activity, Mic, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Settings, ChevronLeft, ChevronRight, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -12,8 +12,7 @@ interface SidebarProps {
 
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: '患者工作站' },
-  { id: 'vision3', icon: Activity, label: '体态分析' },
-  { id: 'medvoice', icon: Mic, label: '语音接诊' },
+  { id: 'datacenter', icon: Database, label: '数据与报告' },
 ];
 
 export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isCollapsed, onToggle, onSettingsClick }) => {

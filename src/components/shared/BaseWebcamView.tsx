@@ -44,8 +44,16 @@ export default function BaseWebcamView({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
   const { stream, error: cameraError, isLoading: isCameraLoading } = useCameraStream(isCameraOn);
+
+  // Track video element mount
+  useEffect(() => {
+    if (videoRef.current && videoRef.current !== videoElement) {
+      setVideoElement(videoRef.current);
+    }
+  }, [videoElement]);
 
   // Sync video source
   useEffect(() => {
@@ -109,7 +117,7 @@ export default function BaseWebcamView({
   }, [onResults, isMirrored, showSkeleton, annotations, headAxes]);
 
   const { isLoading: isModelLoading, error: modelError } = useMediaPipe(
-    videoRef.current,
+    videoElement,
     handleResults,
     isCameraOn && !!stream
   );
@@ -124,7 +132,7 @@ export default function BaseWebcamView({
 
   return (
     <div className={cn(
-      "relative bg-black rounded-[2.5rem] overflow-hidden shadow-2xl group ring-1 ring-white/10",
+      "relative bg-black rounded-2xl overflow-hidden shadow-xl ring-1 ring-white/5",
       aspectRatioClass,
       className
     )}>
@@ -133,8 +141,8 @@ export default function BaseWebcamView({
           {/* Loading States */}
           {(isCameraLoading || isModelLoading) && !isVideoReady && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 z-30">
-              <Loader2 className="h-10 w-10 text-blue-500 animate-spin mb-4" />
-              <p className="text-gray-400 text-sm animate-pulse">
+              <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-3" />
+              <p className="text-gray-400 text-xs animate-pulse">
                 {isCameraLoading ? "正在启动摄像头..." : "正在初始化 AI 模型..."}
               </p>
             </div>
@@ -142,10 +150,10 @@ export default function BaseWebcamView({
 
           {/* Error State */}
           {error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 text-white z-40 p-6 text-center">
-              <VideoOff className="h-12 w-12 text-red-500 mb-4" />
-              <h3 className="text-xl font-bold mb-2">{cameraError ? '摄像头访问失败' : 'AI 模型加载失败'}</h3>
-              <p className="text-gray-400 max-w-xs mb-6 text-sm">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 text-white z-40 p-4 text-center">
+              <VideoOff className="h-10 w-10 text-red-500 mb-3" />
+              <h3 className="text-lg font-bold mb-2">{cameraError ? '摄像头访问失败' : 'AI 模型加载失败'}</h3>
+              <p className="text-gray-400 max-w-xs mb-4 text-xs">
                 {cameraError 
                   ? (cameraError.message.includes("NotReadableError") || cameraError.message.includes("Device in use") 
                     ? "摄像头被其他程序占用，请关闭后重试。" 
@@ -154,7 +162,7 @@ export default function BaseWebcamView({
               </p>
               <button 
                 onClick={() => window.location.reload()}
-                className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-sm font-medium"
+                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition-colors text-xs font-medium"
               >
                 刷新页面
               </button>
@@ -189,26 +197,28 @@ export default function BaseWebcamView({
       ) : (
         /* Camera Off State */
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950 text-white z-10">
-          <div className="bg-white/5 p-8 rounded-full mb-6 border border-white/10 backdrop-blur-sm">
-            <VideoOff className="h-12 w-12 text-gray-400" />
+          <div className="bg-white/5 p-6 rounded-full mb-4 border border-white/10">
+            <VideoOff className="h-10 w-10 text-gray-400" />
           </div>
-          <p className="text-gray-400 text-lg font-medium">摄像头已关闭</p>
-          <button 
-            onClick={() => onCameraToggle?.(true)}
-            className="mt-8 px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-base font-bold transition-all shadow-lg shadow-blue-500/20 cursor-pointer active:scale-95 pointer-events-auto"
-          >
-            开启摄像头
-          </button>
+          <p className="text-gray-400 text-sm font-medium">摄像头已关闭</p>
+          {onCameraToggle && (
+            <button 
+              onClick={() => onCameraToggle(true)}
+              className="mt-6 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all cursor-pointer active:scale-95 pointer-events-auto"
+            >
+              开启摄像头
+            </button>
+          )}
         </div>
       )}
 
       {/* Control Overlay */}
-      {isCameraOn && (
+      {isCameraOn && onCameraToggle && (
         <button
-          onClick={() => onCameraToggle?.(!isCameraOn)}
-          className="absolute top-6 right-6 p-3 rounded-2xl bg-black/40 text-white hover:bg-black/60 transition-all backdrop-blur-xl border border-white/10 pointer-events-auto z-40 cursor-pointer opacity-0 group-hover:opacity-100 shadow-xl"
+          onClick={() => onCameraToggle(!isCameraOn)}
+          className="absolute top-4 right-4 p-2.5 rounded-xl bg-black/40 text-white hover:bg-black/60 transition-all pointer-events-auto z-40 cursor-pointer opacity-0 group-hover:opacity-100"
         >
-          {isCameraOn ? <Video className="h-5 w-5" /> : <VideoOff className="h-5 w-5" />}
+          {isCameraOn ? <Video className="h-4 w-4" /> : <VideoOff className="h-4 w-4" />}
         </button>
       )}
     </div>

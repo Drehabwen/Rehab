@@ -19,6 +19,7 @@ interface SessionState {
   addAssessment: (sessionId: string, assessment: Omit<Assessment, 'id' | 'sessionId' | 'createdAt'>) => Promise<void>;
   getSessionById: (id: string) => Session | undefined;
   getNextSequence: (patientId: string) => Promise<number>;
+  getPatientSessions: (patientId: string) => Session[];
 }
 
 export const useSessionStore = create<SessionState>((set, get) => ({
@@ -164,5 +165,10 @@ export const useSessionStore = create<SessionState>((set, get) => ({
   getSessionById: (id) => {
     const { sessions } = get();
     return sessions.find(s => s.id === id);
+  },
+  
+  getPatientSessions: (patientId) => {
+    const { sessions } = get();
+    return sessions.filter(s => s.patientId === patientId);
   }
 }));

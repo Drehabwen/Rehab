@@ -3,38 +3,59 @@ import ReactDOM from 'react-dom';
 import { 
   FileText, 
   Search, 
-  Filter, 
-  Download, 
   Trash2, 
   Calendar, 
   User, 
   Activity,
   ArrowUpRight,
-  Clock,
   ExternalLink,
-  ChevronDown
+  ChevronDown,
+  Database,
+  FileJson,
+  FileSpreadsheet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useMeasurementStore, PostureReport } from '@/store/useMeasurementStore';
+import { PostureReport } from '@/store/useMeasurementStore';
+import { useAssessmentStore } from '@/store/useAssessmentStore';
+import { usePatientStore } from '@/store/usePatientStore';
 import { ReportChart } from './ReportChart';
+import type { Assessment } from '@/types/assessment';
 
 export const NexusReportCenter: React.FC = () => {
   const { 
-    savedMeasurements, 
-    deleteSavedMeasurement,
-    postureReports,
-    deletePostureReport
-  } = useMeasurementStore();
+    assessments, 
+    loadAssessments, 
+    loadAssessmentsByPatient,
+    deleteAssessment 
+  } = useAssessmentStore();
+  
+  const { 
+    patients, 
+    loadPatients
+  } = usePatientStore();
+  
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedReportHtml, setSelectedReportHtml] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<PostureReport | null>(null);
+  const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const reportContainerRef = useRef<HTMLDivElement>(null);
   const [chartPortals, setChartPortals] = useState<React.ReactPortal[]>([]);
 
   useEffect(() => {
+    loadPatients();
+    loadAssessments();
+  }, [loadPatients, loadAssessments]);
+
+  useEffect(() => {
+    if (selectedPatientId) {
+      loadAssessmentsByPatient(selectedPatientId);
+    }
+  }, [selectedPatientId, loadAssessmentsByPatient]);
+
+  useEffect(() => {
     if (selectedReportHtml && reportContainerRef.current && selectedReport) {
-      // 1. Handle scripts (legacy support)
       const scripts = reportContainerRef.current.getElementsByTagName('script');
       Array.from(scripts).forEach(oldScript => {
         const newScript = document.createElement('script');
@@ -43,7 +64,6 @@ export const NexusReportCenter: React.FC = () => {
         oldScript.parentNode?.replaceChild(newScript, oldScript);
       });
 
-      // 2. Handle Chart Placeholders
       const placeholders = reportContainerRef.current.querySelectorAll('.rehab-chart');
       const newPortals: React.ReactPortal[] = [];
 
@@ -55,26 +75,24 @@ export const NexusReportCenter: React.FC = () => {
         const color = el.getAttribute('data-color') || '#3b82f6';
 
         if (selectedReport.timeSeries) {
-          // Prepare data: Recharts expects an array of objects
           const chartData = selectedReport.timeSeries.map(point => ({
             timestamp: point.timestamp,
-            [metricKey]: point.metrics[metricKey]
+            value: point[metricKey as keyof typeof point] as number
           }));
 
-          newPortals.push(
-            ReactDOM.createPortal(
-              <ReportChart 
-                key={`chart-${idx}`}
-                type={type}
-                data={chartData}
-                title={title}
-                metricKey={metricKey}
-                unit={unit}
-                color={color}
-              />,
-              el as HTMLElement
-            )
+          const portal = ReactDOM.createPortal(
+            <ReportChart
+              key={`chart-${idx}`}
+              type={type}
+              data={chartData}
+              title={title}
+              metricKey={metricKey}
+              unit={unit}
+              color={color}
+            />,
+            el as Element
           );
+          newPortals.push(portal);
         }
       });
       setChartPortals(newPortals);
@@ -83,168 +101,333 @@ export const NexusReportCenter: React.FC = () => {
     }
   }, [selectedReportHtml, selectedReport]);
 
+  const filteredPatients = patients.filter(p => 
+    p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    p.id.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredAssessments = selectedPatientId 
+    ? assessments.filter(a => a.patientId === selectedPatientId)
+    : assessments;
+
   const stats = [
-    { label: '总报告数', value: savedMeasurements.length + postureReports.length, icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: '本周新增', value: '12', icon: Activity, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { label: '待审核', value: '3', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50' },
+    { label: '总评估数', value: assessments.length, icon: Database, color: 'text-blue-500', bg: 'bg-blue-50' },
+    { label: '患者总数', value: patients.length, icon: User, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { label: '本周新增', value: assessments.filter(a => Date.now() - a.createdAt < 7 * 24 * 60 * 60 * 1000).length, icon: Activity, color: 'text-amber-500', bg: 'bg-amber-50' },
   ];
 
-  const allReports = [
-    ...savedMeasurements.map(m => ({ ...m, type: 'measurement' as const })),
-    ...postureReports.map(r => ({ ...r, type: 'posture' as const }))
-  ].sort((a, b) => b.date - a.date);
+  const exportToJson = (assessment: Assessment) => {
+    const dataStr = JSON.stringify(assessment, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `assessment-${assessment.id}-${new Date(assessment.createdAt).toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToCsv = (assessment: Assessment) => {
+    if (!assessment.data.posture?.metrics) return;
+    
+    const metrics = assessment.data.posture.metrics;
+    const rows = Object.entries(metrics).map(([key, value]) => [key, value]);
+    const csvContent = 'metric,value\n' + rows.map(r => r.join(',')).join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `assessment-${assessment.id}-${new Date(assessment.createdAt).toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
-      {/* Header Section */}
-      <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-antey-primary mb-2">
-            <span className="w-8 h-[1px] bg-antey-primary" />
-            Report Management
+    <div className="h-full p-8 overflow-y-auto custom-scrollbar">
+      <div className="max-w-7xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+        <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-2">
+            <h1 className="text-5xl font-black text-slate-900 tracking-tight leading-none">
+              数据与报告
+            </h1>
+            <p className="text-slate-400 font-medium text-lg flex items-center gap-2">
+              <span className="w-8 h-[1px] bg-slate-200" />
+              {selectedPatientId 
+                ? `筛选: ${patients.find(p => p.id === selectedPatientId)?.name || '未知患者'}`
+                : '全部患者的评估记录'
+              }
+            </p>
           </div>
-          <h1 className="text-5xl font-black text-slate-900 tracking-tight leading-none">
-            报告<span className="text-gradient">中心</span>
-          </h1>
-          <p className="text-slate-400 font-medium text-lg">
-            集中管理、分析并导出所有患者的康复数据报告。
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-antey-primary transition-colors" size={16} />
-            <input 
-              type="text" 
-              placeholder="搜索记录..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-white/50 border border-slate-200/50 rounded-2xl py-2.5 pl-12 pr-6 text-sm w-64 focus:ring-4 focus:ring-antey-primary/5 focus:bg-white focus:border-antey-primary/20 transition-all outline-none"
-            />
+          <div className="flex items-center gap-3 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm">
+            <div className="px-4 py-2 bg-white/80 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
+              {assessments.length} 条记录
+            </div>
           </div>
-          <button className="p-2.5 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-antey-primary hover:border-antey-primary/20 transition-all shadow-sm">
-            <Filter size={20} />
-          </button>
-        </div>
-      </section>
+        </section>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, idx) => (
-          <div key={idx} className="bento-card-glass p-8 group hover:-translate-y-1 transition-all duration-500">
-            <div className="flex items-center justify-between mb-4">
-              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-500", stat.bg, stat.color)}>
-                <stat.icon size={24} />
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {stats.map((stat, idx) => (
+            <div key={idx} className="bento-card p-6 flex items-center justify-between">
+              <div>
+                <div className="text-3xl font-black text-slate-900">{stat.value}</div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{stat.label}</div>
               </div>
-              <ArrowUpRight size={20} className="text-slate-300 group-hover:text-antey-primary transition-colors" />
+              <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", stat.bg)}>
+                <stat.icon size={20} className={stat.color} />
+              </div>
             </div>
-            <div className="text-3xl font-black text-slate-900 mb-1">{stat.value}</div>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Reports List */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between px-4">
-          <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-            <Clock size={16} className="text-antey-primary" />
-            最近生成
-          </h2>
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400">排序:</span>
-            <button className="text-[10px] font-black text-slate-900 flex items-center gap-1 uppercase tracking-widest hover:text-antey-primary transition-colors">
-              最新优先 <ChevronDown size={12} />
-            </button>
-          </div>
+          ))}
         </div>
 
-        {allReports.length === 0 ? (
-          <div className="bento-card-glass p-20 flex flex-col items-center justify-center text-center space-y-4 border-dashed">
-            <div className="w-20 h-20 bg-slate-50 rounded-[2.5rem] flex items-center justify-center text-slate-300">
-              <FileText size={40} />
-            </div>
-            <div>
-              <h3 className="text-xl font-black text-slate-900">暂无报告数据</h3>
-              <p className="text-slate-400 text-sm">完成康复评估或体态录制后，报告将在此自动生成。</p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {allReports.map((report) => (
-              <div key={report.id} className="group bento-card-glass p-6 flex items-center justify-between hover:border-antey-primary/30 hover:shadow-2xl transition-all duration-500">
-                <div className="flex items-center gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1">
+            <div className="bento-card p-6">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">
+                <User size={14} />
+                患者筛选
+              </div>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="搜索患者..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-2 focus:ring-antey-primary/10 focus:border-antey-primary/30 transition-all outline-none"
+                />
+              </div>
+              
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                <button
+                  onClick={() => setSelectedPatientId(null)}
+                  className={cn(
+                    "w-full px-4 py-3 flex items-center gap-3 text-left rounded-xl transition-all",
+                    !selectedPatientId 
+                      ? "bg-antey-primary/10 text-antey-primary border border-antey-primary/20" 
+                      : "hover:bg-slate-50 text-slate-600 border border-transparent"
+                  )}
+                >
                   <div className={cn(
-                    "w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-500",
-                    report.type === 'posture' 
-                      ? "bg-blue-50 text-blue-500 group-hover:bg-blue-100" 
-                      : "bg-slate-50 text-slate-400 group-hover:bg-antey-primary/5 group-hover:text-antey-primary"
+                    "w-8 h-8 rounded-lg flex items-center justify-center",
+                    !selectedPatientId ? "bg-antey-primary/20" : "bg-slate-100"
                   )}>
-                    {report.type === 'posture' ? <Activity size={28} /> : <Activity size={28} />}
+                    <Database size={16} />
                   </div>
                   <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                        {report.type === 'posture' ? `体态趋势分析报告 (${report.view === 'front' ? '正视图' : report.view === 'side' ? '侧视图' : '背视图'})` : `关节活动度评估报告 - ${report.id.slice(-6).toUpperCase()}`}
-                      </h3>
-                      <span className={cn(
-                        "px-2 py-0.5 text-[8px] font-black uppercase tracking-widest rounded-md border",
-                        report.type === 'posture' ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                    <div className="font-bold text-sm">全部患者</div>
+                    <div className="text-[10px] text-slate-400">{assessments.length} 条评估</div>
+                  </div>
+                </button>
+                
+                {filteredPatients.map((patient) => {
+                  const patientAssessments = assessments.filter(a => a.patientId === patient.id);
+                  return (
+                    <button
+                      key={patient.id}
+                      onClick={() => setSelectedPatientId(patient.id)}
+                      className={cn(
+                        "w-full px-4 py-3 flex items-center gap-3 text-left rounded-xl transition-all",
+                        selectedPatientId === patient.id 
+                          ? "bg-antey-primary/10 text-antey-primary border border-antey-primary/20" 
+                          : "hover:bg-slate-50 text-slate-600 border border-transparent"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs",
+                        selectedPatientId === patient.id 
+                          ? "bg-antey-primary/20 text-antey-primary" 
+                          : "bg-slate-100 text-slate-500"
                       )}>
-                        {report.type === 'posture' ? 'AI 深度分析' : '已完成'}
-                      </span>
+                        {patient.name?.charAt(0) || patient.id.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-sm truncate">{patient.name || '未命名患者'}</div>
+                        <div className="text-[10px] text-slate-400">{patientAssessments.length} 条评估</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-3">
+            <div className="space-y-3">
+              {filteredAssessments.length === 0 ? (
+                <div className="bento-card p-16 text-center">
+                  <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-6">
+                    <FileText size={32} className="text-slate-300" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 mb-2">暂无评估记录</h3>
+                  <p className="text-slate-400">完成体态评估后，数据将在此自动保存。</p>
+                </div>
+              ) : (
+                filteredAssessments.map((assessment) => (
+                  <div key={assessment.id} className="bento-card p-5 flex items-center justify-between hover:border-antey-primary/30 transition-all group">
+                    <div className="flex items-center gap-5">
+                      <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center">
+                        <Activity size={18} className="text-blue-500" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-sm font-black text-slate-900">
+                            {assessment.type === 'posture' ? '体态评估' : '关节活动度评估'}
+                          </span>
+                          <span className={cn(
+                            "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider",
+                            assessment.mode === 'realtime' 
+                              ? "bg-emerald-50 text-emerald-600" 
+                              : "bg-blue-50 text-blue-600"
+                          )}>
+                            {assessment.mode === 'realtime' ? '实时' : '分步'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-slate-400 text-[10px] font-medium">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={10} />
+                            {new Date(assessment.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <User size={10} />
+                            {patients.find(p => p.id === assessment.patientId)?.name || '未知患者'}
+                          </span>
+                          {assessment.data.posture?.view && (
+                            <span className="flex items-center gap-1">
+                              <ArrowUpRight size={10} />
+                              {assessment.data.posture.view === 'front' ? '正面' : 
+                               assessment.data.posture.view === 'side' ? '侧面' : '背面'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold">
-                        <Calendar size={12} />
-                        {new Date(report.date).toLocaleDateString()}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold">
-                        <User size={12} />
-                        匿名患者
-                      </div>
-                      <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold">
-                        <FileText size={12} />
-                        {report.type === 'posture' ? 'LLM 时序分析' : `${report.measurements?.length || 0} 个分析项`}
-                      </div>
+
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => exportToJson(assessment)}
+                        className="p-2.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all"
+                        title="导出 JSON"
+                      >
+                        <FileJson size={16} />
+                      </button>
+                      <button 
+                        onClick={() => exportToCsv(assessment)}
+                        className="p-2.5 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-xl transition-all"
+                        title="导出 CSV"
+                      >
+                        <FileSpreadsheet size={16} />
+                      </button>
+                      <button 
+                        onClick={() => deleteAssessment(assessment.id)}
+                        className="p-2.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
+                        title="删除"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => setSelectedAssessment(assessment)}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-antey-primary transition-all"
+                      >
+                        详情
+                        <ExternalLink size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {selectedAssessment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-8 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedAssessment(null)} />
+          <div className="relative bg-white shadow-2xl w-full max-w-3xl max-h-[80vh] rounded-3xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500">
+                  <Activity size={20} />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900">评估详情</h3>
+                  <p className="text-[10px] text-slate-400">
+                    {new Date(selectedAssessment.createdAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedAssessment(null)}
+                className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-slate-900 transition-all"
+              >
+                <ChevronDown size={20} className="rotate-180" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {selectedAssessment.data.posture && (
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">检测问题</h4>
+                    <div className="space-y-2">
+                      {selectedAssessment.data.posture.issues.map((issue, idx) => (
+                        <div key={idx} className="p-4 bg-slate-50 rounded-2xl">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={cn(
+                              "px-2 py-1 text-[9px] font-black uppercase rounded-lg",
+                              issue.severity === 'severe' ? 'bg-rose-100 text-rose-600' :
+                              issue.severity === 'moderate' ? 'bg-amber-100 text-amber-600' :
+                              'bg-blue-100 text-blue-600'
+                            )}>
+                              {issue.severity === 'severe' ? '严重' : issue.severity === 'moderate' ? '中度' : '轻度'}
+                            </span>
+                            <span className="font-bold text-slate-900">{issue.title}</span>
+                          </div>
+                          <p className="text-sm text-slate-600">{issue.description}</p>
+                          <p className="text-xs text-slate-400 mt-1">{issue.recommendation}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">测量指标</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {Object.entries(selectedAssessment.data.posture.metrics).map(([key, value]) => (
+                        <div key={key} className="bento-card p-4">
+                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">{key}</div>
+                          <div className="text-lg font-black text-slate-900">
+                            {typeof value === 'number' ? value.toFixed(1) : value}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <button className="p-3 text-slate-400 hover:text-antey-primary hover:bg-slate-50 rounded-xl transition-all">
-                    <Download size={20} />
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (report.type === 'posture') deletePostureReport(report.id);
-                      else deleteSavedMeasurement(report.id);
-                    }}
-                    className="p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                  <div className="w-px h-8 bg-slate-100 mx-2" />
-                  <button 
-                    onClick={() => {
-                      if (report.type === 'posture') {
-                        setSelectedReportHtml(report.html);
-                        setSelectedReport(report as PostureReport);
-                      }
-                    }}
-                    className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-antey-primary transition-all shadow-lg shadow-slate-900/10"
-                  >
-                    查看详情
-                    <ExternalLink size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button 
+                onClick={() => exportToJson(selectedAssessment)}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-slate-50 transition-all flex items-center gap-2"
+              >
+                <FileJson size={14} />
+                导出 JSON
+              </button>
+              <button 
+                onClick={() => exportToCsv(selectedAssessment)}
+                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-antey-primary transition-all flex items-center gap-2"
+              >
+                <FileSpreadsheet size={14} />
+                导出 CSV
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* HTML Report Modal */}
       {selectedReportHtml && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-8 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setSelectedReportHtml(null); setSelectedReport(null); setIsFullscreen(false); }} />
@@ -256,7 +439,7 @@ export const NexusReportCenter: React.FC = () => {
           )}>
             <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
+                <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500">
                   <Activity size={20} />
                 </div>
                 <div>
@@ -276,34 +459,12 @@ export const NexusReportCenter: React.FC = () => {
                   onClick={() => { setSelectedReportHtml(null); setSelectedReport(null); setIsFullscreen(false); }}
                   className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"
                 >
-                  <ChevronDown size={24} className="rotate-180" />
+                  <ChevronDown size={20} className="rotate-180" />
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 md:p-12 bg-slate-50/30">
-              <div className="max-w-4xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-100 p-6 md:p-12">
-                <div 
-                  ref={reportContainerRef}
-                  className="prose prose-slate max-w-none prose-headings:text-slate-900 prose-p:text-slate-600 prose-strong:text-slate-900"
-                  dangerouslySetInnerHTML={{ __html: selectedReportHtml }} 
-                />
-                {/* Render Chart Portals */}
-                {chartPortals}
-              </div>
-            </div>
-            <div className="p-6 border-t border-slate-100 bg-white flex flex-col sm:flex-row items-center justify-between gap-4">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                生成时间: {new Date().toLocaleString()}
-              </p>
-              <div className="flex items-center gap-3 w-full sm:w-auto">
-                <button className="flex-1 sm:flex-none px-6 py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
-                  打印报告
-                </button>
-                <button className="flex-1 sm:flex-none px-8 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20">
-                  导出 PDF
-                </button>
-              </div>
-            </div>
+            <div ref={reportContainerRef} className="flex-1 overflow-y-auto p-8" dangerouslySetInnerHTML={{ __html: selectedReportHtml }} />
+            {chartPortals}
           </div>
         </div>
       )}
