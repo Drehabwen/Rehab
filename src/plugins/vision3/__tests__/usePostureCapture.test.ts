@@ -1,8 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
-import { usePostureCapture, CaptureStatus } from '../hooks/usePostureCapture';
+import { renderHook, act } from '@testing-library/react';
+import { usePostureCapture } from '../hooks/usePostureCapture';
 import { PoseLandmark } from '../vision3-utils';
 
 describe('usePostureCapture', () => {

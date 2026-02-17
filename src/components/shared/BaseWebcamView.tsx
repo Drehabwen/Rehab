@@ -1,15 +1,13 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Results, POSE_CONNECTIONS } from '@mediapipe/holistic';
-import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
+import React, { useEffect, useState } from 'react';
+import { Results } from '@mediapipe/holistic';
 import { Video, VideoOff, Loader2 } from 'lucide-react';
 import { useCameraStream } from '@/hooks/useCameraStream';
 import { useMediaPipe } from '@/hooks/useMediaPipe';
+import { useSkeletonRenderer } from '@/hooks/useSkeletonRenderer';
 import { cn } from '@/lib/utils';
 import { 
   VisualAnnotation, 
-  HeadAxes, 
-  drawAnnotations, 
-  drawHeadAxes 
+  HeadAxes
 } from '@/plugins/vision3/vision3-utils';
 
 interface BaseWebcamViewProps {
@@ -27,7 +25,7 @@ interface BaseWebcamViewProps {
 
 /**
  * BaseWebcamView - A stable foundation for all camera-based features.
- * Handles: Stream sync, MediaPipe initialization, Canvas alignment, and skeletal drawing.
+ * Uses useSkeletonRenderer hook for skeleton drawing logic.
  */
 export default function BaseWebcamView({
   isCameraOn,
@@ -41,21 +39,25 @@ export default function BaseWebcamView({
   annotations = [],
   headAxes = null
 }: BaseWebcamViewProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
   const { stream, error: cameraError, isLoading: isCameraLoading } = useCameraStream(isCameraOn);
 
-  // Track video element mount
+  const { videoRef, canvasRef, handleResults } = useSkeletonRenderer({
+    isMirrored,
+    showSkeleton,
+    annotations,
+    headAxes,
+    onResults
+  });
+
   useEffect(() => {
-    if (videoRef.current && videoRef.current !== videoElement) {
+    if (videoRef.current) {
       setVideoElement(videoRef.current);
     }
-  }, [videoElement]);
+  }, [videoRef]);
 
-  // Sync video source
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -70,51 +72,7 @@ export default function BaseWebcamView({
       video.srcObject = null;
       setIsVideoReady(false);
     }
-  }, [stream, isCameraOn]);
-
-  // Handle results and drawing
-  const handleResults = useCallback((results: Results) => {
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas || !results.poseLandmarks) return;
-
-    // Ensure canvas matches video resolution
-    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      setIsVideoReady(true);
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Drawing skeleton if enabled
-    if (showSkeleton) {
-      const landmarksToDraw = isMirrored 
-        ? results.poseLandmarks.map(lm => ({ ...lm, x: 1 - lm.x }))
-        : results.poseLandmarks;
-
-      drawConnectors(ctx, landmarksToDraw, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
-      drawLandmarks(ctx, landmarksToDraw, { color: '#FF0000', lineWidth: 2, radius: 2 });
-    }
-
-    // Drawing annotations from business logic
-    if (annotations && annotations.length > 0) {
-      drawAnnotations(ctx, annotations, canvas.width, canvas.height, isMirrored);
-    }
-
-    // Drawing head axes if provided
-    if (headAxes) {
-      drawHeadAxes(ctx, headAxes, isMirrored ? canvas.width : undefined);
-    }
-
-    // Pass results to parent for business logic
-    if (onResults) {
-      onResults(results, video, canvas);
-    }
-  }, [onResults, isMirrored, showSkeleton, annotations, headAxes]);
+  }, [stream, isCameraOn, videoRef]);
 
   const { isLoading: isModelLoading, error: modelError } = useMediaPipe(
     videoElement,

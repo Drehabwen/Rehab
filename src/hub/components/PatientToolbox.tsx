@@ -8,7 +8,6 @@ import {
   Calendar,
   User,
   TrendingUp,
-  AlertCircle,
   CheckCircle2,
   ArrowRight
 } from 'lucide-react';
@@ -184,18 +183,6 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {patientAssessments.length === 0 && (
-          <div className="bento-card p-4">
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">
-              <AlertCircle size={14} />
-              开始评估
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              该患者暂无评估记录，请从下方工具箱选择评估工具开始首次评估。
-            </p>
           </div>
         )}
       </div>

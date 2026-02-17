@@ -37,7 +37,7 @@ export const NexusHub: React.FC = () => {
   const [showDataSettings, setShowDataSettings] = useState(false);
   
   const { patients, loadPatients, addPatient } = usePatientStore();
-  const { sessions, loadSessions, getPatientSessions } = useSessionStore();
+  const { loadSessions, getPatientSessions } = useSessionStore();
   
   useEffect(() => {
     loadPatients();
@@ -62,7 +62,7 @@ export const NexusHub: React.FC = () => {
       
       return { ...patient, status, lastSession };
     });
-  }, [patients, sessions]);
+  }, [patients, getPatientSessions]);
 
   const stats = useMemo(() => {
     return {

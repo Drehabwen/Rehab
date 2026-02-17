@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DataProcessor } from '../services/DataProcessor';
 import { globalMonitor } from '../services/GlobalMonitor';
@@ -8,7 +6,6 @@ import { PostureFrame, Landmark } from '../store/usePostureAssessmentStore';
 import { TemporalAnalysis } from '@/lib/posture-processor';
 
 describe('DataFlowIntegration', () => {
-  let analysisDataCallback: (data: TemporalAnalysis) => void;
   let mockAnalysisData: TemporalAnalysis | null = null;
 
   const createStableLandmarks = (offsetX = 0, offsetY = 0): Landmark[] => {
@@ -67,7 +64,7 @@ describe('DataFlowIntegration', () => {
 
     expect(analysisData.timeSeries).toHaveLength(50);
     
-    analysisData.timeSeries.forEach((ts, index) => {
+    analysisData.timeSeries.forEach((ts) => {
       expect(ts).toHaveProperty('timestamp');
       expect(ts).toHaveProperty('metrics');
       expect(ts.metrics).toHaveProperty('swayOffset');
@@ -146,7 +143,6 @@ describe('DataFlowIntegration', () => {
     expect(processedResult.fullBodyLandmarks.length).toBe(33);
     expect(analysisData.timeSeries.length).toBe(35);
 
-    const swayOffsetInProcessed = processedResult.metrics.swayOffset;
     const swayOffsetInAnalysis = analysisData.averages.swayOffset;
     
     const swayOffsetsInTimeSeries = analysisData.timeSeries.map(ts => ts.metrics.swayOffset);
