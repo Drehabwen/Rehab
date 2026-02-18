@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PoseLandmark } from '../vision3-utils';
+import { getViewsForScope, getNextView, getTotalSteps } from '../vision3-scope-config';
+import type { AssessmentScope } from '../store/usePostureAssessmentStore';
 
 interface SteppedAssessmentOverlayProps {
   view: 'front' | 'side' | 'back';
@@ -23,13 +25,8 @@ interface SteppedAssessmentOverlayProps {
   onRetake: () => void;
   onFinish: () => void;
   onReset: () => void;
+  scope: AssessmentScope;
 }
-
-const VIEW_CONFIG = {
-  front: { label: '正视位', desc: '评估高低肩、骨盆倾斜' },
-  side: { label: '侧视位', desc: '评估圆肩驼背、骨盆前倾' },
-  back: { label: '背视位', desc: '评估脊柱侧弯风险' }
-};
 
 export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> = ({
   view,
@@ -42,11 +39,15 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
   onNextView,
   onRetake,
   onFinish,
-  onReset
+  onReset,
+  scope
 }) => {
-  const views: ('front' | 'side' | 'back')[] = ['front', 'side', 'back'];
+  const views = getViewsForScope(scope);
+  const currentViewConfig = views.find(v => v.id === view) || views[0];
   const capturedCount = Object.keys(steppedResults).length;
+  const totalSteps = getTotalSteps(scope);
   const currentCaptured = steppedResults[view];
+  const canProceed = getNextView(scope, view) !== null;
 
   return (
     <div className="absolute inset-0 z-50 flex flex-col items-center pointer-events-none p-12">
@@ -54,15 +55,17 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
       <div className="flex items-center gap-4 bg-slate-900/80 px-8 py-4 rounded-[2.5rem] border border-white/20 shadow-2xl animate-in slide-in-from-top-8 duration-700">
         <div className="flex items-center gap-3 pr-6 border-r border-white/10">
           <Layers className="text-emerald-400" size={18} />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">分步拍摄进度</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">
+            {scope === 'full' ? '分步拍摄进度' : '拍摄进度'}
+          </span>
         </div>
         
-        <div className="flex items-center gap-8">
-          {views.map((v) => {
-            const isCaptured = !!steppedResults[v];
-            const isActive = view === v;
+        <div className="flex items-center gap-6">
+          {views.map((v, index) => {
+            const isCaptured = !!steppedResults[v.id];
+            const isActive = view === v.id;
             return (
-              <div key={v} className="flex items-center gap-3 group">
+              <div key={v.id} className="flex items-center gap-3 group">
                 <div className={cn(
                   "w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-500",
                   isActive ? "bg-white text-slate-900 border-white shadow-lg scale-110" :
@@ -75,12 +78,15 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
                   <span className={cn(
                     "text-[9px] font-black uppercase tracking-widest",
                     isActive ? "text-white" : "text-white/40"
-                  )}>{v}</span>
+                  )}>{v.id}</span>
                   <span className={cn(
                     "text-[11px] font-bold",
                     isActive ? "text-white" : "text-white/60"
-                  )}>{VIEW_CONFIG[v].label}</span>
+                  )}>{v.label}</span>
                 </div>
+                {index < views.length - 1 && (
+                  <ChevronRight size={14} className="text-white/20 ml-2" />
+                )}
               </div>
             );
           })}
@@ -88,21 +94,28 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
       </div>
 
       <div className="flex-1 flex flex-col items-center justify-center w-full">
-        {/* 2. 状态文字 */}
+        {/* 2. 状态文字和范围提示 */}
         <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 mb-4">
             <Info size={14} className="text-emerald-400" />
-            <span className="text-[11px] text-white/80 font-medium">{VIEW_CONFIG[view].desc}</span>
+            <span className="text-[11px] text-white/80 font-medium">{currentViewConfig.description}</span>
+          </div>
+
+          {/* 范围特定的提示 */}
+          <div className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-antey-primary/20 to-cyan-400/20 border border-antey-primary/30 mb-6">
+            <span className="text-[12px] text-antey-primary font-bold">
+              💡 {currentViewConfig.hint}
+            </span>
           </div>
           
           <h2 className="text-5xl font-light text-white tracking-tight drop-shadow-2xl">
-            {captureStatus === 'idle' && `准备拍摄${VIEW_CONFIG[view].label}`}
-            {captureStatus === 'scanning' && (!isInPosition ? '请正对摄像头并保持全身可见' : '已就绪，准备拍摄')}
+            {captureStatus === 'idle' && `准备拍摄 ${currentViewConfig.label}`}
+            {captureStatus === 'scanning' && (!isInPosition ? '请正对摄像头并保持可见' : '已就绪，准备拍摄')}
             {captureStatus === 'countdown' && (
               <span className="text-7xl font-black tabular-nums animate-pulse">{countdown}</span>
             )}
             {captureStatus === 'recording' && '正在采集时序数据...'}
-            {captureStatus === 'completed' && `${VIEW_CONFIG[view].label}拍摄完成`}
+            {captureStatus === 'completed' && `${currentViewConfig.label} 拍摄完成`}
           </h2>
         </div>
 
@@ -171,7 +184,6 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
                 重新拍摄
               </button>
               
-              {/* 灵活选择：立即分析 或 下一步 */}
               <div className="flex gap-3 bg-white/5 p-1.5 rounded-[2.2rem] border border-white/10">
                 <button 
                   onClick={onFinish}
@@ -181,12 +193,12 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
                   <span>立即生成报告</span>
                 </button>
 
-                {view !== 'back' && (
+                {canProceed && (
                   <button 
                     onClick={onNextView}
                     className="flex items-center gap-2 bg-white text-slate-900 px-8 py-3.5 rounded-3xl font-bold text-sm transition-all shadow-xl hover:scale-105 active:scale-95"
                   >
-                    <span>下一步：{VIEW_CONFIG[views[views.indexOf(view) + 1]].label}</span>
+                    <span>下一步：{getNextView(scope, view)?.toUpperCase()}</span>
                     <ChevronRight size={18} />
                   </button>
                 )}
@@ -212,12 +224,12 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
         <div className="flex flex-col items-end">
           <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Current Progress</span>
           <div className="flex gap-1.5">
-            {[1, 2, 3].map(i => (
+            {Array.from({ length: totalSteps }).map((_, i) => (
               <div 
                 key={i} 
                 className={cn(
                   "w-8 h-1.5 rounded-full transition-all duration-500",
-                  i <= capturedCount ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]" : "bg-white/10"
+                  i < capturedCount ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]" : "bg-white/10"
                 )} 
               />
             ))}

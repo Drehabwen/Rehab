@@ -8,11 +8,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Deepseek client (OpenAI compatible)
 client = None
 api_key = os.getenv("DEEPSEEK_API_KEY")
 if api_key:
@@ -22,34 +20,34 @@ if api_key:
         timeout=30.0
     )
 
+SCOPE_MESSAGES = {
+    "full": "你正在对一位患者进行完整的全身多视角（正面、侧面、背面）体态汇总分析。",
+    "upper": "你正在对一位患者进行上半身评估（肩颈、胸椎区域）。重点关注高低肩、圆肩、头前倾、胸椎曲度等问题。",
+    "lower": "你正在对一位患者进行下半身评估（髋、膝、踝区域）。重点关注骨盆前倾、膝超伸、O/X型腿、踝关节稳定等问题。"
+}
+
+SCOPE_ANALYSIS_GUIDE = {
+    "full": "进行完整的全身生物力学分析，交叉校验正面、侧面、背面三个视角的数据。",
+    "upper": "专注于上半身评估，分析肩颈和胸椎区域的体态问题。由于只有部分视角数据，部分分析可能受限。",
+    "lower": "专注于下半身评估，分析髋膝踝的生物力学关系。由于只有部分视角数据，部分分析可能受限。"
+}
+
 class PostureAgent:
-    """
-    Manages the LLM-based posture analysis with memory retention across views.
-    """
     def __init__(self):
-        self.observations = [] # Stores narrations and stats from previous views
+        self.observations = []
+        self.scope = "full"
 
     def clear(self):
         self.observations = []
 
     def analyze_view(self, narration: str, stats: Dict[str, Any]) -> str:
-        """
-        Feeds a single view's data to the LLM, keeping context of previous views.
-        Returns a critical observation for the current view.
-        """
         self.observations.append({
             "narration": narration,
             "stats": stats
         })
-        
-        # In a real "agent" flow, we might call the LLM here to get a per-view thought.
-        # For now, we'll collect them all for the final summary to save tokens and simplify.
         return f"已记录视角数据，当前累计视角数: {len(self.observations)}"
 
     def generate_final_report(self) -> str:
-        """
-        Generates the holistic final report based on all accumulated observations.
-        """
         if not client:
             return "Deepseek API key not found."
 
@@ -57,11 +55,21 @@ class PostureAgent:
         for i, obs in enumerate(self.observations):
             history_context += f"\n--- 视角 {i+1} 数据 ---\n{obs['narration']}\n"
 
+        num_views = len(self.observations)
+        if num_views <= 2:
+            self.scope = "upper" if self._is_upper_focused() else "lower"
+        
+        scope_msg = SCOPE_MESSAGES.get(self.scope, SCOPE_MESSAGES["full"])
+        analysis_guide = SCOPE_ANALYSIS_GUIDE.get(self.scope, SCOPE_ANALYSIS_GUIDE["full"])
+
         prompt = f"""
-        你是一位极其挑剔且专业的康复评估专家。你正在对一位患者进行多视角（正面、侧面、背面）的体态汇总分析。
+        {scope_msg}
         
         ### 历史观测记录 (数值与自然语言描述)
         {history_context}
+        
+        ### 本次评估范围说明
+        {analysis_guide}
         
         ### 时序稳定性参考标准（仅作参考，不要死板套用）：
         - 标准差 < 0.05cm：高度稳定（可视为习惯性体态）
@@ -86,6 +94,7 @@ class PostureAgent:
         
         3. **生成 HTML 报告**（必须严格遵循以下结构）：
            - 使用 Tailwind CSS。
+           - 【评估范围标签】：在报告顶部显示"全身评估"、"上半身评估"或"下半身评估"
            - 【顶部警告栏】：显眼的黄色警告框，内容为「⚠️ 本报告由 AI 生成，仅供参考，不构成医疗诊断或治疗建议。如有不适，请及时就医。」
            - 【原始数据 vs 专家推论对比】（核心，必须放在最前面）：每个关键发现必须展示【原始数值】→【LLM 推理】→【结论权重】的完整链条
            - 【交叉矛盾点汇总】：列出所有视角之间的矛盾，说明每个矛盾的"发现过程"和"最终判断"
@@ -124,11 +133,17 @@ class PostureAgent:
             logger.error(f"Error in generate_final_report: {e}")
             return f"生成报告失败: {str(e)}"
 
-# Global instance for the session (simplified)
+    def _is_upper_focused(self) -> bool:
+        upper_keywords = ["head", "shoulder", "neck", "chest", "spine", "颈椎", "肩", "胸椎", "头"]
+        for obs in self.observations:
+            narration = obs.get("narration", "").lower()
+            if any(kw in narration for kw in upper_keywords):
+                return True
+        return False
+
 posture_agent = PostureAgent()
 
 def extract_html(text: str) -> str:
-    """Extracts HTML content from LLM response."""
     html_match = re.search(r'```html\s*(.*?)\s*```', text, re.DOTALL | re.IGNORECASE)
     if html_match:
         return html_match.group(1).strip()
@@ -140,26 +155,17 @@ def extract_html(text: str) -> str:
     return text.strip()
 
 def generate_posture_report(analysis_data: Dict[str, Any]) -> str:
-    """
-    Compatibility wrapper for existing calls.
-    Now uses the PostureAgent to generate a report.
-    """
-    # If it's a batch/stepped request, it usually comes with multiple frames.
-    # We should clear the agent and feed it everything.
     posture_agent.clear()
     
-    # In the new flow, analysis_data might contain the narration and stats directly.
-    # Or it might be the old format. Let's handle both.
+    scope = analysis_data.get("scope", "full")
+    posture_agent.scope = scope
     
     if "frames" in analysis_data:
-        # New stepped flow
         from utils.narrator import process_time_series
         for frame in analysis_data["frames"]:
-            # frame is a dict from model_dump()
             res = process_time_series(frame["view"], frame["timeSeriesLandmarks"])
             posture_agent.analyze_view(res["narration"], res["stats"])
     else:
-        # Single view or fallback
         narration = analysis_data.get("narration", "未知视角描述")
         stats = analysis_data.get("stats", {})
         posture_agent.analyze_view(narration, stats)
