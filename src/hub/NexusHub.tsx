@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HubSidebar } from './components/HubSidebar';
 import { Bell, Search, Calendar, Clock, Plus, Users, ClipboardList, ChevronLeft, User, Settings, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,22 +10,13 @@ import { GlobalExport } from '@/components/GlobalExport';
 import { NewSessionModal } from './components/NewSessionModal';
 import { PatientSearchModal } from './components/PatientSearchModal';
 import { DataSettingsModal } from './components/DataSettingsModal';
-import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 import { PatientToolbox } from './components/PatientToolbox';
+import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
-import { getRelativeTime } from '@/lib/session-utils';
+import { usePatientList } from './hooks/usePatientList';
 import type { Patient } from '@/types/patient';
-import type { Session } from '@/types/session';
-
-type PatientStatus = 'pending' | 'assessing' | 'report' | 'completed';
-
-interface PatientWithStatus extends Patient {
-  status: PatientStatus;
-  lastSession?: Session;
-}
-
-type ViewMode = 'dashboard' | 'toolbox' | 'workspace';
+import type { PatientStatus, ViewMode } from './types';
 
 export const NexusHub: React.FC = () => {
   const [view, setView] = useState<ViewMode>('dashboard');
@@ -44,34 +35,10 @@ export const NexusHub: React.FC = () => {
     loadSessions();
   }, [loadPatients, loadSessions]);
 
-  const patientsWithStatus = useMemo<PatientWithStatus[]>(() => {
-    return patients.map(patient => {
-      const patientSessions = getPatientSessions(patient.id);
-      const lastSession = patientSessions[0];
-      
-      let status: PatientStatus = 'pending';
-      if (lastSession) {
-        if (lastSession.status === 'completed') {
-          status = 'completed';
-        } else if (lastSession.assessments && lastSession.assessments.length > 0) {
-          status = 'report';
-        } else {
-          status = 'assessing';
-        }
-      }
-      
-      return { ...patient, status, lastSession };
-    });
-  }, [patients, getPatientSessions]);
-
-  const stats = useMemo(() => {
-    return {
-      pending: patientsWithStatus.filter(p => p.status === 'pending').length,
-      assessing: patientsWithStatus.filter(p => p.status === 'assessing').length,
-      report: patientsWithStatus.filter(p => p.status === 'report').length,
-      completed: patientsWithStatus.filter(p => p.status === 'completed').length,
-    };
-  }, [patientsWithStatus]);
+  const { patientsWithStatus, stats, getPatientLabel } = usePatientList({
+    patients,
+    getPatientSessions
+  });
 
   const handleSelectPatient = (patient: Patient) => {
     setSelectedPatient(patient);
@@ -366,10 +333,7 @@ export const NexusHub: React.FC = () => {
                                 </span>
                               </div>
                               <div className="text-[10px] font-medium text-slate-400">
-                                {patient.lastSession 
-                                  ? `最近：${getRelativeTime(patient.lastSession.createdAt)}`
-                                  : '尚未创建接诊记录'
-                                }
+                                {getPatientLabel(patient)}
                               </div>
                             </div>
                           </div>

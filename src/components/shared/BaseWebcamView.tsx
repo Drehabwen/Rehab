@@ -144,7 +144,7 @@ export default function BaseWebcamView({
           {/* AI/Skeleton Layer */}
           <canvas
             ref={canvasRef}
-            className="absolute inset-0 w-full h-full object-contain pointer-events-none z-20"
+            className="absolute inset-0 w-full h-full pointer-events-none z-20"
           />
 
           {/* Overlay Content (passed from parent) */}

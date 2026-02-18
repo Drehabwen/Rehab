@@ -59,6 +59,7 @@ export function useSkeletonRenderer({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (showSkeleton) {
+      console.log('[SkeletonRenderer] Drawing skeleton, landmarks:', results.poseLandmarks?.length);
       const landmarksToDraw = isMirrored 
         ? results.poseLandmarks.map(lm => ({ ...lm, x: 1 - lm.x }))
         : results.poseLandmarks;
