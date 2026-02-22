@@ -17,7 +17,7 @@ interface UsePostureCaptureProps {
 
 /**
  * usePostureCapture - 原子化捕获逻辑 Hook
- * 负责：位置检测、倒计时、2秒时序数据采集、状态流转
+ * 负责：直接录制2秒时序数据，简化流程
  */
 export const usePostureCapture = ({ 
   activeTab, 
@@ -27,28 +27,17 @@ export const usePostureCapture = ({
 }: UsePostureCaptureProps) => {
   const [captureStatus, setCaptureStatus] = useState<CaptureStatus>('idle');
   const [countdown, setCountdown] = useState(5);
-  const [recordingProgress, setRecordingProgress] = useState(0); // 0-100
-  const [isInPosition, setIsInPosition] = useState(false);
+  const [recordingProgress, setRecordingProgress] = useState(0);
+  const [isInPosition, setIsInPosition] = useState(true);
   
   const landmarksBufferRef = useRef<PoseLandmark[][]>([]);
   const recordingBufferRef = useRef<PoseLandmark[][]>([]);
   const recordingStartTimeRef = useRef<number>(0);
 
-  // 1. 位置检测逻辑
-  const checkUserPosition = useCallback((landmarks: PoseLandmark[]) => {
-    if (!landmarks || landmarks.length < 33) return false;
-    const keyPointsIndices = [0, 11, 12, 23, 24]; // Nose, Shoulders, Hips
-    const visible = keyPointsIndices.every(idx => (landmarks[idx].visibility ?? 0) > 0.5);
-    return visible;
-  }, []);
-
-  // 2. 外部调用的关键点处理函数
   const handleLandmarks = useCallback((landmarks: PoseLandmark[]) => {
-    // 实时 Buffer (用于位置检测等)
     landmarksBufferRef.current.push(landmarks);
     if (landmarksBufferRef.current.length > 30) landmarksBufferRef.current.shift();
     
-    // 如果正在录制，则存入录制 Buffer
     if (captureStatus === 'recording') {
       recordingBufferRef.current.push(landmarks);
       
@@ -56,7 +45,6 @@ export const usePostureCapture = ({
       const progress = Math.min(100, (elapsed / 2000) * 100);
       setRecordingProgress(progress);
       
-      // 达到 2 秒，结束录制
       if (elapsed >= 2000) {
         const video = document.querySelector('video') as HTMLVideoElement | null;
         onCapture({
@@ -70,44 +58,13 @@ export const usePostureCapture = ({
         recordingBufferRef.current = [];
       }
     }
-    
-    if (activeTab === 'posture' && !isEntryMode) {
-      if (captureStatus === 'scanning' || captureStatus === 'idle') {
-        const inPos = checkUserPosition(landmarks);
-        setIsInPosition(prev => prev !== inPos ? inPos : prev);
-        
-        if (inPos && captureStatus === 'scanning') {
-          setCaptureStatus('countdown');
-        }
-      }
-    }
-  }, [activeTab, isEntryMode, captureStatus, checkUserPosition, assessmentMode, onCapture]);
+  }, [captureStatus, assessmentMode, onCapture]);
 
-  // 3. 状态监听与录制初始化
   useEffect(() => {
     if (captureStatus === 'recording') {
       setRecordingProgress(0);
       recordingStartTimeRef.current = Date.now();
       recordingBufferRef.current = [];
-    }
-  }, [captureStatus]);
-
-  // 4. 倒计时时机控制
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (captureStatus === 'countdown' && countdown > 0) {
-      timer = setTimeout(() => setCountdown(c => c - 1), 1000);
-    } else if (captureStatus === 'countdown' && countdown === 0) {
-      // 倒计时结束，开始录制
-      setCaptureStatus('recording');
-    }
-    return () => clearTimeout(timer);
-  }, [captureStatus, countdown]);
-
-  // 4. 状态重置
-  useEffect(() => {
-    if (captureStatus === 'countdown') {
-      setCountdown(5);
     }
   }, [captureStatus]);
 

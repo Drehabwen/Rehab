@@ -19,6 +19,7 @@ from models import (
     SteppedAnalysisRequest
 )
 from utils.posture_analysis import analyze_posture
+from utils.data_cleaner import clean_timeseries, get_algorithm_info
 from utils.joint_analysis import calculate_joint_angle
 from utils.camera_stream import CameraManager
 from utils.llm_reporter import generate_posture_report
@@ -146,35 +147,26 @@ async def websocket_endpoint(websocket: WebSocket):
             message = json.loads(data)
             
             if message.get("type") == "POSTURE_SYNC":
-                # Validate and parse using Pydantic
                 request = AnalysisRequest(**message)
                 
-                # Process time-series data using narrator
-                # Convert Pydantic models to dicts for narrator
+                scope = request.scope or "full"
+                algorithm_info = get_algorithm_info(scope)
+                
                 landmarks_sequence = [[lm.model_dump() for lm in frame] for frame in request.timeSeriesLandmarks]
                 analysis_result = process_time_series(request.view, landmarks_sequence)
                 
-                # For real-time feedback (skeleton/metrics), use the LAST frame of the sequence
-                # or the average. Let's use the average for stability.
-                avg_landmarks = []
-                num_frames = len(request.timeSeriesLandmarks)
-                if num_frames > 0:
-                    num_lms = len(request.timeSeriesLandmarks[0])
-                    for i in range(num_lms):
-                        avg_x = sum(f[i].x for f in request.timeSeriesLandmarks) / num_frames
-                        avg_y = sum(f[i].y for f in request.timeSeriesLandmarks) / num_frames
-                        avg_z = sum(f[i].z or 0 for f in request.timeSeriesLandmarks) / num_frames
-                        avg_landmarks.append(Landmark(x=avg_x, y=avg_y, z=avg_z))
+                cleaned_landmarks = clean_timeseries(request.timeSeriesLandmarks, scope)
                 
-                # Perform analysis on averaged landmarks
                 result = analyze_posture(
                     view=request.view,
-                    landmarks=avg_landmarks,
+                    landmarks=cleaned_landmarks,
                     width=request.width,
                     height=request.height
                 )
                 
-                # Construct response
+                result["metrics"].cleaningAlgorithm = algorithm_info["algorithm"]
+                result["metrics"].cleaningParams = algorithm_info["params"]
+                
                 response = AnalysisResponse(
                     metrics=result["metrics"],
                     issues=result["issues"],

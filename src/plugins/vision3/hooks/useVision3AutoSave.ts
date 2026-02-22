@@ -4,19 +4,22 @@ import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { AssessmentMode } from '../components/Vision3CameraStage';
+import type { AssessmentScope } from '../store/usePostureAssessmentStore';
 
 interface UseVision3AutoSaveProps {
   step: string;
   wsResult: { metrics: PostureMetrics; issues: PostureIssue[] } | null;
   assessmentMode: AssessmentMode;
   view: 'front' | 'side' | 'back';
+  scope: AssessmentScope;
 }
 
 export const useVision3AutoSave = ({
   step,
   wsResult,
   assessmentMode,
-  view
+  view,
+  scope
 }: UseVision3AutoSaveProps) => {
   const hasSavedRef = useRef(false);
   const { currentPatient, patients } = usePatientStore();

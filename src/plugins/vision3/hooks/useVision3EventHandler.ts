@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { SteppedResults, CaptureStatus } from '../components/Vision3CameraStage';
+import { getNextView } from '../vision3-scope-config';
+import type { AssessmentScope } from '../store/usePostureAssessmentStore';
 
 interface UseVision3EventHandlerProps {
   setCaptureStatus: React.Dispatch<React.SetStateAction<CaptureStatus>>;
@@ -13,6 +15,7 @@ interface UseVision3EventHandlerProps {
   view: 'front' | 'side' | 'back';
   steppedResults: SteppedResults;
   analyzeStepped: (frames: any[]) => void;
+  scope: AssessmentScope;
 }
 
 export const useVision3EventHandler = ({
@@ -26,20 +29,25 @@ export const useVision3EventHandler = ({
   isFullscreen,
   view,
   steppedResults,
-  analyzeStepped
+  analyzeStepped,
+  scope
 }: UseVision3EventHandlerProps) => {
   const handleStartCapture = useCallback(() => {
-    setCaptureStatus('scanning');
+    setCaptureStatus('recording');
   }, [setCaptureStatus]);
 
   const handleNextView = useCallback(() => {
-    const viewOrder: ('front' | 'side' | 'back')[] = ['front', 'side', 'back'];
-    const currentIndex = viewOrder.indexOf(view);
-    if (currentIndex < viewOrder.length - 1) {
-      setView(viewOrder[currentIndex + 1]);
+    const nextView = getNextView(scope, view);
+    if (nextView) {
+      setView(nextView);
       setCaptureStatus('idle');
     }
-  }, [view, setView, setCaptureStatus]);
+  }, [scope, view, setView, setCaptureStatus]);
+
+  const canProceedToNextView = useCallback((): boolean => {
+    const nextView = getNextView(scope, view);
+    return nextView !== null;
+  }, [scope, view]);
 
   const handleFinishStepped = useCallback(() => {
     const frames = Object.entries(steppedResults).map(([v, data]) => ({
@@ -80,6 +88,7 @@ export const useVision3EventHandler = ({
     handleNextView,
     handleFinishStepped,
     handleResetToEntry,
-    handleSelectMode
+    handleSelectMode,
+    canProceedToNextView
   };
 };

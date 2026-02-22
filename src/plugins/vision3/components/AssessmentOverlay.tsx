@@ -158,12 +158,12 @@ export const AssessmentOverlay: React.FC = () => {
               <div className="flex-1">
                 <div className="flex justify-between items-end mb-3">
                   <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Diagnostic Engine</span>
-                  <span className="text-2xl font-light text-white tracking-tighter">{Math.round(fakeProgress)}%</span>
+                  <span className="text-2xl font-light text-white tracking-tighter">{Math.round(fakeProgress || 0)}%</span>
                 </div>
                 <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-white transition-all duration-500 ease-out shadow-[0_0_15px_rgba(255,255,255,0.5)]"
-                    style={{ width: `${fakeProgress}%` }}
+                    style={{ width: `${fakeProgress || 0}%` }}
                   />
                 </div>
               </div>

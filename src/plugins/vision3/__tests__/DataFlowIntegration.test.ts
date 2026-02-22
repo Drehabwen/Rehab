@@ -116,10 +116,10 @@ describe('DataFlowIntegration', () => {
     }
 
     vi.advanceTimersByTime(1000);
-    expect(usePostureAssessmentStore.getState().step).toBe('capturing_upper');
+    expect(usePostureAssessmentStore.getState().step).toBe('capturing');
 
     const store = usePostureAssessmentStore.getState();
-    store.setStep('capturing_lower');
+    store.setStep('capturing');
 
     for (let i = 0; i < 40; i++) {
       globalMonitor.onFrame(createStableLandmarks(i * 0.001, 0));

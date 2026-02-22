@@ -25,7 +25,8 @@ describe('SteppedAssessmentOverlay', () => {
     onNextView: vi.fn(),
     onRetake: vi.fn(),
     onFinish: vi.fn(),
-    onReset: vi.fn()
+    onReset: vi.fn(),
+    scope: 'full' as const
   };
 
   beforeEach(() => {

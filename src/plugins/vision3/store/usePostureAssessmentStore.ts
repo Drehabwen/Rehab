@@ -1,19 +1,29 @@
 import { create } from 'zustand';
 
-/**
- * 评估阶段定义
- */
+export type AssessmentScope = 'full' | 'upper' | 'lower';
+
 export type AssessmentStep = 
-  | 'idle'             // 闲置状态
-  | 'prep_upper'       // 上半身准备 (ROI + 稳定性校验)
-  | 'capturing_upper'  // 上半身采样 (2s 录制)
-  | 'prep_lower'       // 下半身准备
-  | 'capturing_lower'  // 下半身采样 (2s 录制)
-  | 'stitching'        // 拼图与去噪计算
-  | 'analyzing'        // 语义指标提取
-  | 'completed'        // 完成
-  | 'error'            // 错误
-  | 'stepped_guide';   // 分步模式指引状态
+  | 'idle'
+  | 'prep'
+  | 'prep_upper'
+  | 'prep_lower'
+  | 'capturing'
+  | 'capturing_upper'
+  | 'capturing_lower'
+  | 'stitching'
+  | 'analyzing'
+  | 'completed'
+  | 'error'
+  | 'stepped_guide';
+
+export type AnalysisPhase = 
+  | 'idle'
+  | 'sending_data'
+  | 'cleaning_data'
+  | 'analyzing_views'
+  | 'calling_llm'
+  | 'generating_report'
+  | 'completed';
 
 export interface Landmark {
   x: number;
@@ -28,30 +38,35 @@ export interface PostureFrame {
 }
 
 export interface PostureResult {
-  fullBodyLandmarks: Landmark[]; // 拼图对齐后的全身点位
-  metrics: Record<string, number>; // 提取的物理指标（角度、距离等）
+  fullBodyLandmarks: Landmark[];
+  metrics: Record<string, number>;
   timestamp: number;
 }
 
 interface PostureAssessmentState {
   step: AssessmentStep;
-  countdown: number;          // 实时倒计时
-  stabilityProgress: number;  // 稳定性进度 (0-100)
-  captureProgress: number;    // 采样进度 (0-100)
+  scope: AssessmentScope;
+  countdown: number;
+  stabilityProgress: number;
+  captureProgress: number;
   
-  // 采样原始数据
+  analysisPhase: AnalysisPhase;
+  analysisProgress: number;
+  
   upperFrames: PostureFrame[];
   lowerFrames: PostureFrame[];
   
-  // 最终对齐结果
   result: PostureResult | null;
   error: string | null;
 
-  // Actions
   setStep: (step: AssessmentStep) => void;
+  setScope: (scope: AssessmentScope) => void;
   setCountdown: (seconds: number) => void;
   setStabilityProgress: (progress: number) => void;
   setCaptureProgress: (progress: number) => void;
+  
+  setAnalysisPhase: (phase: AnalysisPhase) => void;
+  setAnalysisProgress: (progress: number) => void;
   
   addUpperFrame: (frame: PostureFrame) => void;
   addLowerFrame: (frame: PostureFrame) => void;
@@ -64,18 +79,25 @@ interface PostureAssessmentState {
 
 export const usePostureAssessmentStore = create<PostureAssessmentState>((set) => ({
   step: 'idle',
+  scope: 'full',
   countdown: 0,
   stabilityProgress: 0,
   captureProgress: 0,
+  analysisPhase: 'idle',
+  analysisProgress: 0,
   upperFrames: [],
   lowerFrames: [],
   result: null,
   error: null,
 
   setStep: (step) => set({ step }),
+  setScope: (scope) => set({ scope }),
   setCountdown: (seconds) => set({ countdown: seconds }),
   setStabilityProgress: (progress) => set({ stabilityProgress: progress }),
   setCaptureProgress: (progress) => set({ captureProgress: progress }),
+
+  setAnalysisPhase: (phase) => set({ analysisPhase: phase }),
+  setAnalysisProgress: (progress) => set({ analysisProgress: progress }),
 
   addUpperFrame: (frame) => set((state) => ({ 
     upperFrames: [...state.upperFrames, frame] 
@@ -90,9 +112,12 @@ export const usePostureAssessmentStore = create<PostureAssessmentState>((set) =>
 
   reset: () => set({
     step: 'idle',
+    scope: 'full',
     countdown: 0,
     stabilityProgress: 0,
     captureProgress: 0,
+    analysisPhase: 'idle',
+    analysisProgress: 0,
     upperFrames: [],
     lowerFrames: [],
     result: null,

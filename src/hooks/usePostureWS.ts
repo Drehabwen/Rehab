@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PostureMetrics, PostureIssue, Landmark } from '@/types/posture';
 import { TemporalAnalysis } from '@/lib/posture-processor';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
+import { usePostureAssessmentStore, AnalysisPhase } from '@/plugins/vision3/store/usePostureAssessmentStore';
 
 // Re-export types for backward compatibility
 export type { PostureMetrics, PostureIssue, Landmark };
@@ -51,6 +52,9 @@ export function usePostureWS(url: string = 'ws://localhost:8001/ws/analyze') {
   const savePostureReport = useMeasurementStore(state => state.savePostureReport);
   const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
   const lastBatchTimeSeriesRef = useRef<TemporalAnalysis['timeSeries']>([]);
+  
+  const setAnalysisPhase = usePostureAssessmentStore(state => state.setAnalysisPhase);
+  const setAnalysisProgress = usePostureAssessmentStore(state => state.setAnalysisProgress);
 
   const flushPending = useCallback(() => {
     if (ws.current?.readyState === WebSocket.OPEN && pendingMessages.current.length) {
@@ -90,6 +94,8 @@ export function usePostureWS(url: string = 'ws://localhost:8001/ws/analyze') {
           } else if (data.type === 'HTML_REPORT') {
             setHtmlReport(data.html);
             savePostureReport(currentViewRef.current, data.html, lastBatchTimeSeriesRef.current);
+            setAnalysisPhase('completed');
+            setAnalysisProgress(100);
           }
         } catch (e) {
           console.error('Failed to parse analysis result:', e);
@@ -123,7 +129,7 @@ export function usePostureWS(url: string = 'ws://localhost:8001/ws/analyze') {
       console.error('Connection error:', e);
       setStatus('error');
     }
-  }, [url, savePostureReport, flushPending]);
+  }, [url, savePostureReport, flushPending, setAnalysisPhase, setAnalysisProgress]);
 
   useEffect(() => {
     connect();
@@ -180,11 +186,29 @@ export function usePostureWS(url: string = 'ws://localhost:8001/ws/analyze') {
     if (frames.length) {
       currentViewRef.current = frames[0].view;
     }
+    
+    setAnalysisPhase('sending_data');
+    setAnalysisProgress(10);
+    
+    const phaseSequence: { phase: AnalysisPhase; progress: number; delay: number }[] = [
+      { phase: 'cleaning_data', progress: 25, delay: 400 },
+      { phase: 'analyzing_views', progress: 50, delay: 800 },
+      { phase: 'calling_llm', progress: 75, delay: 1200 },
+      { phase: 'generating_report', progress: 90, delay: 1800 },
+    ];
+    
+    phaseSequence.forEach((item, index) => {
+      setTimeout(() => {
+        setAnalysisPhase(item.phase);
+        setAnalysisProgress(item.progress);
+      }, item.delay);
+    });
+    
     sendMessage({
       type: 'POSTURE_STEPPED_ANALYSIS',
       frames
     });
-  }, [sendMessage]);
+  }, [sendMessage, setAnalysisPhase, setAnalysisProgress]);
 
   return useMemo(() => ({ 
     result, 

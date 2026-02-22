@@ -8,6 +8,7 @@ import { AssessmentOverlay } from './AssessmentOverlay';
 import { SteppedAssessmentOverlay } from './SteppedAssessmentOverlay';
 import { VisualAnnotation, HeadAxes, PoseLandmark } from '../vision3-utils';
 import { ActiveMeasurement } from '@/store/useMeasurementStore';
+import type { AssessmentScope } from '../store/usePostureAssessmentStore';
 
 export type ViewType = 'front' | 'side' | 'back';
 export type CaptureStatus = 'idle' | 'scanning' | 'countdown' | 'recording' | 'analyzing' | 'completed' | 'error';
@@ -55,6 +56,7 @@ interface Vision3CameraStageProps {
   resetMeasurement: () => void;
   setIsCameraOn: (enabled: boolean) => void;
   setView: (view: ViewType) => void;
+  scope: AssessmentScope;
 }
 
 export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
@@ -88,7 +90,8 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
   stopMeasurement,
   resetMeasurement,
   setIsCameraOn,
-  setView
+  setView,
+  scope
 }) => {
   return (
     <div ref={videoContainerRef} className={cn(
@@ -132,6 +135,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
           }}
           onFinish={handleFinishStepped}
           onReset={handleResetToEntry}
+          scope={scope}
         />
       )}
 

@@ -1,5 +1,7 @@
 import type { Landmark, PostureIssue, PostureMetrics } from './posture';
 
+export type AssessmentScope = 'full' | 'upper' | 'lower';
+
 export type AssessmentMode = 'realtime' | 'stepped';
 
 export type AssessmentView = 'front' | 'side' | 'back';
@@ -7,6 +9,7 @@ export type AssessmentView = 'front' | 'side' | 'back';
 export interface PostureAssessmentData {
   mode: AssessmentMode;
   view: AssessmentView;
+  scope?: AssessmentScope;
   metrics: PostureMetrics;
   issues: PostureIssue[];
   landmarks?: Landmark[];

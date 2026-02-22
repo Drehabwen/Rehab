@@ -6,7 +6,7 @@ import { usePostureAnalysis } from './hooks/usePostureAnalysis';
 import { useVision3EventHandler } from './hooks/useVision3EventHandler';
 import { useVision3AutoSave } from './hooks/useVision3AutoSave';
 
-import { usePostureAssessmentStore } from './store/usePostureAssessmentStore';
+import { usePostureAssessmentStore, AssessmentScope } from './store/usePostureAssessmentStore';
 import {
   getShoulderStatus,
   getHeadStatus,
@@ -40,7 +40,9 @@ export const Vision3Plugin: React.FC = () => {
 
   const { 
     step,
-    setStep 
+    setStep,
+    scope,
+    setScope
   } = usePostureAssessmentStore();
 
   const {
@@ -69,7 +71,8 @@ export const Vision3Plugin: React.FC = () => {
     handleNextView,
     handleFinishStepped,
     handleResetToEntry,
-    handleSelectMode
+    handleSelectMode,
+    canProceedToNextView
   } = useVision3EventHandler({
     setCaptureStatus,
     setView,
@@ -81,14 +84,16 @@ export const Vision3Plugin: React.FC = () => {
     isFullscreen,
     view,
     steppedResults,
-    analyzeStepped
+    analyzeStepped,
+    scope
   });
 
   useVision3AutoSave({
     step,
     wsResult,
     assessmentMode,
-    view
+    view,
+    scope
   });
 
   // Posture States
@@ -138,7 +143,9 @@ export const Vision3Plugin: React.FC = () => {
             onSelectMode={(mode, v) => {
               setAssessmentMode(mode);
               handleSelectMode(mode, v);
-            }} 
+            }}
+            selectedScope={scope}
+            onSelectScope={setScope}
           />
         ) : (
           <div className="flex-1 grid grid-cols-12 grid-rows-6 gap-8 min-h-0 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -174,6 +181,7 @@ export const Vision3Plugin: React.FC = () => {
               resetMeasurement={resetMeasurement}
               setIsCameraOn={setIsCameraOn}
               setView={setView}
+              scope={scope}
             />
 
           <Vision3Dashboard 
