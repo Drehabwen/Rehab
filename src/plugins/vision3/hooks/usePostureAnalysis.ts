@@ -33,7 +33,8 @@ export function usePostureAnalysis({
     analyze, 
     analyzeBatch, 
     analyzeStepped,
-    htmlReport 
+    htmlReport,
+    timeSeriesData
   } = usePostureWS();
 
   const [steppedResults, setSteppedResults] = useState<Record<string, { timeSeriesLandmarks: PoseLandmark[][]; width: number; height: number; timestamp: number }>>({});
@@ -120,6 +121,7 @@ export function usePostureAnalysis({
     steppedResults,
     setSteppedResults,
     headAxes,
-    annotations: wsResult?.annotations || []
+    annotations: wsResult?.annotations || [],
+    timeSeriesData
   };
 }

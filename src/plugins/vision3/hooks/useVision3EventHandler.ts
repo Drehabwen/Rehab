@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { SteppedResults, CaptureStatus } from '../components/Vision3CameraStage';
+import { SteppedFrame } from '@/hooks/usePostureWS';
 
 interface UseVision3EventHandlerProps {
   setCaptureStatus: React.Dispatch<React.SetStateAction<CaptureStatus>>;
@@ -12,7 +13,7 @@ interface UseVision3EventHandlerProps {
   isFullscreen: boolean;
   view: 'front' | 'side' | 'back';
   steppedResults: SteppedResults;
-  analyzeStepped: (frames: any[]) => void;
+  analyzeStepped: (frames: SteppedFrame[]) => void;
 }
 
 export const useVision3EventHandler = ({

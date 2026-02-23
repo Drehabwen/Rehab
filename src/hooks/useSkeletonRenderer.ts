@@ -36,12 +36,15 @@ export function useSkeletonRenderer({
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
+    console.log('[SkeletonRenderer] handleResults called! results:', !!results, 'poseLandmarks:', !!results?.poseLandmarks);
+
     if (!video || !canvas) {
       console.warn('[useSkeletonRenderer] Video or canvas not ready, skipping frame');
       return;
     }
 
     if (!results?.poseLandmarks) {
+      console.log('[SkeletonRenderer] No pose landmarks detected');
       return;
     }
 
@@ -59,13 +62,15 @@ export function useSkeletonRenderer({
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (showSkeleton) {
-      console.log('[SkeletonRenderer] Drawing skeleton, landmarks:', results.poseLandmarks?.length);
+      console.log('[SkeletonRenderer] Drawing skeleton, landmarks count:', results.poseLandmarks.length);
       const landmarksToDraw = isMirrored 
         ? results.poseLandmarks.map(lm => ({ ...lm, x: 1 - lm.x }))
         : results.poseLandmarks;
 
       drawConnectors(ctx, landmarksToDraw, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
-      drawLandmarks(ctx, landmarksToDraw, { color: '#FF0000', lineWidth: 2, radius: 2 });
+      drawLandmarks(ctx, landmarksToDraw, { color: '#FF0000', lineWidth: 2, radius: 4 });
+    } else {
+      console.log('[SkeletonRenderer] showSkeleton is false, skipping skeleton drawing');
     }
 
     if (annotations && annotations.length > 0) {

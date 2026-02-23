@@ -7,10 +7,12 @@ export type AssessmentView = 'front' | 'side' | 'back';
 export interface PostureAssessmentData {
   mode: AssessmentMode;
   view: AssessmentView;
-  metrics: PostureMetrics;
-  issues: PostureIssue[];
+  metrics?: PostureMetrics;
+  issues?: PostureIssue[];
   landmarks?: Landmark[];
   confidence: number;
+  htmlReport?: string;
+  timeSeries?: any[];
 }
 
 export interface RomAssessmentData {

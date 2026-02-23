@@ -128,9 +128,8 @@ export const NexusReportCenter: React.FC = () => {
   };
 
   const exportToCsv = (assessment: Assessment) => {
-    if (!assessment.data.posture?.metrics) return;
-    
-    const metrics = assessment.data.posture.metrics;
+    const metrics = assessment.data.posture?.metrics;
+    if (!metrics) return;
     const rows = Object.entries(metrics).map(([key, value]) => [key, value]);
     const csvContent = 'metric,value\n' + rows.map(r => r.join(',')).join('\n');
     
@@ -160,10 +159,10 @@ export const NexusReportCenter: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-3 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm">
-            <div className="px-4 py-2 bg-white/80 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              {assessments.length} 条记录
+              <div className="px-4 py-2 bg-white/80 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                {assessments.length} 条记录
+              </div>
             </div>
-          </div>
         </section>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -409,6 +408,30 @@ export const NexusReportCenter: React.FC = () => {
             </div>
             
             <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              {selectedAssessment.data.posture?.htmlReport && (
+                <button
+                  onClick={() => {
+                    const postureData = selectedAssessment.data.posture;
+                    if (postureData && postureData.htmlReport) {
+                      setSelectedReportHtml(postureData.htmlReport);
+                      
+                      // Construct PostureReport object for charts
+                      const report: PostureReport = {
+                        id: selectedAssessment.id,
+                        date: selectedAssessment.createdAt,
+                        view: postureData.view || 'unknown',
+                        html: postureData.htmlReport,
+                        timeSeries: postureData.timeSeries
+                      };
+                      setSelectedReport(report);
+                    }
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-indigo-200"
+                >
+                  <Activity size={14} />
+                  查看深度报告
+                </button>
+              )}
               <button 
                 onClick={() => exportToJson(selectedAssessment)}
                 className="px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-slate-50 transition-all flex items-center gap-2"

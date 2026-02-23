@@ -105,9 +105,11 @@ class TemporalAnalysisRequest(BaseModel):
 class SteppedAnalysisRequest(BaseModel):
     type: str = "POSTURE_STEPPED_ANALYSIS"
     frames: List[SteppedFrame]
+    mock: bool = False
 
 class HTMLReportResponse(BaseModel):
     type: str = "HTML_REPORT"
     html: str
     reportId: str
+    timeSeries: Optional[List[Dict[str, Any]]] = None
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))

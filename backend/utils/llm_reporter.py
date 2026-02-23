@@ -19,7 +19,7 @@ if api_key:
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
-        timeout=30.0
+        timeout=120.0
     )
 
 class PostureAgent:
@@ -119,6 +119,7 @@ class PostureAgent:
             )
             
             raw_content = response.choices[0].message.content
+            logger.info(f"DeepSeek Response: {raw_content[:200]}...") # Log first 200 chars
             return extract_html(raw_content)
         except Exception as e:
             logger.error(f"Error in generate_final_report: {e}")
@@ -153,7 +154,11 @@ def generate_posture_report(analysis_data: Dict[str, Any]) -> str:
     
     if "frames" in analysis_data:
         # New stepped flow
-        from utils.narrator import process_time_series
+        try:
+            from backend.utils.narrator import process_time_series
+        except ImportError:
+            from utils.narrator import process_time_series # Fallback for different contexts
+            
         for frame in analysis_data["frames"]:
             # frame is a dict from model_dump()
             res = process_time_series(frame["view"], frame["timeSeriesLandmarks"])

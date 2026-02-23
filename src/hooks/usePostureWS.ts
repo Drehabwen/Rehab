@@ -40,10 +40,11 @@ export interface SteppedFrame {
   timestamp: number;
 }
 
-export function usePostureWS(url: string = 'ws://localhost:8001/ws/analyze') {
+export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
   const [htmlReport, setHtmlReport] = useState<string | null>(null);
+  const [timeSeriesData, setTimeSeriesData] = useState<TemporalAnalysis['timeSeries'] | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout>();
@@ -89,7 +90,10 @@ export function usePostureWS(url: string = 'ws://localhost:8001/ws/analyze') {
             setJointResult(data);
           } else if (data.type === 'HTML_REPORT') {
             setHtmlReport(data.html);
-            savePostureReport(currentViewRef.current, data.html, lastBatchTimeSeriesRef.current);
+            // Use timeSeries from backend response if available (stepped analysis), otherwise fall back to local ref (batch analysis)
+            const timeSeries = data.timeSeries || lastBatchTimeSeriesRef.current;
+            setTimeSeriesData(timeSeries);
+            savePostureReport(currentViewRef.current, data.html, timeSeries);
           }
         } catch (e) {
           console.error('Failed to parse analysis result:', e);
@@ -186,14 +190,20 @@ export function usePostureWS(url: string = 'ws://localhost:8001/ws/analyze') {
     });
   }, [sendMessage]);
 
-  return useMemo(() => ({ 
-    result, 
-    jointResult, 
-    htmlReport, 
-    status, 
-    analyze, 
-    analyzeJoint, 
+  return {
+    result,
+    jointResult,
+    htmlReport,
+    timeSeriesData,
+    status,
+    analyze,
     analyzeBatch,
-    analyzeStepped
-  }), [result, jointResult, htmlReport, status, analyze, analyzeJoint, analyzeBatch, analyzeStepped]);
+    analyzeStepped,
+    analyzeJoint,
+    connect,
+    disconnect: () => {
+      ws.current?.close();
+      setStatus('disconnected');
+    }
+  };
 }

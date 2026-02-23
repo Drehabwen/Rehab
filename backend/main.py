@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.concurrency import run_in_threadpool
 from typing import List, Dict, Any, Optional
 import statistics
 import time
@@ -8,6 +9,9 @@ import uvicorn
 import os
 import sys
 import json
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Add current directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +20,7 @@ from models import (
     AnalysisRequest, AnalysisResponse, PostureMetrics, 
     JointAnalysisRequest, JointAnalysisResponse,
     TemporalAnalysisRequest, HTMLReportResponse,
-    SteppedAnalysisRequest
+    SteppedAnalysisRequest, Landmark
 )
 from utils.posture_analysis import analyze_posture
 from utils.joint_analysis import calculate_joint_angle
@@ -36,17 +40,26 @@ camera_manager = CameraManager()
 
 def build_time_series(frames):
     series = []
+    # frames is a list of SteppedFrame, each containing timeSeriesLandmarks (List[List[Landmark]])
     for frame in frames:
-        analysis = analyze_posture(
-            view=frame.view,
-            landmarks=frame.landmarks,
-            width=frame.width,
-            height=frame.height
-        )
-        metrics = analysis["metrics"].model_dump()
-        metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
-        timestamp = frame.timestamp or int(time.time() * 1000)
-        series.append({"timestamp": timestamp, "view": frame.view, **metrics})
+        base_timestamp = frame.timestamp or int(time.time() * 1000)
+        num_frames = len(frame.timeSeriesLandmarks)
+        
+        for i, landmarks in enumerate(frame.timeSeriesLandmarks):
+            analysis = analyze_posture(
+                view=frame.view,
+                landmarks=landmarks,
+                width=frame.width,
+                height=frame.height
+            )
+            metrics = analysis["metrics"].model_dump()
+            metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+            
+            # Synthesize timestamp: assume 30fps (33ms per frame), ending at base_timestamp
+            timestamp = base_timestamp - (num_frames - 1 - i) * 33
+            
+            series.append({"timestamp": timestamp, "view": frame.view, **metrics})
+            
     series.sort(key=lambda item: item.get("timestamp", 0))
     return series
 
@@ -138,53 +151,79 @@ app.add_middleware(
 
 @app.websocket("/ws/analyze")
 async def websocket_endpoint(websocket: WebSocket):
+    print("WebSocket connection attempt...", flush=True)
     await websocket.accept()
-    print("WebSocket connection established")
+    print("WebSocket connection established", flush=True)
     try:
         while True:
+            # Add timeout to prevent blocking forever if client is silent
+            # But client sends data, so let's just read
             data = await websocket.receive_text()
-            message = json.loads(data)
+            print(f"Received raw data len: {len(data)}", flush=True)
             
-            if message.get("type") == "POSTURE_SYNC":
-                # Validate and parse using Pydantic
-                request = AnalysisRequest(**message)
+            try:
+                message = json.loads(data)
+            except json.JSONDecodeError as e:
+                print(f"JSON Decode Error: {e}", flush=True)
+                continue
+            
+            msg_type = message.get("type")
+            print(f"Message type: {msg_type}", flush=True)
+
+            if msg_type == "POSTURE_SYNC":
+                print("Processing POSTURE_SYNC...", flush=True)
+                try:
+                    # Validate and parse using Pydantic
+                    request = AnalysisRequest(**message)
+                    print(f"Pydantic validation success for POSTURE_SYNC", flush=True)
+                    
+                    # Process time-series data using narrator
+                    # Convert Pydantic models to dicts for narrator
+                    # landmarks_sequence = [[lm.model_dump() for lm in frame] for frame in request.timeSeriesLandmarks]
+                    # analysis_result = process_time_series(request.view, landmarks_sequence)
+                    # Skip heavy processing for now to test echo
+                    
+                    # For real-time feedback (skeleton/metrics), use the LAST frame of the sequence
+                    # or the average. Let's use the average for stability.
+                    avg_landmarks = []
+                    num_frames = len(request.timeSeriesLandmarks)
+                    if num_frames > 0:
+                        num_lms = len(request.timeSeriesLandmarks[0])
+                        for i in range(num_lms):
+                            avg_x = sum(f[i].x for f in request.timeSeriesLandmarks) / num_frames
+                            avg_y = sum(f[i].y for f in request.timeSeriesLandmarks) / num_frames
+                            avg_z = sum(f[i].z or 0 for f in request.timeSeriesLandmarks) / num_frames
+                            avg_landmarks.append(Landmark(x=avg_x, y=avg_y, z=avg_z))
+                    
+                    print(f"Calculated average landmarks for {num_frames} frames", flush=True)
+
+                    # Perform analysis on averaged landmarks
+                    result = analyze_posture(
+                        view=request.view,
+                        landmarks=avg_landmarks,
+                        width=request.width,
+                        height=request.height
+                    )
+                    # result['metrics'] is a Pydantic model, use model_dump() to get dict
+                    print(f"Analysis complete. Metrics: {result['metrics']}", flush=True)
+                    
+                    # Construct response
+                    response = AnalysisResponse(
+                        metrics=result["metrics"],
+                        issues=result["issues"],
+                        annotations=result.get("annotations", [])
+                    )
+                    
+                    # Send back the results
+                    resp_json = response.model_dump_json()
+                    await websocket.send_text(resp_json)
+                    print(f"Sent POSTURE_SYNC response len: {len(resp_json)}", flush=True)
+                except Exception as e:
+                    print(f"Error processing POSTURE_SYNC: {e}", flush=True)
+                    import traceback
+                    traceback.print_exc()
                 
-                # Process time-series data using narrator
-                # Convert Pydantic models to dicts for narrator
-                landmarks_sequence = [[lm.model_dump() for lm in frame] for frame in request.timeSeriesLandmarks]
-                analysis_result = process_time_series(request.view, landmarks_sequence)
-                
-                # For real-time feedback (skeleton/metrics), use the LAST frame of the sequence
-                # or the average. Let's use the average for stability.
-                avg_landmarks = []
-                num_frames = len(request.timeSeriesLandmarks)
-                if num_frames > 0:
-                    num_lms = len(request.timeSeriesLandmarks[0])
-                    for i in range(num_lms):
-                        avg_x = sum(f[i].x for f in request.timeSeriesLandmarks) / num_frames
-                        avg_y = sum(f[i].y for f in request.timeSeriesLandmarks) / num_frames
-                        avg_z = sum(f[i].z or 0 for f in request.timeSeriesLandmarks) / num_frames
-                        avg_landmarks.append(Landmark(x=avg_x, y=avg_y, z=avg_z))
-                
-                # Perform analysis on averaged landmarks
-                result = analyze_posture(
-                    view=request.view,
-                    landmarks=avg_landmarks,
-                    width=request.width,
-                    height=request.height
-                )
-                
-                # Construct response
-                response = AnalysisResponse(
-                    metrics=result["metrics"],
-                    issues=result["issues"],
-                    annotations=result.get("annotations", [])
-                )
-                
-                # Send back the results
-                await websocket.send_text(response.model_dump_json())
-                
-            elif message.get("type") == "JOINT_ANALYSIS":
+            elif msg_type == "JOINT_ANALYSIS":
                 try:
                     # Validate and parse using Pydantic
                     request = JointAnalysisRequest(**message)
@@ -223,7 +262,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     print(f"Received batch analysis for view: {request.view}")
                     
                     # Generate HTML report using LLM
-                    html_content = generate_posture_report(request.model_dump())
+                    html_content = await run_in_threadpool(generate_posture_report, request.model_dump())
                     
                     # Construct response
                     report_response = HTMLReportResponse(
@@ -241,17 +280,29 @@ async def websocket_endpoint(websocket: WebSocket):
                     request = SteppedAnalysisRequest(**message)
                     frames = request.frames
                     
-                    if len(frames) == 0:
+                    if request.mock:
+                        html_content = "<div class='p-8 text-center text-slate-400'>[MOCK] AI Report Generated</div>"
+                        print("Generated MOCK report", flush=True)
+                    elif len(frames) == 0:
                         html_content = "<div class='p-8 text-center text-slate-400'>未采集到任何视角数据，请重新采集。</div>"
                     else:
                         print(f"Received stepped analysis for {len(frames)} views")
                         # Use the new llm_reporter which handles multi-view Agent logic
-                        html_content = generate_posture_report({"frames": [f.model_dump() for f in frames]})
+                        html_content = await run_in_threadpool(generate_posture_report, {"frames": [f.model_dump() for f in frames]})
                     
+                    # Build time series for charts (if we have frames)
+                    time_series = []
+                    if frames and len(frames) > 0:
+                        try:
+                            time_series = build_time_series(frames)
+                        except Exception as e:
+                            print(f"Error building time series: {e}", flush=True)
+
                     # Construct response
                     report_response = HTMLReportResponse(
                         html=html_content,
-                        reportId=str(uuid.uuid4())
+                        reportId=str(uuid.uuid4()),
+                        timeSeries=time_series
                     )
                     
                     # Send back the HTML report
@@ -285,4 +336,6 @@ except Exception as e:
     print(f"MedVoice AI integration failed: {e}")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import uvicorn
+    # Use port 8002 to avoid conflicts with zombie processes on 8000
+    uvicorn.run(app, host="0.0.0.0", port=8002)

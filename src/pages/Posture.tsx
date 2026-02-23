@@ -15,6 +15,8 @@ import { BOX, checkUserPosition } from './posture/utils';
 import { AnalysisOverlay } from './posture/AnalysisOverlay';
 import { PostureResultPanel } from './posture/PostureResultPanel';
 import { PosturePDFTemplate } from './posture/PosturePDFTemplate';
+import { useTimeSeriesCollector } from '@/plugins/vision3/hooks/useTimeSeriesCollector';
+import { PoseLandmark } from '@/plugins/vision3/vision3-utils';
 
 type PostureResult = { issues: PostureIssue[]; metrics: PostureMetrics; image: string };
 
@@ -56,6 +58,21 @@ export default function Posture() {
 
   // We need to keep track of latest landmarks for snapshot
   const landmarksBufferRef = useRef<Landmark[][]>([]);
+
+  // --- Exploration V2: Headless Collector Integration ---
+  const [isCollectingV2, setIsCollectingV2] = useState(false);
+  const { collectFrame, progress: collectionProgress } = useTimeSeriesCollector({
+    view,
+    isCollecting: isCollectingV2,
+    onCollectionComplete: (data) => {
+      console.log("🔥 [Exploration V2] Collection Complete!", data);
+      alert(`采集完成！\n视角: ${data.view}\n帧数: ${data.timeSeriesLandmarks.length}\n耗时: ~${data.timeSeriesLandmarks.length/30}s`);
+      setIsCollectingV2(false);
+      // Optional: Send to backend for analysis (Mock for now)
+      // analyzeStepped([data]); 
+    }
+  });
+  // ------------------------------------------------------
 
   const drawResultCanvas = useCallback((
     imageSrc: string, 
@@ -248,6 +265,30 @@ export default function Posture() {
   const onResults = useCallback((results: Results) => {
     if (results.poseLandmarks) {
       const poseLandmarks = results.poseLandmarks as Landmark[];
+
+      const image = results.image;
+      const width = image instanceof HTMLVideoElement
+        ? image.videoWidth
+        : image instanceof HTMLImageElement
+          ? image.naturalWidth
+          : image instanceof HTMLCanvasElement
+            ? image.width
+            : 640;
+      const height = image instanceof HTMLVideoElement
+        ? image.videoHeight
+        : image instanceof HTMLImageElement
+          ? image.naturalHeight
+          : image instanceof HTMLCanvasElement
+            ? image.height
+            : 480;
+      const normalizedLandmarks: PoseLandmark[] = poseLandmarks.map((landmark) => ({
+        x: landmark.x,
+        y: landmark.y,
+        z: landmark.z ?? 0,
+        visibility: landmark.visibility
+      }));
+      collectFrame(normalizedLandmarks, width, height);
+
       const status = captureStatusRef.current;
 
       // 1. 根据状态管理缓冲区
@@ -314,7 +355,7 @@ export default function Posture() {
         }
       }
     }
-  }, [isInPosition, analyzeBatch, view]);
+  }, [isInPosition, analyzeBatch, view, collectFrame]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -395,7 +436,23 @@ export default function Posture() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2">
         <div>
           <h2 className="text-4xl font-extrabold tracking-tight text-slate-900 mb-2">体态评估</h2>
-          <p className="text-slate-500 text-lg">AI 智能分析您的站姿与脊柱健康</p>
+          <div className="flex items-center gap-4">
+            <p className="text-slate-500 text-lg">AI 智能分析您的站姿与脊柱健康</p>
+            
+            {/* --- Exploration V2: Debug Button (Moved here) --- */}
+            <button
+              onClick={() => setIsCollectingV2(prev => !prev)}
+              className={cn(
+                "px-3 py-1 rounded-full text-xs font-bold shadow-sm transition-all border border-gray-200",
+                isCollectingV2 
+                  ? "bg-red-500 text-white animate-pulse border-red-600" 
+                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+              )}
+            >
+              {isCollectingV2 ? `Collecting... ${Math.round(collectionProgress)}%` : "🧪 Start V2 Capture"}
+            </button>
+            {/* ------------------------------------------------ */}
+          </div>
         </div>
         
         <div className="flex p-1 bg-white/50 backdrop-blur-md rounded-2xl border border-white/40 shadow-sm self-start md:self-auto">
@@ -417,6 +474,7 @@ export default function Posture() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
         {/* Camera/Image Area */}
         <div className="lg:col-span-7 bg-black rounded-[2.5rem] overflow-hidden shadow-2xl aspect-[4/3] relative group ring-1 ring-white/10">
           {!result ? (
