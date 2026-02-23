@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -8,12 +8,20 @@ class Landmark(BaseModel):
     z: Optional[float] = 0.0
     visibility: Optional[float] = 1.0
 
+class SteppedFrame(BaseModel):
+    view: str
+    width: int
+    height: int
+    timeSeriesLandmarks: List[List[Landmark]]
+    image: Optional[str] = None
+    timestamp: Optional[int] = None
+
 class AnalysisRequest(BaseModel):
     type: str = Field(..., description="Message type, e.g., 'POSTURE_SYNC'")
     view: str = Field(..., description="Camera view: 'front', 'back', or 'side'")
     width: int
     height: int
-    landmarks: List[Landmark]
+    timeSeriesLandmarks: List[List[Landmark]]
     image: Optional[str] = Field(None, description="Base64 encoded image data for snapshot analysis")
 
 class PostureIssue(BaseModel):
@@ -35,6 +43,7 @@ class PostureMetrics(BaseModel):
     headYaw: Optional[float] = None
     headRoll: Optional[float] = None
     head_axes: Optional[List[Dict[str, float]]] = None  # Added for head pose visualization
+    swayOffset: Optional[float] = None  # Added for stability tracking
 
 class JointMeasurementRequest(BaseModel):
     id: str
@@ -76,19 +85,26 @@ class AnalysisResponse(BaseModel):
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
 
 class TemporalStability(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     swayArea: float
     maxDeviation: float
-    stdDev: float
+    sd: float = Field(..., alias="sd") # Map sd from frontend to sd in backend
     velocity: float
 
 class TemporalAnalysisRequest(BaseModel):
     type: str = "POSTURE_BATCH_ANALYSIS"
     view: str
-    duration: float
-    frameCount: int
-    averages: PostureMetrics
-    stability: TemporalStability
+    duration: Optional[float] = None
+    frameCount: Optional[int] = None
+    averages: Optional[Dict[str, Any]] = None
+    stability: Optional[TemporalStability] = None
     timeSeries: Optional[List[Dict[str, Any]]] = None
+    frames: Optional[List[SteppedFrame]] = None # Added for batch processing from frames
+
+class SteppedAnalysisRequest(BaseModel):
+    type: str = "POSTURE_STEPPED_ANALYSIS"
+    frames: List[SteppedFrame]
 
 class HTMLReportResponse(BaseModel):
     type: str = "HTML_REPORT"

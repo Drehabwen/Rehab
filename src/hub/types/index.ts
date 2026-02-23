@@ -1,3 +1,5 @@
+import React from 'react';
+
 export interface PluginManifest {
   id: string;
   name: string;
@@ -18,3 +20,7 @@ export interface HubState {
     microphone: 'connected' | 'disconnected' | 'error';
   };
 }
+
+export type PatientStatus = 'pending' | 'assessing' | 'report' | 'completed';
+export type ViewMode = 'dashboard' | 'toolbox' | 'workspace';
+export type PluginType = 'vision3' | 'medvoice' | 'reports' | 'datacenter';

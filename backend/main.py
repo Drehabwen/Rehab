@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any, Optional
+import statistics
+import time
 import uvicorn
 import os
 import sys
@@ -13,12 +15,15 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from models import (
     AnalysisRequest, AnalysisResponse, PostureMetrics, 
     JointAnalysisRequest, JointAnalysisResponse,
-    TemporalAnalysisRequest, HTMLReportResponse
+    TemporalAnalysisRequest, HTMLReportResponse,
+    SteppedAnalysisRequest
 )
 from utils.posture_analysis import analyze_posture
+from utils.data_cleaner import clean_timeseries, get_algorithm_info
 from utils.joint_analysis import calculate_joint_angle
 from utils.camera_stream import CameraManager
 from utils.llm_reporter import generate_posture_report
+from utils.narrator import process_time_series
 import uuid
 
 app = FastAPI(
@@ -29,6 +34,66 @@ app = FastAPI(
 
 # Initialize Camera Manager
 camera_manager = CameraManager()
+
+def build_time_series(frames):
+    series = []
+    for frame in frames:
+        analysis = analyze_posture(
+            view=frame.view,
+            landmarks=frame.landmarks,
+            width=frame.width,
+            height=frame.height
+        )
+        metrics = analysis["metrics"].model_dump()
+        metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+        timestamp = frame.timestamp or int(time.time() * 1000)
+        series.append({"timestamp": timestamp, "view": frame.view, **metrics})
+    series.sort(key=lambda item: item.get("timestamp", 0))
+    return series
+
+def compute_averages(series):
+    sums: Dict[str, float] = {}
+    counts: Dict[str, int] = {}
+    for item in series:
+        for key, value in item.items():
+            if key in ("timestamp", "view"):
+                continue
+            if isinstance(value, (int, float)):
+                sums[key] = sums.get(key, 0.0) + float(value)
+                counts[key] = counts.get(key, 0) + 1
+    return {key: sums[key] / counts[key] for key in sums}
+
+def select_stability_key(series):
+    preferred = ["swayOffset", "headDeviation", "headForward", "shoulderAngle", "hipAngle", "shoulderRounded", "headPitch", "headYaw", "headRoll"]
+    for key in preferred:
+        if any(isinstance(item.get(key), (int, float)) for item in series):
+            return key
+    for item in series:
+        for key, value in item.items():
+            if key in ("timestamp", "view"):
+                continue
+            if isinstance(value, (int, float)):
+                return key
+    return None
+
+def compute_stability(series):
+    key = select_stability_key(series)
+    if not key:
+        return {"swayArea": 0.0, "maxDeviation": 0.0, "sd": 0.0, "velocity": 0.0}
+    values = [float(item[key]) for item in series if isinstance(item.get(key), (int, float))]
+    if not values:
+        return {"swayArea": 0.0, "maxDeviation": 0.0, "sd": 0.0, "velocity": 0.0}
+    mean = sum(values) / len(values)
+    sd = statistics.pstdev(values) if len(values) > 1 else 0.0
+    max_deviation = max(abs(v - mean) for v in values)
+    velocity = sum(abs(values[i] - values[i - 1]) for i in range(1, len(values))) / (len(values) - 1) if len(values) > 1 else 0.0
+    sway_area = sum(abs(v - mean) for v in values)
+    return {
+        "swayArea": sway_area,
+        "maxDeviation": max_deviation,
+        "sd": sd,
+        "velocity": velocity
+    }
 
 # --- Video Stream ---
 
@@ -82,31 +147,34 @@ async def websocket_endpoint(websocket: WebSocket):
             message = json.loads(data)
             
             if message.get("type") == "POSTURE_SYNC":
-                # Validate and parse using Pydantic
                 request = AnalysisRequest(**message)
                 
-                # Check if image data is present
-                if request.image:
-                    print(f"Received snapshot image for view: {request.view}")
-                    # TODO: Phase 2 - Decode and process image with geometric engine
-                    # For now, we just acknowledge receipt
+                scope = request.scope or "full"
+                algorithm_info = get_algorithm_info(scope)
                 
-                # Perform analysis
+                landmarks_sequence = [[lm.model_dump() for lm in frame] for frame in request.timeSeriesLandmarks]
+                analysis_result = process_time_series(request.view, landmarks_sequence)
+                
+                cleaned_landmarks = clean_timeseries(request.timeSeriesLandmarks, scope)
+                
                 result = analyze_posture(
                     view=request.view,
-                    landmarks=request.landmarks,
+                    landmarks=cleaned_landmarks,
                     width=request.width,
                     height=request.height
                 )
                 
-                # Construct response
+                result["metrics"].cleaningAlgorithm = algorithm_info["algorithm"]
+                result["metrics"].cleaningParams = algorithm_info["params"]
+                
                 response = AnalysisResponse(
                     metrics=result["metrics"],
-                    issues=result["issues"]
+                    issues=result["issues"],
+                    annotations=result.get("annotations", [])
                 )
                 
                 # Send back the results
-                await websocket.send_text(response.json())
+                await websocket.send_text(response.model_dump_json())
                 
             elif message.get("type") == "JOINT_ANALYSIS":
                 try:
@@ -115,8 +183,8 @@ async def websocket_endpoint(websocket: WebSocket):
                     
                     results = []
                     # Pre-convert landmarks to dict once for performance
-                    landmarks_dict = [lm.dict() for lm in request.landmarks]
-                    world_landmarks_dict = [lm.dict() for lm in request.worldLandmarks] if request.worldLandmarks else None
+                    landmarks_dict = [lm.model_dump() for lm in request.landmarks]
+                    world_landmarks_dict = [lm.model_dump() for lm in request.worldLandmarks] if request.worldLandmarks else None
                     
                     for m in request.measurements:
                         angle = calculate_joint_angle(
@@ -136,7 +204,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
                     
                     # Send back the results
-                    await websocket.send_text(response.json())
+                    await websocket.send_text(response.model_dump_json())
                 except Exception as e:
                     print(f"Error processing JOINT_ANALYSIS: {e}")
             
@@ -147,7 +215,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     print(f"Received batch analysis for view: {request.view}")
                     
                     # Generate HTML report using LLM
-                    html_content = generate_posture_report(request.dict())
+                    html_content = generate_posture_report(request.model_dump())
                     
                     # Construct response
                     report_response = HTMLReportResponse(
@@ -156,9 +224,34 @@ async def websocket_endpoint(websocket: WebSocket):
                     )
                     
                     # Send back the HTML report
-                    await websocket.send_text(report_response.json())
+                    await websocket.send_text(report_response.model_dump_json())
                 except Exception as e:
                     print(f"Error processing POSTURE_BATCH_ANALYSIS: {e}")
+
+            elif message.get("type") == "POSTURE_STEPPED_ANALYSIS":
+                try:
+                    request = SteppedAnalysisRequest(**message)
+                    frames = request.frames
+                    
+                    if len(frames) == 0:
+                        html_content = "<div class='p-8 text-center text-slate-400'>未采集到任何视角数据，请重新采集。</div>"
+                    else:
+                        print(f"Received stepped analysis for {len(frames)} views")
+                        # Use the new llm_reporter which handles multi-view Agent logic
+                        html_content = generate_posture_report({"frames": [f.model_dump() for f in frames]})
+                    
+                    # Construct response
+                    report_response = HTMLReportResponse(
+                        html=html_content,
+                        reportId=str(uuid.uuid4())
+                    )
+                    
+                    # Send back the HTML report
+                    await websocket.send_text(report_response.model_dump_json())
+                except Exception as e:
+                    print(f"Error processing POSTURE_STEPPED_ANALYSIS: {e}")
+                    import traceback
+                    traceback.print_exc()
                 
     except WebSocketDisconnect:
         print("WebSocket disconnected")

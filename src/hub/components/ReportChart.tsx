@@ -11,9 +11,11 @@ import {
   Area
 } from 'recharts';
 
+type ReportChartDatum = { timestamp: number } & Record<string, number>;
+
 interface ReportChartProps {
   type: 'sway' | 'angle' | 'velocity';
-  data: any[];
+  data: ReportChartDatum[];
   title?: string;
   metricKey: string;
   unit?: string;

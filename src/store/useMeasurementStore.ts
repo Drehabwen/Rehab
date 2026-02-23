@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { JointType, MovementDirection } from '@/types/posture';
+import { TemporalAnalysis } from '@/lib/posture-processor';
 
 export interface MeasurementDataPoint {
   timestamp: number;
@@ -24,7 +25,7 @@ export interface PostureReport {
   date: number;
   view: string;
   html: string;
-  timeSeries?: any[];
+  timeSeries?: TemporalAnalysis['timeSeries'];
 }
 
 interface MeasurementState {
@@ -48,7 +49,7 @@ interface MeasurementState {
   resetMeasurement: () => void;
   saveMeasurement: () => void;
   deleteSavedMeasurement: (id: string) => void;
-  savePostureReport: (view: string, html: string, timeSeries?: any[]) => void;
+  savePostureReport: (view: string, html: string, timeSeries?: TemporalAnalysis['timeSeries']) => void;
   deletePostureReport: (id: string) => void;
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Activity, Mic, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Settings, ChevronLeft, ChevronRight, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -7,15 +7,15 @@ interface SidebarProps {
   onSelect: (id: string) => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  onSettingsClick?: () => void;
 }
 
 const navItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: '患者工作站' },
-  { id: 'vision3', icon: Activity, label: '体态分析' },
-  { id: 'medvoice', icon: Mic, label: '语音接诊' },
+  { id: 'datacenter', icon: Database, label: '数据与报告' },
 ];
 
-export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isCollapsed, onToggle }) => {
+export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isCollapsed, onToggle, onSettingsClick }) => {
   return (
     <aside className={cn(
       "h-screen bg-slate-900 text-white transition-all duration-500 flex flex-col border-r border-white/5 relative z-20 shadow-2xl",
@@ -77,9 +77,12 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
 
       {/* Footer Actions */}
       <div className="p-4 space-y-3 border-t border-white/5">
-        <button className={cn(
-          "w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-white/40 hover:bg-white/5 hover:text-white transition-all duration-500 group"
-        )}>
+        <button 
+          onClick={onSettingsClick || (() => {})}
+          className={cn(
+            "w-full flex items-center gap-4 px-4 py-4 rounded-2xl text-white/40 hover:bg-white/5 hover:text-white transition-all duration-500 group"
+          )}
+        >
           <Settings size={24} className="group-hover:rotate-90 transition-transform duration-700" />
           {!isCollapsed && <span className="font-black text-[11px] uppercase tracking-[0.2em]">系统设置</span>}
         </button>

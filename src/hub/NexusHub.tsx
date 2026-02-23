@@ -1,41 +1,189 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HubSidebar } from './components/HubSidebar';
-import { Bell, Camera, Mic, Search, Activity, ChevronRight, Calendar, FileText } from 'lucide-react';
+import { Bell, Search, Calendar, Clock, Plus, Users, ClipboardList, ChevronLeft, User, Settings, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
 import { MedVoicePlugin } from '@/plugins/medvoice/MedVoicePlugin';
 import { NexusReportCenter } from './components/NexusReportCenter';
 import { GlobalExport } from '@/components/GlobalExport';
+import { NewSessionModal } from './components/NewSessionModal';
+import { PatientSearchModal } from './components/PatientSearchModal';
+import { DataSettingsModal } from './components/DataSettingsModal';
+import { PatientToolbox } from './components/PatientToolbox';
+import { WorkspaceToolbar } from './components/WorkspaceToolbar';
+import { usePatientStore } from '@/store/usePatientStore';
+import { useSessionStore } from '@/store/useSessionStore';
+import { usePatientList } from './hooks/usePatientList';
+import type { Patient } from '@/types/patient';
+import type { PatientStatus, ViewMode } from './types';
 
 export const NexusHub: React.FC = () => {
-  const [activePlugin, setActivePlugin] = useState('dashboard');
+  const [view, setView] = useState<ViewMode>('dashboard');
+  const [activePlugin, setActivePlugin] = useState<'vision3' | 'medvoice' | 'reports' | 'datacenter'>('vision3');
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showNewSessionModal, setShowNewSessionModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showDataSettings, setShowDataSettings] = useState(false);
   
-  const plugins = [
-    { id: 'dashboard', name: '总览', icon: Activity, color: 'text-antey-primary' },
-    { id: 'vision3', name: '体态分析', icon: Camera, color: 'text-antey-accent' },
-    { id: 'reports', name: '报告中心', icon: FileText, color: 'text-blue-500' },
-    { id: 'medvoice', name: '语音助手', icon: Mic, color: 'text-purple-500' },
-  ];
+  const { patients, loadPatients, addPatient } = usePatientStore();
+  const { loadSessions, getPatientSessions } = useSessionStore();
+  
+  useEffect(() => {
+    loadPatients();
+    loadSessions();
+  }, [loadPatients, loadSessions]);
+
+  const { patientsWithStatus, stats, getPatientLabel } = usePatientList({
+    patients,
+    getPatientSessions
+  });
+
+  const handleSelectPatient = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setView('toolbox');
+  };
+
+  const handleToolSelectFromToolbox = (toolId: string) => {
+    setActivePlugin(toolId as 'vision3' | 'medvoice');
+    setView('workspace');
+  };
+
+  const handleBackFromToolbox = () => {
+    setView('dashboard');
+    setSelectedPatient(null);
+  };
+
+  const handleBackFromWorkspace = () => {
+    setView('toolbox');
+  };
+
+  const handleSelectTool = (tool: 'vision3' | 'medvoice' | 'reports' | 'datacenter') => {
+    setActivePlugin(tool);
+  };
+
+  const handleBackToDashboard = () => {
+    setView('dashboard');
+    setSelectedPatient(null);
+  };
+
+  const handleStartNewPatient = async (name?: string) => {
+    const newPatient = await addPatient(name);
+    setSelectedPatient(newPatient);
+    setView('toolbox');
+    setShowNewSessionModal(false);
+  };
+
+  const getStatusLabel = (status: PatientStatus) => {
+    const labels = {
+      pending: '待接诊',
+      assessing: '评估中',
+      report: '待报告',
+      completed: '已完成'
+    };
+    return labels[status];
+  };
+
+  const getStatusColor = (status: PatientStatus) => {
+    const colors = {
+      pending: 'bg-slate-100 text-slate-600',
+      assessing: 'bg-blue-50 text-blue-600',
+      report: 'bg-amber-50 text-amber-600',
+      completed: 'bg-emerald-50 text-emerald-600'
+    };
+    return colors[status];
+  };
+
+  const renderWorkspaceContent = () => {
+    switch (activePlugin) {
+      case 'vision3':
+        return <Vision3Plugin />;
+      case 'medvoice':
+        return <MedVoicePlugin />;
+      case 'reports':
+        return <NexusReportCenter />;
+      case 'datacenter':
+        return <NexusReportCenter />;
+      default:
+        return <Vision3Plugin />;
+    }
+  };
 
   return (
     <div className="flex h-screen mesh-gradient font-sans text-slate-900 overflow-hidden">
-      <HubSidebar 
-        activeId={activePlugin} 
-        onSelect={setActivePlugin} 
-        isCollapsed={isCollapsed} 
-        onToggle={() => setIsCollapsed(!isCollapsed)} 
-      />
+      {view === 'dashboard' && (
+        <HubSidebar 
+          activeId="dashboard" 
+          onSelect={(id) => {
+            if (id === 'datacenter') {
+              setView('workspace');
+              setActivePlugin('datacenter');
+              setSelectedPatient(null);
+            } else if (id === 'vision3') {
+              setView('workspace');
+              setActivePlugin('vision3');
+            }
+          }} 
+          isCollapsed={isCollapsed} 
+          onToggle={() => setIsCollapsed(!isCollapsed)}
+          onSettingsClick={() => setShowDataSettings(true)}
+        />
+      )}
       
-      <main className="flex-1 flex flex-col min-w-0 relative">
-        {/* Top Navigation */}
-        <header className="h-20 border-b border-slate-200/60 bg-white/40 backdrop-blur-xl flex items-center justify-between px-8 sticky top-0 z-10">
+      <main className={cn("flex-1 flex flex-col min-w-0 relative", (view === 'workspace' || view === 'toolbox') && "w-full")}>
+        {(view === 'workspace' || view === 'toolbox') && selectedPatient && (
+          <div className="absolute top-0 left-0 right-0 z-20">
+            <div className="bg-white/60 backdrop-blur-xl border-b border-slate-200/60 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={view === 'workspace' ? handleBackFromWorkspace : handleBackFromToolbox}
+                    className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+                  >
+                    <ChevronLeft size={18} className="text-slate-600" />
+                  </button>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center">
+                      <User size={18} className="text-slate-500" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-black">
+                          {selectedPatient.id}
+                        </span>
+                        <span className="text-sm font-black text-slate-900">
+                          {selectedPatient.name || '匿名患者'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-medium text-slate-400">
+                        {view === 'toolbox' ? '工具箱' : `第 ${getPatientSessions(selectedPatient.id).length + 1} 次接诊`}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setShowDataSettings(true)}
+                  className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  <Settings size={18} className="text-slate-500" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <header className={cn(
+          "h-20 border-b border-slate-200/60 bg-white/40 backdrop-blur-xl flex items-center justify-between px-8 sticky top-0 z-10",
+          view === 'workspace' && "hidden"
+        )}>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-antey-primary animate-pulse shadow-[0_0_8px_rgba(13,148,136,0.5)]" />
               <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">
-                {activePlugin === 'dashboard' ? 'Nexus / Dashboard' : `Nexus / ${activePlugin.toUpperCase()}`}
+                Nexus / {view === 'dashboard' ? '患者管理' : '工作台'}
               </h2>
             </div>
           </div>
@@ -45,7 +193,7 @@ export const NexusHub: React.FC = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-antey-primary transition-colors" size={16} />
               <input 
                 type="text" 
-                placeholder="搜索患者、记录或指令..." 
+                placeholder="搜索患者..." 
                 className="bg-white/50 border border-slate-200/50 rounded-2xl py-2.5 pl-12 pr-6 text-sm w-80 focus:ring-4 focus:ring-antey-primary/5 focus:bg-white focus:border-antey-primary/20 transition-all outline-none"
               />
             </div>
@@ -75,81 +223,241 @@ export const NexusHub: React.FC = () => {
           </div>
         </header>
 
-        {/* Content Area */}
-        <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
-          {activePlugin === 'dashboard' && (
-            <div className="max-w-7xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-              <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className="space-y-2">
-                  <h1 className="text-6xl font-black text-slate-900 tracking-tight leading-none">
-                    下午好, <span className="text-gradient">李医生</span>
-                  </h1>
-                  <p className="text-slate-400 font-medium text-lg flex items-center gap-2">
-                    <span className="w-8 h-[1px] bg-slate-200" />
-                    “科技赋能康复，让每一步都更坚定。”
-                  </p>
-                </div>
-                <div className="flex items-center gap-3 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm">
-                   <div className="px-4 py-2 bg-white/80 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                     2024.02.08
-                   </div>
-                   <div className="px-4 py-2 bg-antey-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-antey-primary/20 flex items-center gap-2">
-                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                     工作站就绪
-                   </div>
-                </div>
-              </section>
+        <div className="flex-1 overflow-hidden relative">
+          {view === 'dashboard' && (
+            <div className="h-full p-8 overflow-y-auto custom-scrollbar">
+              <div className="max-w-7xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                <section className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                  <div className="space-y-2">
+                    <h1 className="text-5xl font-black text-slate-900 tracking-tight leading-none">
+                      患者管理
+                    </h1>
+                    <p className="text-slate-400 font-medium text-lg flex items-center gap-2">
+                      <span className="w-8 h-[1px] bg-slate-200" />
+                      今日共有 {patients.length} 位患者记录
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-white/50 shadow-sm">
+                      <div className="px-4 py-2 bg-white/80 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
+                      </div>
+                  </div>
+                </section>
 
-              {/* Main Content Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Tools Selector */}
-                <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                  {plugins.slice(1).map(plugin => (
-                    <button 
-                      key={plugin.id}
-                      onClick={() => setActivePlugin(plugin.id)}
-                      className="group bento-card p-12 text-left h-full flex flex-col justify-between hover:border-antey-primary/20 transition-all"
-                    >
-                      <div className="absolute -top-12 -right-12 w-48 h-48 bg-gradient-to-br from-antey-primary/5 to-transparent rounded-full group-hover:scale-150 transition-transform duration-1000 pointer-events-none" />
-                      
-                      <div>
-                        <div className={cn("w-20 h-20 rounded-[2rem] bg-slate-50 flex items-center justify-center mb-10 group-hover:bg-white group-hover:shadow-2xl group-hover:shadow-antey-primary/20 transition-all duration-700", plugin.color)}>
-                          <plugin.icon size={36} />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <button 
+                    onClick={() => setShowNewSessionModal(true)}
+                    className="group bento-card p-6 flex items-center justify-between hover:border-antey-primary/30 transition-all bg-gradient-to-br from-antey-primary/5 to-transparent"
+                  >
+                    <div>
+                      <div className="text-3xl font-black text-slate-900">{stats.pending}</div>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">待接诊</div>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-antey-primary/10 flex items-center justify-center group-hover:bg-antey-primary group-hover:scale-110 transition-all">
+                      <Plus size={20} className="text-antey-primary group-hover:text-white" />
+                    </div>
+                  </button>
+                  
+                  <div className="bento-card p-6 flex items-center justify-between">
+                    <div>
+                      <div className="text-3xl font-black text-slate-900">{stats.assessing}</div>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">评估中</div>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center">
+                      <ClipboardList size={20} className="text-blue-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="bento-card p-6 flex items-center justify-between">
+                    <div>
+                      <div className="text-3xl font-black text-slate-900">{stats.report}</div>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">待报告</div>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center">
+                      <Clock size={20} className="text-amber-500" />
+                    </div>
+                  </div>
+                  
+                  <div className="bento-card p-6 flex items-center justify-between">
+                    <div>
+                      <div className="text-3xl font-black text-slate-900">{stats.completed}</div>
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">已完成</div>
+                    </div>
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                      <Users size={20} className="text-emerald-500" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => setShowNewSessionModal(true)}
+                    className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-antey-primary to-teal-600 text-white rounded-2xl shadow-lg shadow-antey-primary/20 hover:shadow-xl hover:shadow-antey-primary/30 transition-all hover:scale-[1.02]"
+                  >
+                    <Plus size={18} />
+                    <span className="text-[11px] font-black uppercase tracking-wider">新建患者</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => setShowSearchModal(true)}
+                    className="flex items-center gap-3 px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl shadow-sm hover:shadow-lg hover:border-antey-primary/20 transition-all"
+                  >
+                    <Users size={18} className="text-slate-400" />
+                    <span className="text-[11px] font-black uppercase tracking-wider">查找患者</span>
+                  </button>
+                </div>
+
+                {patientsWithStatus.length > 0 ? (
+                  <div>
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6">
+                      患者列表
+                    </h3>
+                    <div className="space-y-3">
+                      {patientsWithStatus.map(patient => (
+                        <div
+                          key={patient.id}
+                          onClick={() => handleSelectPatient(patient)}
+                          className="w-full bento-card p-5 flex items-center justify-between hover:border-antey-primary/30 transition-all group cursor-pointer"
+                        >
+                          <div className="flex items-center gap-5">
+                            <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center group-hover:bg-antey-primary/10 transition-colors">
+                              <Users size={18} className="text-slate-400 group-hover:text-antey-primary transition-colors" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-3 mb-1">
+                                <span className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-black tracking-wider">
+                                  {patient.id}
+                                </span>
+                                <span className="text-sm font-black text-slate-900">
+                                  {patient.name || '匿名患者'}
+                                </span>
+                              </div>
+                              <div className="text-[10px] font-medium text-slate-400">
+                                {getPatientLabel(patient)}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className={cn(
+                              "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider",
+                              getStatusColor(patient.status)
+                            )}>
+                              {getStatusLabel(patient.status)}
+                            </span>
+                          </div>
                         </div>
-                        <h3 className="text-4xl font-black text-slate-900 mb-4 tracking-tight">{plugin.name}</h3>
-                        <p className="text-slate-400 font-medium leading-relaxed text-lg">
-                          {plugin.id === 'vision3' ? '基于计算机视觉的实时姿态评估与关键关节活动度分析系统。' : 'AI 驱动的病历录入与语音指令交互助手。'}
-                        </p>
-                      </div>
-
-                      <div className="mt-12 flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.3em] text-antey-primary opacity-40 group-hover:opacity-100 transition-all translate-x-[-10px] group-hover:translate-x-0 duration-500">
-                        立即启动模块 <div className="w-8 h-[1px] bg-antey-primary group-hover:w-12 transition-all" /> <ChevronRight size={16} />
-                      </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bento-card p-16 text-center">
+                    <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-6">
+                      <Users size={32} className="text-slate-300" />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">暂无患者记录</h3>
+                    <p className="text-slate-400 mb-8">点击"新建患者"开始您的第一个接诊</p>
+                    <button 
+                      onClick={() => setShowNewSessionModal(true)}
+                      className="inline-flex items-center gap-2 px-8 py-4 bg-antey-primary text-white rounded-2xl font-black text-sm uppercase tracking-wider hover:bg-teal-600 transition-all"
+                    >
+                      <Plus size={18} />
+                      新建患者
                     </button>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {activePlugin === 'vision3' && (
-            <div className="h-full">
-              <Vision3Plugin />
-            </div>
+          {(view === 'workspace' || view === 'toolbox') && selectedPatient && (
+            <>
+              <div className="h-full pt-4 pb-20">
+                {view === 'toolbox' ? (
+                  <PatientToolbox 
+                    patient={selectedPatient}
+                    onSelectTool={handleToolSelectFromToolbox}
+                    onBack={handleBackFromToolbox}
+                    sessionCount={getPatientSessions(selectedPatient.id).length}
+                  />
+                ) : (
+                  renderWorkspaceContent()
+                )}
+              </div>
+              
+              {view === 'workspace' && (
+                <WorkspaceToolbar 
+                  activeTool={activePlugin}
+                  onSelectTool={handleSelectTool}
+                />
+              )}
+            </>
           )}
-
-          {activePlugin === 'medvoice' && (
-            <div className="h-full">
-              <MedVoicePlugin />
-            </div>
-          )}
-
-          {activePlugin === 'reports' && (
-            <div className="h-full">
-              <NexusReportCenter />
-            </div>
+          
+          {view === 'workspace' && !selectedPatient && activePlugin === 'datacenter' && (
+            <>
+              <div className="absolute top-0 left-0 right-0 z-20">
+                <div className="bg-white/60 backdrop-blur-xl border-b border-slate-200/60 px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <button 
+                        onClick={handleBackToDashboard}
+                        className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+                      >
+                        <ChevronLeft size={18} className="text-slate-600" />
+                      </button>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center">
+                          <Database size={18} className="text-emerald-500" />
+                        </div>
+                        <div>
+                          <span className="text-sm font-black text-slate-900">数据与报告中心</span>
+                          <div className="text-[10px] font-medium text-slate-400">
+                            查看所有评估记录
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setShowDataSettings(true)}
+                      className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors"
+                    >
+                      <Settings size={18} className="text-slate-500" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="h-full pt-4">
+                {renderWorkspaceContent()}
+              </div>
+              
+              <WorkspaceToolbar 
+                activeTool={activePlugin}
+                onSelectTool={handleSelectTool}
+              />
+            </>
           )}
         </div>
+
+        <NewSessionModal 
+          isOpen={showNewSessionModal}
+          onClose={() => setShowNewSessionModal(false)}
+          onStartSession={handleStartNewPatient}
+        />
+        
+        <PatientSearchModal 
+          isOpen={showSearchModal}
+          onClose={() => setShowSearchModal(false)}
+          onSelectPatient={handleSelectPatient}
+        />
+        
+        <DataSettingsModal 
+          isOpen={showDataSettings}
+          onClose={() => setShowDataSettings(false)}
+        />
       </main>
     </div>
   );

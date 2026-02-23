@@ -110,3 +110,111 @@ export const getSeverityLabel = (severity: string) => {
     default: return '观察';
   }
 };
+
+export interface VisualAnnotation {
+  type: 'line' | 'point' | 'angle' | 'text';
+  points: { x: number; y: number }[];
+  color?: string;
+  label?: string;
+  dashed?: boolean;
+  dash?: number[];
+  lineWidth?: number;
+}
+
+/**
+ * 绘制后端同步的视觉标注
+ * @param ctx Canvas Context
+ * @param annotations 标注指令数组
+ * @param width Canvas 宽度
+ * @param height Canvas 高度
+ * @param isMirrored 是否镜像
+ */
+export const drawAnnotations = (
+  ctx: CanvasRenderingContext2D,
+  annotations: VisualAnnotation[],
+  width: number,
+  height: number,
+  isMirrored: boolean
+) => {
+  const transform = (p: { x: number; y: number }) => {
+    const x = isMirrored ? (1 - p.x) * width : p.x * width;
+    const y = p.y * height;
+    return { x, y };
+  };
+
+  ctx.save();
+  
+  annotations.forEach((ann) => {
+    const color = ann.color || '#00FF00';
+    const lineWidth = ann.lineWidth || 2;
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = lineWidth;
+    
+    if (ann.dashed) {
+      ctx.setLineDash(ann.dash || [5, 5]);
+    } else {
+      ctx.setLineDash([]);
+    }
+
+    switch (ann.type) {
+      case 'line':
+        if (ann.points.length >= 2) {
+          const p1 = transform(ann.points[0]);
+          const p2 = transform(ann.points[1]);
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+          
+          if (ann.label) {
+            ctx.font = 'bold 14px sans-serif';
+            ctx.fillText(ann.label, (p1.x + p2.x) / 2 + 5, (p1.y + p2.y) / 2 - 5);
+          }
+        }
+        break;
+
+      case 'point':
+        ann.points.forEach((p) => {
+          const tp = transform(p);
+          ctx.beginPath();
+          ctx.arc(tp.x, tp.y, 4, 0, Math.PI * 2);
+          ctx.fill();
+          if (ann.label) {
+            ctx.font = '12px sans-serif';
+            ctx.fillText(ann.label, tp.x + 8, tp.y + 4);
+          }
+        });
+        break;
+
+      case 'angle':
+        if (ann.points.length >= 3) {
+          const p1 = transform(ann.points[0]);
+          const p2 = transform(ann.points[1]); // Vertex
+          const p3 = transform(ann.points[2]);
+          
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.lineTo(p3.x, p3.y);
+          ctx.stroke();
+
+          if (ann.label) {
+            ctx.font = 'bold 16px sans-serif';
+            ctx.fillText(ann.label, p2.x + 10, p2.y - 10);
+          }
+        }
+        break;
+
+      case 'text':
+        if (ann.points.length >= 1) {
+          const tp = transform(ann.points[0]);
+          ctx.font = 'bold 18px sans-serif';
+          ctx.fillText(ann.label || '', tp.x, tp.y);
+        }
+        break;
+    }
+  });
+
+  ctx.restore();
+};

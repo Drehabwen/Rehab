@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Results, POSE_CONNECTIONS } from '@mediapipe/holistic';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
-import { Camera as CameraIcon, CheckCircle, User, RefreshCw, FileDown, AlertTriangle } from 'lucide-react';
+import { Camera as CameraIcon, User, RefreshCw, AlertTriangle } from 'lucide-react';
 import { usePostureWS, VisualAnnotation, PostureIssue, PostureMetrics, Landmark } from '@/hooks/usePostureWS';
 import { useNavigate } from 'react-router-dom';
 import { PostureProcessor } from '@/lib/posture-processor';
@@ -236,7 +236,7 @@ export default function Posture() {
     if (imageSrc) {
         setCapturedImage(imageSrc);
         setLandmarks(currentLandmarks);
-        analyze(view, currentLandmarks, video.videoWidth, video.videoHeight);
+        analyze(view, [currentLandmarks], video.videoWidth, video.videoHeight);
     }
   }, [view, analyze]);
 
