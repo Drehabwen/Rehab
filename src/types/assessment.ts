@@ -1,4 +1,5 @@
 import type { Landmark, PostureIssue, PostureMetrics } from './posture';
+import type { TemporalAnalysis } from '@/lib/posture-processor';
 
 export type AssessmentMode = 'realtime' | 'stepped';
 
@@ -12,7 +13,7 @@ export interface PostureAssessmentData {
   landmarks?: Landmark[];
   confidence: number;
   htmlReport?: string;
-  timeSeries?: any[];
+  timeSeries?: TemporalAnalysis['timeSeries'];
 }
 
 export interface RomAssessmentData {

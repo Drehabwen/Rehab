@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { PostureMetrics, PostureIssue, Landmark } from '@/types/posture';
 import { TemporalAnalysis } from '@/lib/posture-processor';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
@@ -60,7 +60,7 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
     }
   }, []);
 
-  const sendMessage = useCallback((payload: object) => {
+  const sendMessage = useCallback((payload: any) => {
     const message = JSON.stringify(payload);
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(message);

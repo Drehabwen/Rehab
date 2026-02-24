@@ -3,7 +3,7 @@ import { Results } from '@mediapipe/holistic';
 import { usePostureWS } from '@/hooks/usePostureWS';
 import { usePostureAssessmentStore } from '../store/usePostureAssessmentStore';
 import { globalMonitor } from '../services/GlobalMonitor';
-import { usePostureCapture } from './usePostureCapture';
+import { useCaptureStateMachine, CaptureStatus } from './useCaptureStateMachine';
 import { 
   normalizeHeadAxes, 
   smoothHeadAxes, 
@@ -39,34 +39,45 @@ export function usePostureAnalysis({
 
   const [steppedResults, setSteppedResults] = useState<Record<string, { timeSeriesLandmarks: PoseLandmark[][]; width: number; height: number; timestamp: number }>>({});
 
-  // --- Capture Logic (Atomic Hook) ---
+  // Handle Capture Completion
+  const onCapture = useCallback((data: { 
+    timeSeriesLandmarks: PoseLandmark[][]; 
+    width: number; 
+    height: number; 
+    timestamp: number 
+  }) => {
+    if (assessmentMode === 'realtime') {
+      // 实时模式下直接分析全部时序数据
+      analyze(view, data.timeSeriesLandmarks, data.width, data.height);
+    } else {
+      // 分步模式下存入结果
+      setSteppedResults(prev => ({
+        ...prev,
+        [view]: data
+      }));
+    }
+  }, [assessmentMode, analyze, view]);
+
+  // --- Capture Logic (StateMachine) ---
   const {
-    captureStatus,
-    setCaptureStatus,
+    status: captureStatus,
+    dispatch: captureDispatch,
     countdown,
     recordingProgress,
     isInPosition,
-    handleLandmarks
-  } = usePostureCapture({
-    activeTab,
-    isEntryMode,
-    assessmentMode,
-    onCapture: useCallback((data) => {
-      if (assessmentMode === 'realtime') {
-        analyze(view, [data.timeSeriesLandmarks[data.timeSeriesLandmarks.length - 1]], data.width, data.height);
-      } else {
-        setSteppedResults(prev => ({
-          ...prev,
-          [view]: { 
-            timeSeriesLandmarks: data.timeSeriesLandmarks, 
-            width: data.width, 
-            height: data.height, 
-            timestamp: data.timestamp 
-          }
-        }));
-      }
-    }, [assessmentMode, analyze, view])
-  });
+    processLandmarks
+  } = useCaptureStateMachine(onCapture);
+
+  useEffect(() => {
+    // 实时模式：等到后端返回结果后再完成
+    if (wsResult && assessmentMode === 'realtime' && captureStatus === 'analyzing') {
+      captureDispatch({ type: 'ANALYSIS_COMPLETE' });
+    }
+    // 分步模式：录制完成后直接标记为该视角拍摄完成（预览状态）
+    if (assessmentMode === 'stepped' && captureStatus === 'analyzing') {
+      captureDispatch({ type: 'ANALYSIS_COMPLETE' });
+    }
+  }, [wsResult, assessmentMode, captureStatus, captureDispatch]);
 
   // --- Analysis Visualization Logic ---
   const [headAxes, setHeadAxes] = useState<HeadAxes | null>(null);
@@ -101,10 +112,14 @@ export function usePostureAnalysis({
   const onResults = useCallback((results: Results) => {
     if (results.poseLandmarks) {
       const landmarks = results.poseLandmarks as PoseLandmark[];
-      handleLandmarks(landmarks);
+      // 获取当前画面的实际尺寸
+      const width = results.image?.width || 640;
+      const height = results.image?.height || 480;
+      
+      processLandmarks(landmarks, width, height);
       globalMonitor.onFrame(landmarks);
     }
-  }, [handleLandmarks]);
+  }, [processLandmarks]);
 
   return {
     wsResult,
@@ -114,7 +129,29 @@ export function usePostureAnalysis({
     htmlReport,
     onResults,
     captureStatus,
-    setCaptureStatus,
+    setCaptureStatus: (value: React.SetStateAction<CaptureStatus>) => {
+      const status = typeof value === 'function' ? (value as any)(captureStatus) : value;
+      switch (status) {
+        case 'scanning':
+          captureDispatch({ type: 'START_SCAN' });
+          break;
+        case 'recording':
+          captureDispatch({ type: 'START_RECORDING' });
+          break;
+        case 'analyzing':
+          captureDispatch({ type: 'ANALYSIS_START' });
+          break;
+        case 'completed':
+          captureDispatch({ type: 'ANALYSIS_COMPLETE' });
+          break;
+        case 'idle':
+          captureDispatch({ type: 'RESET' });
+          break;
+        default:
+          console.warn(`[usePostureAnalysis] Unknown status transition: ${status}`);
+      }
+    },
+    captureDispatch,
     countdown,
     recordingProgress,
     isInPosition,
@@ -122,6 +159,27 @@ export function usePostureAnalysis({
     setSteppedResults,
     headAxes,
     annotations: wsResult?.annotations || [],
-    timeSeriesData
+    timeSeriesData,
+    simulateMockCapture: () => {
+      console.log('[Mock] Starting simulation...');
+      const mockFrames: PoseLandmark[][] = [];
+      for (let f = 0; f < 60; f++) {
+        const t = f / 30;
+        const landmarks: PoseLandmark[] = Array.from({ length: 33 }, (_, i) => ({
+          x: 0.5 + (i === 11 || i === 12 ? 0.02 * Math.sin(Math.PI * t) : 0),
+          y: 0.5 + (i * 0.01),
+          z: 0,
+          visibility: 0.95
+        }));
+        mockFrames.push(landmarks);
+      }
+      
+      onCapture({
+        timeSeriesLandmarks: mockFrames,
+        width: 640,
+        height: 480,
+        timestamp: Date.now()
+      });
+    }
   };
 }

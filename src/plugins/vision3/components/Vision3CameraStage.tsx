@@ -55,6 +55,7 @@ interface Vision3CameraStageProps {
   resetMeasurement: () => void;
   setIsCameraOn: (enabled: boolean) => void;
   setView: (view: ViewType) => void;
+  simulateMockCapture?: () => void;
 }
 
 export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
@@ -88,7 +89,8 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
   stopMeasurement,
   resetMeasurement,
   setIsCameraOn,
-  setView
+  setView,
+  simulateMockCapture
 }) => {
   return (
     <div ref={videoContainerRef} className={cn(
@@ -172,6 +174,18 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
               {activeTab === 'posture' ? 'Posture AI Core' : 'Joint ROM Engine'} v3.2
             </span>
           </div>
+          {simulateMockCapture && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                simulateMockCapture();
+              }}
+              className="ml-2 px-3 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-500 text-[10px] font-black rounded-lg border border-amber-500/30 transition-all uppercase"
+              title="模拟测试数据"
+            >
+              Mock
+            </button>
+          )}
         </div>
       </div>
 

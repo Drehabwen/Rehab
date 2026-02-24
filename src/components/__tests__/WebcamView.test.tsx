@@ -46,7 +46,10 @@ describe('WebcamView', () => {
       analyzeBatch: vi.fn(),
       analyzeStepped: vi.fn(),
       jointResult: null,
-      htmlReport: null
+      htmlReport: null,
+      timeSeriesData: null,
+      connect: vi.fn(),
+      disconnect: vi.fn()
     });
 
     mockedUseCameraStream.mockReturnValue({

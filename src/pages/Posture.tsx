@@ -15,8 +15,6 @@ import { BOX, checkUserPosition } from './posture/utils';
 import { AnalysisOverlay } from './posture/AnalysisOverlay';
 import { PostureResultPanel } from './posture/PostureResultPanel';
 import { PosturePDFTemplate } from './posture/PosturePDFTemplate';
-import { useTimeSeriesCollector } from '@/plugins/vision3/hooks/useTimeSeriesCollector';
-import { PoseLandmark } from '@/plugins/vision3/vision3-utils';
 
 type PostureResult = { issues: PostureIssue[]; metrics: PostureMetrics; image: string };
 
@@ -58,21 +56,6 @@ export default function Posture() {
 
   // We need to keep track of latest landmarks for snapshot
   const landmarksBufferRef = useRef<Landmark[][]>([]);
-
-  // --- Exploration V2: Headless Collector Integration ---
-  const [isCollectingV2, setIsCollectingV2] = useState(false);
-  const { collectFrame, progress: collectionProgress } = useTimeSeriesCollector({
-    view,
-    isCollecting: isCollectingV2,
-    onCollectionComplete: (data) => {
-      console.log("🔥 [Exploration V2] Collection Complete!", data);
-      alert(`采集完成！\n视角: ${data.view}\n帧数: ${data.timeSeriesLandmarks.length}\n耗时: ~${data.timeSeriesLandmarks.length/30}s`);
-      setIsCollectingV2(false);
-      // Optional: Send to backend for analysis (Mock for now)
-      // analyzeStepped([data]); 
-    }
-  });
-  // ------------------------------------------------------
 
   const drawResultCanvas = useCallback((
     imageSrc: string, 
@@ -266,29 +249,6 @@ export default function Posture() {
     if (results.poseLandmarks) {
       const poseLandmarks = results.poseLandmarks as Landmark[];
 
-      const image = results.image;
-      const width = image instanceof HTMLVideoElement
-        ? image.videoWidth
-        : image instanceof HTMLImageElement
-          ? image.naturalWidth
-          : image instanceof HTMLCanvasElement
-            ? image.width
-            : 640;
-      const height = image instanceof HTMLVideoElement
-        ? image.videoHeight
-        : image instanceof HTMLImageElement
-          ? image.naturalHeight
-          : image instanceof HTMLCanvasElement
-            ? image.height
-            : 480;
-      const normalizedLandmarks: PoseLandmark[] = poseLandmarks.map((landmark) => ({
-        x: landmark.x,
-        y: landmark.y,
-        z: landmark.z ?? 0,
-        visibility: landmark.visibility
-      }));
-      collectFrame(normalizedLandmarks, width, height);
-
       const status = captureStatusRef.current;
 
       // 1. 根据状态管理缓冲区
@@ -355,7 +315,7 @@ export default function Posture() {
         }
       }
     }
-  }, [isInPosition, analyzeBatch, view, collectFrame]);
+  }, [isInPosition, analyzeBatch, view]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -439,19 +399,6 @@ export default function Posture() {
           <div className="flex items-center gap-4">
             <p className="text-slate-500 text-lg">AI 智能分析您的站姿与脊柱健康</p>
             
-            {/* --- Exploration V2: Debug Button (Moved here) --- */}
-            <button
-              onClick={() => setIsCollectingV2(prev => !prev)}
-              className={cn(
-                "px-3 py-1 rounded-full text-xs font-bold shadow-sm transition-all border border-gray-200",
-                isCollectingV2 
-                  ? "bg-red-500 text-white animate-pulse border-red-600" 
-                  : "bg-white text-gray-500 hover:bg-gray-100 hover:text-gray-900"
-              )}
-            >
-              {isCollectingV2 ? `Collecting... ${Math.round(collectionProgress)}%` : "🧪 Start V2 Capture"}
-            </button>
-            {/* ------------------------------------------------ */}
           </div>
         </div>
         

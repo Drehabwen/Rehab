@@ -33,13 +33,17 @@ export const usePostureCapture = ({
   const landmarksBufferRef = useRef<PoseLandmark[][]>([]);
   const recordingBufferRef = useRef<PoseLandmark[][]>([]);
   const recordingStartTimeRef = useRef<number>(0);
+  const scanningStartRef = useRef<number | null>(null);
 
   // 1. 位置检测逻辑
   const checkUserPosition = useCallback((landmarks: PoseLandmark[]) => {
     if (!landmarks || landmarks.length < 33) return false;
     const keyPointsIndices = [0, 11, 12, 23, 24]; // Nose, Shoulders, Hips
-    const visible = keyPointsIndices.every(idx => (landmarks[idx].visibility ?? 0) > 0.5);
-    return visible;
+    const visibleCount = keyPointsIndices.reduce((count, idx) => {
+      const visibility = landmarks[idx].visibility ?? 1;
+      return visibility > 0.3 ? count + 1 : count;
+    }, 0);
+    return visibleCount >= 3;
   }, []);
 
   // 2. 外部调用的关键点处理函数
@@ -79,6 +83,13 @@ export const usePostureCapture = ({
         if (inPos && captureStatus === 'scanning') {
           setCaptureStatus('countdown');
         }
+        if (!inPos && captureStatus === 'scanning' && scanningStartRef.current) {
+          const elapsed = Date.now() - scanningStartRef.current;
+          if (elapsed > 1500) {
+            setIsInPosition(true);
+            setCaptureStatus('countdown');
+          }
+        }
       }
     }
   }, [activeTab, isEntryMode, captureStatus, checkUserPosition, assessmentMode, onCapture]);
@@ -89,6 +100,14 @@ export const usePostureCapture = ({
       setRecordingProgress(0);
       recordingStartTimeRef.current = Date.now();
       recordingBufferRef.current = [];
+    }
+  }, [captureStatus]);
+
+  useEffect(() => {
+    if (captureStatus === 'scanning') {
+      scanningStartRef.current = Date.now();
+    } else {
+      scanningStartRef.current = null;
     }
   }, [captureStatus]);
 

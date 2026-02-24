@@ -3,6 +3,7 @@ import { PostureMetrics, PostureIssue } from '@/hooks/usePostureWS';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
+import type { TemporalAnalysis } from '@/lib/posture-processor';
 import { AssessmentMode } from '../components/Vision3CameraStage';
 
 interface UseVision3AutoSaveProps {
@@ -11,7 +12,7 @@ interface UseVision3AutoSaveProps {
   assessmentMode: AssessmentMode;
   view: 'front' | 'side' | 'back';
   htmlReport?: string | null;
-  timeSeriesData?: any[] | null;
+  timeSeriesData?: TemporalAnalysis['timeSeries'] | null;
 }
 
 export const useVision3AutoSave = ({

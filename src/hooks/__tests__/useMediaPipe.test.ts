@@ -25,6 +25,10 @@ describe('useMediaPipe', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    // Clear global singleton state
+    if (typeof window !== 'undefined') {
+      delete (window as any)['__NEXUS_HOLISTIC_SINGLETON__'];
+    }
     // Mock requestAnimationFrame to prevent recursion issues in tests
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
       setTimeout(() => cb(Date.now()), 16);
