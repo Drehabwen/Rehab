@@ -20,14 +20,14 @@ export const AssessmentOverlay: React.FC = () => {
   const stabilityCircleProps = useMemo(() => {
     const radius = 58;
     const circumference = 2 * Math.PI * radius;
-    const offset = circumference * (1 - stabilityProgress / 100);
+    const offset = circumference * (1 - (stabilityProgress || 0) / 100);
     return { circumference, offset };
   }, [stabilityProgress]);
 
   if (step === 'idle') return null;
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center pointer-events-none p-12">
+    <div className="absolute inset-0 z-40 flex flex-col items-center pointer-events-none p-12">
       {/* 1. Top Progress Indicator (Only for Split Mode) */}
       {(['prep_upper', 'capturing_upper', 'prep_lower', 'capturing_lower', 'stitching'].includes(step)) && (
         <div className="flex items-center gap-4 bg-white/40 backdrop-blur-3xl px-8 py-4 rounded-[2.5rem] border border-white/60 shadow-xl animate-in slide-in-from-top-8 duration-1000">

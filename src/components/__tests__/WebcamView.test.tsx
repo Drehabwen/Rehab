@@ -46,7 +46,7 @@ describe('WebcamView', () => {
       analyzeBatch: vi.fn(),
       analyzeStepped: vi.fn(),
       jointResult: null,
-      htmlReport: null,
+      markdownReport: null,
       timeSeriesData: null,
       connect: vi.fn(),
       disconnect: vi.fn()

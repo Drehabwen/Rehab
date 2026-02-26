@@ -14,6 +14,7 @@ import {
   FileJson,
   FileSpreadsheet
 } from 'lucide-react';
+import { MarkdownReport } from '@/components/shared/MarkdownReport';
 import { cn } from '@/lib/utils';
 import { PostureReport } from '@/store/useMeasurementStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
@@ -36,7 +37,7 @@ export const NexusReportCenter: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [selectedReportHtml, setSelectedReportHtml] = useState<string | null>(null);
+  const [selectedReportMarkdown, setSelectedReportMarkdown] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<PostureReport | null>(null);
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -55,7 +56,7 @@ export const NexusReportCenter: React.FC = () => {
   }, [selectedPatientId, loadAssessmentsByPatient]);
 
   useEffect(() => {
-    if (selectedReportHtml && reportContainerRef.current && selectedReport) {
+    if (selectedReportMarkdown && reportContainerRef.current && selectedReport) {
       const scripts = reportContainerRef.current.getElementsByTagName('script');
       Array.from(scripts).forEach(oldScript => {
         const newScript = document.createElement('script');
@@ -99,7 +100,7 @@ export const NexusReportCenter: React.FC = () => {
     } else {
       setChartPortals([]);
     }
-  }, [selectedReportHtml, selectedReport]);
+  }, [selectedReportMarkdown, selectedReport]);
 
   const filteredPatients = patients.filter(p => 
     p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -408,19 +409,20 @@ export const NexusReportCenter: React.FC = () => {
             </div>
             
             <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-3">
-              {selectedAssessment.data.posture?.htmlReport && (
+              {selectedAssessment.data.posture?.markdownReport && (
                 <button
                   onClick={() => {
                     const postureData = selectedAssessment.data.posture;
-                    if (postureData && postureData.htmlReport) {
-                      setSelectedReportHtml(postureData.htmlReport);
+                    if (postureData && postureData.markdownReport) {
+                      setSelectedReportMarkdown(postureData.markdownReport);
                       
                       // Construct PostureReport object for charts
                       const report: PostureReport = {
                         id: selectedAssessment.id,
                         date: selectedAssessment.createdAt,
                         view: postureData.view || 'unknown',
-                        html: postureData.htmlReport,
+                        html: '', // Legacy support
+                        markdown: postureData.markdownReport,
                         timeSeries: postureData.timeSeries
                       };
                       setSelectedReport(report);
@@ -451,9 +453,9 @@ export const NexusReportCenter: React.FC = () => {
         </div>
       )}
 
-      {selectedReportHtml && (
+      {selectedReportMarkdown && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-8 animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setSelectedReportHtml(null); setSelectedReport(null); setIsFullscreen(false); }} />
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setSelectedReportMarkdown(null); setSelectedReport(null); setIsFullscreen(false); }} />
           <div className={cn(
             "relative bg-white shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ease-in-out",
             isFullscreen 
@@ -479,14 +481,16 @@ export const NexusReportCenter: React.FC = () => {
                   <ArrowUpRight size={20} className={isFullscreen ? "rotate-180" : ""} />
                 </button>
                 <button 
-                  onClick={() => { setSelectedReportHtml(null); setSelectedReport(null); setIsFullscreen(false); }}
+                  onClick={() => { setSelectedReportMarkdown(null); setSelectedReport(null); setIsFullscreen(false); }}
                   className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"
                 >
                   <ChevronDown size={20} className="rotate-180" />
                 </button>
               </div>
             </div>
-            <div ref={reportContainerRef} className="flex-1 overflow-y-auto p-8" dangerouslySetInnerHTML={{ __html: selectedReportHtml }} />
+            <div ref={reportContainerRef} className="flex-1 overflow-y-auto p-0 bg-slate-900">
+              <MarkdownReport content={selectedReportMarkdown} animate={false} className="border-none rounded-none h-full" />
+            </div>
             {chartPortals}
           </div>
         </div>

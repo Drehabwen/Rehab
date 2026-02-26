@@ -69,7 +69,7 @@ describe('usePostureAnalysis', () => {
       analyze: mockAnalyze,
       analyzeBatch: mockAnalyzeBatch,
       analyzeStepped: mockAnalyzeStepped,
-      htmlReport: null
+      markdownReport: null
     });
 
     mockUsePostureCapture.mockReturnValue({
@@ -167,7 +167,7 @@ describe('usePostureAnalysis', () => {
       analyze: mockAnalyze,
       analyzeBatch: mockAnalyzeBatch,
       analyzeStepped: mockAnalyzeStepped,
-      htmlReport: null
+      markdownReport: null
     });
 
     const { result } = renderHook(() => usePostureAnalysis({
@@ -243,7 +243,7 @@ describe('usePostureAnalysis', () => {
       analyze: mockAnalyze,
       analyzeBatch: mockAnalyzeBatch,
       analyzeStepped: mockAnalyzeStepped,
-      htmlReport: '<html>Report</html>'
+      markdownReport: '### Report'
     });
 
     rerender();
@@ -296,7 +296,7 @@ describe('usePostureAnalysis', () => {
       analyze: mockAnalyze,
       analyzeBatch: mockAnalyzeBatch,
       analyzeStepped: mockAnalyzeStepped,
-      htmlReport: null
+      markdownReport: null
     });
 
     rerender();
@@ -310,7 +310,7 @@ describe('usePostureAnalysis', () => {
       analyze: mockAnalyze,
       analyzeBatch: mockAnalyzeBatch,
       analyzeStepped: mockAnalyzeStepped,
-      htmlReport: null
+      markdownReport: null
     });
 
     rerender();
@@ -374,7 +374,7 @@ describe('usePostureAnalysis', () => {
       analyze: mockAnalyze,
       analyzeBatch: mockAnalyzeBatch,
       analyzeStepped: mockAnalyzeStepped,
-      htmlReport: null
+      markdownReport: null
     });
 
     const { result } = renderHook(() => usePostureAnalysis({

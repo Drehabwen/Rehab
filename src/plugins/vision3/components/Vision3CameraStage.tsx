@@ -117,24 +117,26 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       {(captureStatus === 'analyzing' || step === 'completed' || assessmentMode === 'realtime') ? (
         <AssessmentOverlay />
       ) : (
-        <SteppedAssessmentOverlay 
-          view={view}
-          captureStatus={captureStatus}
-          countdown={countdown}
-          recordingProgress={recordingProgress}
-          isInPosition={isInPosition}
-          steppedResults={steppedResults}
-          onStartCapture={handleStartCapture}
-          onNextView={handleNextView}
-          onRetake={() => {
-            const newResults = { ...steppedResults };
-            delete newResults[view];
-            setSteppedResults(newResults);
-            setCaptureStatus('idle');
-          }}
-          onFinish={handleFinishStepped}
-          onReset={handleResetToEntry}
-        />
+        <div className="absolute inset-0 z-40 pointer-events-none">
+          <SteppedAssessmentOverlay 
+            view={view}
+            captureStatus={captureStatus}
+            countdown={countdown}
+            recordingProgress={recordingProgress}
+            isInPosition={isInPosition}
+            steppedResults={steppedResults}
+            onStartCapture={handleStartCapture}
+            onNextView={handleNextView}
+            onRetake={() => {
+              const newResults = { ...steppedResults };
+              delete newResults[view];
+              setSteppedResults(newResults);
+              setCaptureStatus('idle');
+            }}
+            onFinish={handleFinishStepped}
+            onReset={handleResetToEntry}
+          />
+        </div>
       )}
 
       {/* Fullscreen Toggle Button */}

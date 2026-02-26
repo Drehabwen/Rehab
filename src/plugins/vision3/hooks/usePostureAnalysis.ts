@@ -33,7 +33,7 @@ export function usePostureAnalysis({
     analyze, 
     analyzeBatch, 
     analyzeStepped,
-    htmlReport,
+    markdownReport,
     timeSeriesData
   } = usePostureWS();
 
@@ -106,8 +106,8 @@ export function usePostureAnalysis({
   }, [analyzeBatch]);
 
   useEffect(() => {
-    if (htmlReport) setStep('completed');
-  }, [htmlReport, setStep]);
+    if (wsResult) setStep('completed');
+  }, [wsResult, setStep]);
 
   const onResults = useCallback((results: Results) => {
     if (results.poseLandmarks) {
@@ -126,7 +126,7 @@ export function usePostureAnalysis({
     analyze,
     analyzeBatch,
     analyzeStepped,
-    htmlReport,
+    markdownReport,
     onResults,
     captureStatus,
     setCaptureStatus: (value: React.SetStateAction<CaptureStatus>) => {

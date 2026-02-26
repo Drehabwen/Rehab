@@ -43,7 +43,7 @@ export interface SteppedFrame {
 export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
-  const [htmlReport, setHtmlReport] = useState<string | null>(null);
+  const [markdownReport, setMarkdownReport] = useState<string | null>(null);
   const [timeSeriesData, setTimeSeriesData] = useState<TemporalAnalysis['timeSeries'] | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const ws = useRef<WebSocket | null>(null);
@@ -88,12 +88,12 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
             setResult(data);
           } else if (data.type === 'JOINT_RESULT') {
             setJointResult(data);
-          } else if (data.type === 'HTML_REPORT') {
-            setHtmlReport(data.html);
+          } else if (data.type === 'POSTURE_REPORT') {
+            setMarkdownReport(data.markdown);
             // Use timeSeries from backend response if available (stepped analysis), otherwise fall back to local ref (batch analysis)
             const timeSeries = data.timeSeries || lastBatchTimeSeriesRef.current;
             setTimeSeriesData(timeSeries);
-            savePostureReport(currentViewRef.current, data.html, timeSeries);
+            savePostureReport(currentViewRef.current, '', data.markdown, timeSeries);
           }
         } catch (e) {
           console.error('Failed to parse analysis result:', e);
@@ -138,7 +138,7 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
   }, [connect]);
 
   const analyze = useCallback((view: 'front' | 'side' | 'back', timeSeriesLandmarks: Landmark[][], width: number, height: number) => {
-    setHtmlReport(null);
+    setMarkdownReport(null);
     setResult(null);
     currentViewRef.current = view;
     sendMessage({
@@ -168,7 +168,7 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
   }, [sendMessage]);
 
   const analyzeBatch = useCallback((analysis: TemporalAnalysis) => {
-    setHtmlReport(null);
+    setMarkdownReport(null);
     setResult(null);
     currentViewRef.current = analysis.view;
     lastBatchTimeSeriesRef.current = analysis.timeSeries;
@@ -179,7 +179,7 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
   }, [sendMessage]);
 
   const analyzeStepped = useCallback((frames: SteppedFrame[]) => {
-    setHtmlReport(null);
+    setMarkdownReport(null);
     setResult(null);
     if (frames.length) {
       currentViewRef.current = frames[0].view;
@@ -193,7 +193,7 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
   return {
     result,
     jointResult,
-    htmlReport,
+    markdownReport,
     timeSeriesData,
     status,
     analyze,

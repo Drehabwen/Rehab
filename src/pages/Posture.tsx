@@ -41,7 +41,7 @@ export default function Posture() {
   const reportCanvasRef = useRef<HTMLCanvasElement>(null);
   
   // WebSocket for posture analysis
-  const { result: wsResult, htmlReport, analyze, analyzeBatch } = usePostureWS();
+  const { result: wsResult, markdownReport, analyze, analyzeBatch } = usePostureWS();
 
   // Auto-capture states
   const [captureStatus, setCaptureStatus] = useState<'idle' | 'scanning' | 'countdown' | 'recording' | 'analyzing' | 'completed'>('idle');
@@ -171,7 +171,7 @@ export default function Posture() {
   }, [wsResult, capturedImage, landmarks, drawResultCanvas, captureStatus]);
 
   useEffect(() => {
-    if (htmlReport) {
+    if (markdownReport) {
       setCaptureStatus('completed');
       
       // 延迟显示跳转提示，让用户看到“完成”状态
@@ -182,7 +182,7 @@ export default function Posture() {
         setCaptureStatus('idle');
       }, 1500);
     }
-  }, [htmlReport, navigate]);
+  }, [markdownReport, navigate]);
 
   const handleCapture = useCallback((video: HTMLVideoElement) => {
     if (landmarksBufferRef.current.length === 0) return;

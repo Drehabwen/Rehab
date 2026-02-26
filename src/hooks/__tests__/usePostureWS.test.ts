@@ -49,7 +49,7 @@ describe('usePostureWS', () => {
       expect(result.current.status).toBe('disconnected');
       expect(result.current.result).toBeNull();
       expect(result.current.jointResult).toBeNull();
-      expect(result.current.htmlReport).toBeNull();
+      expect(result.current.markdownReport).toBeNull();
     });
 
     it('should connect to WebSocket on mount', () => {
@@ -176,7 +176,7 @@ describe('usePostureWS', () => {
       expect(result.current.jointResult).toEqual(mockResponse.results);
     });
 
-    it('should handle POSTURE_BATCH_ANALYSIS response', () => {
+    it('should handle POSTURE_REPORT response', () => {
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
       const messageCallback = mockWebSocket.addEventListener.mock.calls.find(
@@ -184,8 +184,8 @@ describe('usePostureWS', () => {
       )?.[1];
 
       const mockResponse = {
-        type: 'POSTURE_BATCH_ANALYSIS',
-        html: '<div class="report">Test Report</div>',
+        type: 'POSTURE_REPORT',
+        markdown: '### Test Report',
         reportId: 'test-report-123'
       };
 
@@ -193,27 +193,7 @@ describe('usePostureWS', () => {
         if (messageCallback) messageCallback({ data: JSON.stringify(mockResponse) });
       });
 
-      expect(result.current.htmlReport).toBe('<div class="report">Test Report</div>');
-    });
-
-    it('should handle POSTURE_STEPPED_ANALYSIS response', () => {
-      const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
-
-      const messageCallback = mockWebSocket.addEventListener.mock.calls.find(
-        (call: any[]) => call[0] === 'message'
-      )?.[1];
-
-      const mockResponse = {
-        type: 'POSTURE_STEPPED_ANALYSIS',
-        html: '<div class="stepped-report">Stepped Report</div>',
-        reportId: 'stepped-report-456'
-      };
-
-      act(() => {
-        if (messageCallback) messageCallback({ data: JSON.stringify(mockResponse) });
-      });
-
-      expect(result.current.htmlReport).toBe('<div class="stepped-report">Stepped Report</div>');
+      expect(result.current.markdownReport).toBe('### Test Report');
     });
 
     it('should handle unknown message types', () => {
@@ -234,7 +214,7 @@ describe('usePostureWS', () => {
 
       expect(result.current.result).toBeNull();
       expect(result.current.jointResult).toBeNull();
-      expect(result.current.htmlReport).toBeNull();
+      expect(result.current.markdownReport).toBeNull();
     });
 
     it('should handle invalid JSON messages', () => {

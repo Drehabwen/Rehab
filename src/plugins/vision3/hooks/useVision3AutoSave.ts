@@ -11,7 +11,8 @@ interface UseVision3AutoSaveProps {
   wsResult: { metrics: PostureMetrics; issues: PostureIssue[] } | null;
   assessmentMode: AssessmentMode;
   view: 'front' | 'side' | 'back';
-  htmlReport?: string | null;
+  markdownReport?: string | null;
+  auxiliaryReport?: string | null;
   timeSeriesData?: TemporalAnalysis['timeSeries'] | null;
 }
 
@@ -20,7 +21,8 @@ export const useVision3AutoSave = ({
   wsResult,
   assessmentMode,
   view,
-  htmlReport,
+  markdownReport,
+  auxiliaryReport,
   timeSeriesData
 }: UseVision3AutoSaveProps) => {
   const hasSavedRef = useRef(false);
@@ -30,8 +32,8 @@ export const useVision3AutoSave = ({
 
   useEffect(() => {
     const saveAssessment = async () => {
-      // Save if completed AND we have either WS results OR an HTML report
-      if (step === 'completed' && (wsResult || htmlReport) && !hasSavedRef.current) {
+      // Save if completed AND we have either WS results OR a markdown report
+      if (step === 'completed' && (wsResult || markdownReport || auxiliaryReport) && !hasSavedRef.current) {
         hasSavedRef.current = true;
         
         try {
@@ -71,13 +73,13 @@ export const useVision3AutoSave = ({
                 metrics: wsResult?.metrics,
                 issues: wsResult?.issues,
                 confidence: 0.85,
-                htmlReport: htmlReport || undefined,
+                markdownReport: markdownReport || auxiliaryReport || undefined,
                 timeSeries: timeSeriesData || undefined
               }
             }
           });
           
-          console.log('Assessment saved successfully', { hasWsResult: !!wsResult, hasHtmlReport: !!htmlReport });
+          console.log('Assessment saved successfully', { hasWsResult: !!wsResult, hasMarkdownReport: !!markdownReport });
         } catch (error) {
           console.error('Failed to save assessment:', error);
         }
@@ -85,7 +87,7 @@ export const useVision3AutoSave = ({
     };
     
     saveAssessment();
-  }, [step, wsResult, htmlReport, timeSeriesData, currentPatient, patients, sessions, startSession, addAssessment, assessmentMode, view]);
+  }, [step, wsResult, markdownReport, auxiliaryReport, timeSeriesData, currentPatient, patients, sessions, startSession, addAssessment, assessmentMode, view]);
 
   useEffect(() => {
     if (step !== 'completed') {

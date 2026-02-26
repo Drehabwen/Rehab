@@ -54,8 +54,13 @@ async def simulate_posture_sync():
             result = json.loads(response)
             print("\nReceived Response:")
             print(f"Type: {result.get('type')}")
-            print(f"Metrics: {json.dumps(result.get('metrics'), indent=2)}")
-            print(f"Issues found: {len(result.get('issues', []))}")
+            
+            if result.get('type') == 'POSTURE_REPORT':
+                print("[SUCCESS] Received Markdown Report!")
+                print(f"Markdown Content Preview:\n{result.get('markdown', '')[:200]}...")
+            else:
+                print(f"Metrics: {json.dumps(result.get('metrics'), indent=2)}")
+                print(f"Issues found: {len(result.get('issues', []))}")
             
     except Exception as e:
         print(f"Error: {e}")
@@ -108,17 +113,17 @@ async def simulate_stepped_analysis():
             print(f"Sending POSTURE_STEPPED_ANALYSIS with {len(views)} views...")
             await websocket.send(json.dumps(payload))
             
-            # Wait for HTML_REPORT response
+            # Wait for POSTURE_REPORT response
             while True:
                 response = await websocket.recv()
                 result = json.loads(response)
                 print(f"Received message type: {result.get('type')}")
                 
-                if result.get('type') == 'HTML_REPORT':
-                    print("\n[SUCCESS] Received HTML Report!")
+                if result.get('type') == 'POSTURE_REPORT':
+                    print("\n[SUCCESS] Received Markdown Report!")
                     print(f"Report ID: {result.get('reportId')}")
-                    print(f"HTML Content Length: {len(result.get('html', ''))}")
-                    print(f"Preview (first 100 chars): {result.get('html', '')[:100]}...")
+                    print(f"Markdown Content Length: {len(result.get('markdown', ''))}")
+                    print(f"Preview (first 100 chars):\n{result.get('markdown', '')[:100]}...")
                     break
                 elif result.get('type') == 'ERROR':
                     print(f"[ERROR] {result.get('message')}")

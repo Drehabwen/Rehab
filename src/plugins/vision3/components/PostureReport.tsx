@@ -6,16 +6,17 @@ import {
   CheckCircle,
   BrainCircuit
 } from 'lucide-react';
+import { MarkdownReport } from '@/components/shared/MarkdownReport';
 
 interface PostureReportProps {
-  htmlReport?: string;
+  markdownReport?: string;
   onReset: () => void;
 }
 
-export const PostureReport: React.FC<PostureReportProps> = ({ htmlReport, onReset }) => {
+export const PostureReport: React.FC<PostureReportProps> = ({ markdownReport, onReset }) => {
   return (
     <div className="flex-1 flex flex-col min-h-0 animate-in fade-in slide-in-from-right-4 duration-700">
-      {!htmlReport ? (
+      {!markdownReport ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50/50 rounded-[3rem] border border-dashed border-slate-200">
           <div className="w-20 h-20 rounded-3xl bg-antey-primary/10 flex items-center justify-center mb-6 animate-pulse">
             <BrainCircuit className="text-antey-primary" size={40} />
@@ -53,20 +54,8 @@ export const PostureReport: React.FC<PostureReportProps> = ({ htmlReport, onRese
             </div>
           </div>
 
-          {/* Report Content - Scrollable Glass Container */}
           <div className="flex-1 bg-slate-50/80 rounded-[2.5rem] border border-slate-200/60 overflow-hidden flex flex-col">
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              <article 
-                className="prose prose-slate prose-sm max-w-none 
-                  prose-headings:font-black prose-headings:tracking-tight prose-headings:text-slate-900
-                  prose-p:text-slate-600 prose-p:leading-relaxed prose-p:font-medium
-                  prose-strong:text-slate-900 prose-strong:font-black
-                  prose-ul:list-disc prose-ul:pl-4
-                  [&>h1]:text-xl [&>h2]:text-lg [&>h3]:text-base
-                  [&>p]:mb-4"
-                dangerouslySetInnerHTML={{ __html: htmlReport }} 
-              />
-            </div>
+            <MarkdownReport content={markdownReport} animate={true} className="border-none rounded-none h-full bg-transparent" />
           </div>
 
           {/* Actions */}

@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from models import (
     AnalysisRequest, AnalysisResponse, PostureMetrics, 
     JointAnalysisRequest, JointAnalysisResponse,
-    TemporalAnalysisRequest, HTMLReportResponse,
+    TemporalAnalysisRequest, PostureReportResponse,
     SteppedAnalysisRequest, Landmark
 )
 from utils.posture_analysis import analyze_posture
@@ -261,16 +261,16 @@ async def websocket_endpoint(websocket: WebSocket):
                     request = TemporalAnalysisRequest(**message)
                     print(f"Received batch analysis for view: {request.view}")
                     
-                    # Generate HTML report using LLM
-                    html_content = await run_in_threadpool(generate_posture_report, request.model_dump())
+                    # Generate Markdown report using LLM
+                    markdown_content = await run_in_threadpool(generate_posture_report, request.model_dump())
                     
                     # Construct response
-                    report_response = HTMLReportResponse(
-                        html=html_content,
+                    report_response = PostureReportResponse(
+                        markdown=markdown_content,
                         reportId=str(uuid.uuid4())
                     )
                     
-                    # Send back the HTML report
+                    # Send back the Markdown report
                     await websocket.send_text(report_response.model_dump_json())
                 except Exception as e:
                     print(f"Error processing POSTURE_BATCH_ANALYSIS: {e}")
@@ -281,32 +281,33 @@ async def websocket_endpoint(websocket: WebSocket):
                     frames = request.frames
                     
                     if request.mock:
-                        html_content = "<div class='p-8 text-center text-slate-400'>[MOCK] AI Report Generated</div>"
+                        markdown_content = "### [MOCK] AI Posture Report\n\n- **Stability**: Excellent\n- **Posture**: Normal\n\nThis is a mock report for testing."
                         print("Generated MOCK report", flush=True)
                     elif len(frames) == 0:
-                        html_content = "<div class='p-8 text-center text-slate-400'>未采集到任何视角数据，请重新采集。</div>"
+                        markdown_content = "> **⚠️ 警告**：未采集到任何视角数据，请重新采集。"
                     else:
                         print(f"Received stepped analysis for {len(frames)} views")
-                        # Use the new llm_reporter which handles multi-view Agent logic
-                        html_content = await run_in_threadpool(generate_posture_report, {"frames": [f.model_dump() for f in frames]})
+                        markdown_content = await run_in_threadpool(generate_posture_report, {"frames": [f.model_dump() for f in frames]})
                     
-                    # Build time series for charts (if we have frames)
                     time_series = []
                     if frames and len(frames) > 0:
                         try:
                             time_series = build_time_series(frames)
                         except Exception as e:
                             print(f"Error building time series: {e}", flush=True)
-
-                    # Construct response
-                    report_response = HTMLReportResponse(
-                        html=html_content,
+                    
+                    report_response = PostureReportResponse(
+                        markdown=markdown_content,
                         reportId=str(uuid.uuid4()),
                         timeSeries=time_series
                     )
                     
-                    # Send back the HTML report
+                    print(f"--- SENDING POSTURE_REPORT ---", flush=True)
+                    print(f"Markdown length: {len(markdown_content)}", flush=True)
+                    print(f"Content snippet: {markdown_content[:100]}...", flush=True)
+                    
                     await websocket.send_text(report_response.model_dump_json())
+                    print("POSTURE_REPORT sent successfully", flush=True)
                 except Exception as e:
                     print(f"Error processing POSTURE_STEPPED_ANALYSIS: {e}")
                     import traceback

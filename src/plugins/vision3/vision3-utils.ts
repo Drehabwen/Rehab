@@ -1,4 +1,5 @@
 import { Results } from '@mediapipe/holistic';
+import { PostureMetrics } from '@/types/posture';
 
 export const jointNameMap: Record<string, string> = {
   cervical: '颈椎',
@@ -109,6 +110,37 @@ export const getSeverityLabel = (severity: string) => {
     case 'mild': return '轻微';
     default: return '观察';
   }
+};
+
+export const generateAuxiliaryReport = (metrics: PostureMetrics): string => {
+  const sections: string[] = [];
+  
+  sections.push('# 辅助诊断初步结论');
+  sections.push('> **提示**：本结论由系统规则引擎自动计算生成，仅供参考。');
+  
+  sections.push('## 关键指标分析');
+  
+  if (metrics.headForward !== undefined) {
+    const status = getHeadStatus(metrics.headForward);
+    sections.push(`- **头部前倾**：${metrics.headForward.toFixed(1)}° (${status.text})`);
+  }
+  
+  if (metrics.shoulderAngle !== undefined) {
+    const status = getShoulderStatus(metrics.shoulderAngle);
+    sections.push(`- **高低肩**：${Math.abs(metrics.shoulderAngle).toFixed(1)}° (${status.text})`);
+  }
+  
+  if (metrics.hipAngle !== undefined) {
+    const status = getHipStatus(metrics.hipAngle);
+    sections.push(`- **骨盆倾斜**：${Math.abs(metrics.hipAngle).toFixed(1)}° (${status.text})`);
+  }
+
+  sections.push('\n## 建议');
+  sections.push('根据初步计算结果，您可以：');
+  sections.push('1. 点击下方 **“深度分析”** 按钮，获取 AI 专家的详细生物力学推导。');
+  sections.push('2. 针对上述异常项，咨询康复科医生进行进一步核实。');
+
+  return sections.join('\n');
 };
 
 export interface VisualAnnotation {

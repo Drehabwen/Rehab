@@ -12,7 +12,7 @@ export interface PostureAssessmentData {
   issues?: PostureIssue[];
   landmarks?: Landmark[];
   confidence: number;
-  htmlReport?: string;
+  markdownReport?: string;
   timeSeries?: TemporalAnalysis['timeSeries'];
 }
 

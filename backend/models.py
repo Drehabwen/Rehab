@@ -107,9 +107,9 @@ class SteppedAnalysisRequest(BaseModel):
     frames: List[SteppedFrame]
     mock: bool = False
 
-class HTMLReportResponse(BaseModel):
-    type: str = "HTML_REPORT"
-    html: str
+class PostureReportResponse(BaseModel):
+    type: str = "POSTURE_REPORT"
+    markdown: str
     reportId: str
     timeSeries: Optional[List[Dict[str, Any]]] = None
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
