@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Results } from '@mediapipe/holistic';
-import { Loader2 } from 'lucide-react';
+import { Results } from '@/lib/mediapipe-utils';
 import { PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
-import { PostureProcessor } from '@/lib/posture-processor';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { useVision3Camera } from './hooks/useVision3Camera';
 import { usePostureAnalysis } from './hooks/usePostureAnalysis';
@@ -14,46 +12,15 @@ import {
   getShoulderStatus,
   getHeadStatus,
   getHipStatus,
-  getSeverityLabel,
-  generateAuxiliaryReport
+  getSeverityLabel
 } from './vision3-utils';
 
 import { Vision3EntryHub, AssessmentMode } from './components/Vision3EntryHub';
 import { MetricsSidebar } from './components/MetricsSidebar';
 import { Vision3Header } from './components/Vision3Header';
 import { Vision3CameraStage } from './components/Vision3CameraStage';
-import { Vision3Dashboard } from './components/Vision3Dashboard';
-import { MarkdownReport } from '@/components/shared/MarkdownReport';
-
-const mergeMetrics = (analyses: Array<ReturnType<typeof PostureProcessor.process>>): PostureMetrics => {
-  const merged: PostureMetrics = {};
-  const front = analyses.find(a => a.view === 'front');
-  const back = analyses.find(a => a.view === 'back');
-  const side = analyses.find(a => a.view === 'side');
-
-  const shoulderAngles: number[] = [];
-  if (front?.averages.shoulderAngle !== undefined) shoulderAngles.push(front.averages.shoulderAngle);
-  if (back?.averages.shoulderAngle !== undefined) shoulderAngles.push(back.averages.shoulderAngle);
-  if (shoulderAngles.length) {
-    merged.shoulderAngle = shoulderAngles.reduce((a, b) => a + b, 0) / shoulderAngles.length;
-  }
-
-  const hipAngles: number[] = [];
-  if (front?.averages.hipAngle !== undefined) hipAngles.push(front.averages.hipAngle);
-  if (back?.averages.hipAngle !== undefined) hipAngles.push(back.averages.hipAngle);
-  if (hipAngles.length) {
-    merged.hipAngle = hipAngles.reduce((a, b) => a + b, 0) / hipAngles.length;
-  }
-
-  if (side?.averages.headForward !== undefined) merged.headForward = side.averages.headForward;
-  if (front?.averages.headDeviation !== undefined) merged.headDeviation = front.averages.headDeviation;
-
-  return merged;
-};
-
-export const Vision3Plugin: React.FC<{
-  onNavigate?: (plugin: 'vision3' | 'medvoice' | 'reports' | 'datacenter') => void;
-}> = ({ onNavigate }) => {
+import { Vision3AnalysisPanel } from './components/Vision3AnalysisPanel';
+export const Vision3Plugin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'posture' | 'rom'>('posture');
   const [isEntryMode, setIsEntryMode] = useState(true);
   const [assessmentMode, setAssessmentMode] = useState<AssessmentMode>('stepped');
@@ -61,6 +28,7 @@ export const Vision3Plugin: React.FC<{
   const [showHeadAxes, setShowHeadAxes] = useState(true);
   const [axesScale, setAxesScale] = useState(1);
   const [activePanel, setActivePanel] = useState<'dashboard' | 'report'>('dashboard');
+  const [reportType, setReportType] = useState<'auxiliary' | 'deep'>('auxiliary');
   
   // Custom Hooks
   const {
@@ -91,12 +59,11 @@ export const Vision3Plugin: React.FC<{
     headAxes,
     annotations,
     markdownReport,
+    auxiliaryReport,
     timeSeriesData,
     simulateMockCapture
   } = usePostureAnalysis({
     axesScale,
-    activeTab,
-    isEntryMode,
     view,
     assessmentMode
   });
@@ -131,13 +98,8 @@ export const Vision3Plugin: React.FC<{
     startMeasurement,
     stopMeasurement,
     resetMeasurement,
-    activeMeasurements,
-    postureReports,
-    savePostureReport
+    activeMeasurements
   } = useMeasurementStore();
-
-  const [auxiliaryReport, setAuxiliaryReport] = useState<string | null>(null);
-  const latestMarkdownReport = markdownReport || auxiliaryReport || postureReports[0]?.markdown || null;
 
   useVision3AutoSave({
     step,
@@ -148,29 +110,6 @@ export const Vision3Plugin: React.FC<{
     auxiliaryReport,
     timeSeriesData
   });
-  useEffect(() => {
-    if (wsResult?.metrics && !markdownReport) {
-      const auxReport = generateAuxiliaryReport(wsResult.metrics);
-      setAuxiliaryReport(auxReport);
-    }
-  }, [wsResult, markdownReport]);
-
-  useEffect(() => {
-    if (assessmentMode !== 'stepped') return;
-    if (captureStatus !== 'analyzing') return;
-    if (auxiliaryReport) return;
-    const frames = Object.values(steppedResults);
-    if (!frames.length) return;
-    const analyses = Object.entries(steppedResults).map(([v, data]) => {
-      const durationMs = Math.max(1, Math.round((data.timeSeriesLandmarks.length / 30) * 1000));
-      return PostureProcessor.process(data.timeSeriesLandmarks, v as 'front' | 'side' | 'back', durationMs);
-    });
-    const mergedMetrics = mergeMetrics(analyses);
-    const auxReport = generateAuxiliaryReport(mergedMetrics);
-    setAuxiliaryReport(auxReport);
-    setStep('completed');
-    savePostureReport('stepped', '', auxReport, analyses[0]?.timeSeries);
-  }, [assessmentMode, captureStatus, steppedResults, auxiliaryReport, setStep, savePostureReport]);
 
   // Sync WebSocket result to local state
   useEffect(() => {
@@ -185,16 +124,17 @@ export const Vision3Plugin: React.FC<{
   useEffect(() => {
     if (markdownReport) {
       console.log("Deep AI report received, switching to report panel");
-      setAuxiliaryReport(null);
+      setReportType('deep');
       setActivePanel('report');
     }
   }, [markdownReport]);
 
   useEffect(() => {
-    if (captureStatus === 'analyzing' || auxiliaryReport) {
+    if (auxiliaryReport && !markdownReport) {
+      setReportType('auxiliary');
       setActivePanel('report');
     }
-  }, [captureStatus, auxiliaryReport]);
+  }, [auxiliaryReport, markdownReport]);
 
   const handleResults = React.useCallback((results: Results) => {
     onResults(results);
@@ -267,62 +207,26 @@ export const Vision3Plugin: React.FC<{
               simulateMockCapture={simulateMockCapture}
             />
 
-          {/* Right Panel: Assessment & Reports */}
-          <div className="col-span-12 lg:col-span-4 h-full flex flex-col gap-4">
-            {/* Panel Toggle Header */}
-            <div className="flex p-1 bg-slate-900/60 rounded-xl border border-slate-800/50 backdrop-blur-sm self-start">
-              <button
-                onClick={() => setActivePanel('dashboard')}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  activePanel === 'dashboard' 
-                    ? 'bg-blue-500/20 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.1)]' 
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${activePanel === 'dashboard' ? 'bg-blue-400 animate-pulse' : 'bg-slate-600'}`} />
-                数据面板
-              </button>
-              <button
-                onClick={() => setActivePanel('report')}
-                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  activePanel === 'report' 
-                    ? 'bg-purple-500/20 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.1)]' 
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                }`}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${activePanel === 'report' ? 'bg-purple-400 animate-pulse' : 'bg-slate-600'}`} />
-                AI 报告
-                {captureStatus === 'analyzing' && <Loader2 className="w-3 h-3 animate-spin" />}
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-hidden min-h-0">
-              {activePanel === 'report' ? (
-                <div className="h-full animate-in fade-in slide-in-from-right-4 duration-500">
-                  <MarkdownReport 
-                    content={latestMarkdownReport} 
-                    loading={captureStatus === 'analyzing' && !latestMarkdownReport} 
-                  />
-                </div>
-              ) : (
-                <div className="h-full animate-in fade-in slide-in-from-left-4 duration-500">
-                  <Vision3Dashboard 
-                    activeTab={activeTab}
-                    result={result}
-                    showHeadAxes={showHeadAxes}
-                    setShowHeadAxes={setShowHeadAxes}
-                    axesScale={axesScale}
-                    setAxesScale={setAxesScale}
-                    getShoulderStatus={getShoulderStatus}
-                    getHeadStatus={getHeadStatus}
-                    getHipStatus={getHipStatus}
-                    getSeverityLabel={getSeverityLabel}
-                  />
-                </div>
-              )}
-            </div>
+            <Vision3AnalysisPanel 
+              activePanel={activePanel}
+              setActivePanel={setActivePanel}
+              reportType={reportType}
+              setReportType={setReportType}
+              captureStatus={captureStatus}
+              markdownReport={markdownReport}
+              auxiliaryReport={auxiliaryReport}
+              activeTab={activeTab}
+              result={result}
+              showHeadAxes={showHeadAxes}
+              setShowHeadAxes={setShowHeadAxes}
+              axesScale={axesScale}
+              setAxesScale={setAxesScale}
+              getShoulderStatus={getShoulderStatus}
+              getHeadStatus={getHeadStatus}
+              getHipStatus={getHipStatus}
+              getSeverityLabel={getSeverityLabel}
+            />
           </div>
-        </div>
       )}
       </React.Suspense>
       

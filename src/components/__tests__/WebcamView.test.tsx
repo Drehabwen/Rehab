@@ -39,15 +39,16 @@ describe('WebcamView', () => {
     });
 
     mockedUsePostureWS.mockReturnValue({
-      result: null,
+      result: { metrics: {}, issues: [], timestamp: 0 },
       status: 'connected',
       analyze: vi.fn(),
       analyzeJoint: mockAnalyzeJoint,
       analyzeBatch: vi.fn(),
       analyzeStepped: vi.fn(),
-      jointResult: null,
-      markdownReport: null,
-      timeSeriesData: null,
+      jointResult: { results: [], timestamp: 0 },
+      markdownReport: '',
+      auxiliaryReport: '',
+      timeSeriesData: [],
       connect: vi.fn(),
       disconnect: vi.fn()
     });

@@ -2,30 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { PostureMetrics, PostureIssue, Landmark } from '@/types/posture';
 import { TemporalAnalysis } from '@/lib/posture-processor';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
+import { 
+  generateAuxiliaryReport, 
+  AnalysisResult, 
+  VisualAnnotation 
+} from '@/utils/posture-report-utils';
 
 // Re-export types for backward compatibility
-export type { PostureMetrics, PostureIssue, Landmark };
-
-export interface VisualAnnotation {
-  type: 'line' | 'point' | 'angle' | 'text';
-  points: { x: number; y: number }[];
-  color?: string;
-  label?: string;
-  dashed?: boolean;
-  dash?: number[];
-  lineWidth?: number;
-}
-
-interface AnalysisResult {
-  metrics: PostureMetrics;
-  issues: PostureIssue[];
-  annotations?: VisualAnnotation[];
-  stability?: {
-    sd: number;
-    score: number;
-  };
-  timestamp: number;
-}
+export type { PostureMetrics, PostureIssue, Landmark, AnalysisResult, VisualAnnotation };
 
 interface JointResult {
   results: { id: string; angle: number | null }[];
@@ -44,6 +28,7 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
   const [markdownReport, setMarkdownReport] = useState<string | null>(null);
+  const [auxiliaryReport, setAuxiliaryReport] = useState<string | null>(null);
   const [timeSeriesData, setTimeSeriesData] = useState<TemporalAnalysis['timeSeries'] | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const ws = useRef<WebSocket | null>(null);
@@ -60,7 +45,7 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
     }
   }, []);
 
-  const sendMessage = useCallback((payload: any) => {
+  const sendMessage = useCallback((payload: Record<string, unknown>) => {
     const message = JSON.stringify(payload);
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(message);
@@ -86,6 +71,8 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
           const data = JSON.parse(event.data);
           if (data.type === 'ANALYSIS_RESULT') {
             setResult(data);
+            const auxReport = generateAuxiliaryReport(data);
+            setAuxiliaryReport(auxReport);
           } else if (data.type === 'JOINT_RESULT') {
             setJointResult(data);
           } else if (data.type === 'POSTURE_REPORT') {
@@ -194,6 +181,7 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
     result,
     jointResult,
     markdownReport,
+    auxiliaryReport,
     timeSeriesData,
     status,
     analyze,

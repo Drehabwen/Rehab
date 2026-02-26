@@ -13,6 +13,7 @@ export interface PostureAssessmentData {
   landmarks?: Landmark[];
   confidence: number;
   markdownReport?: string;
+  auxiliaryReport?: string;
   timeSeries?: TemporalAnalysis['timeSeries'];
 }
 

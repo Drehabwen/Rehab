@@ -106,7 +106,7 @@ export const NexusHub: React.FC = () => {
       case 'datacenter':
         return <NexusReportCenter />;
       default:
-        return <Vision3Plugin onNavigate={handleSelectTool} />;
+        return <Vision3Plugin />;
     }
   };
 

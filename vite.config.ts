@@ -27,4 +27,7 @@ export default defineConfig({
     }), 
     tsconfigPaths()
   ],
+  optimizeDeps: {
+    exclude: ['@mediapipe/pose']
+  }
 })

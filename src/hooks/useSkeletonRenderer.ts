@@ -1,5 +1,5 @@
-import { useRef, useCallback, useEffect } from 'react';
-import { Results, POSE_CONNECTIONS } from '@mediapipe/holistic';
+import { useRef, useCallback } from 'react';
+import { Results, POSE_CONNECTIONS } from '@/lib/mediapipe-utils';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { 
   VisualAnnotation, 
@@ -32,12 +32,11 @@ export function useSkeletonRenderer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastResultsRef = useRef<Results | null>(null);
-  const requestRef = useRef<number | null>(null);
 
-  const draw = useCallback(() => {
+  const draw = useCallback((results: Results | null = null) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const results = lastResultsRef.current;
+    const res = results || lastResultsRef.current;
 
     if (!video || !canvas) return;
 
@@ -51,10 +50,10 @@ export function useSkeletonRenderer({
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (showSkeleton && results?.poseLandmarks) {
+    if (showSkeleton && res?.poseLandmarks) {
       const landmarksToDraw = isMirrored 
-        ? results.poseLandmarks.map(lm => ({ ...lm, x: 1 - lm.x }))
-        : results.poseLandmarks;
+        ? res.poseLandmarks.map(lm => ({ ...lm, x: 1 - lm.x }))
+        : res.poseLandmarks;
 
       drawConnectors(ctx, landmarksToDraw, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
       drawLandmarks(ctx, landmarksToDraw, { color: '#FF0000', lineWidth: 2, radius: 4 });
@@ -67,27 +66,20 @@ export function useSkeletonRenderer({
     if (headAxes) {
       drawHeadAxes(ctx, headAxes, isMirrored ? canvas.width : undefined);
     }
-
-    requestRef.current = requestAnimationFrame(draw);
   }, [isMirrored, showSkeleton, annotations, headAxes]);
-
-  // Start animation loop
-  useEffect(() => {
-    requestRef.current = requestAnimationFrame(draw);
-    return () => {
-      if (requestRef.current) cancelAnimationFrame(requestRef.current);
-    };
-  }, [draw]);
 
   const handleResults = useCallback((results: Results) => {
     lastResultsRef.current = results;
+    
+    // Data-driven drawing: update the canvas immediately when new results arrive
+    draw(results);
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (onResults && video && canvas) {
       onResults(results, video, canvas);
     }
-  }, [onResults]);
+  }, [onResults, draw]);
 
   return {
     videoRef,

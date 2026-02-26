@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Results } from '@mediapipe/holistic';
+import { Results } from '@/lib/mediapipe-utils';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { usePostureWS } from '@/hooks/usePostureWS';
 import { Landmark } from '@/types/posture';

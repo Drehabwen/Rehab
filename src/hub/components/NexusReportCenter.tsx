@@ -38,11 +38,31 @@ export const NexusReportCenter: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedReportMarkdown, setSelectedReportMarkdown] = useState<string | null>(null);
+  const [reportType, setReportType] = useState<'auxiliary' | 'deep'>('deep');
   const [selectedReport, setSelectedReport] = useState<PostureReport | null>(null);
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const reportContainerRef = useRef<HTMLDivElement>(null);
   const [chartPortals, setChartPortals] = useState<React.ReactPortal[]>([]);
+
+  useEffect(() => {
+    const postureData = selectedAssessment?.data.posture;
+    if (postureData) {
+      if (postureData.markdownReport) {
+        setReportType('deep');
+      } else if (postureData.auxiliaryReport) {
+        setReportType('auxiliary');
+      }
+    }
+  }, [selectedAssessment]);
+
+  useEffect(() => {
+    const postureData = selectedAssessment?.data.posture;
+    if (postureData) {
+      const content = reportType === 'deep' ? (postureData.markdownReport || postureData.auxiliaryReport) : (postureData.auxiliaryReport || postureData.markdownReport);
+      if (content) setSelectedReportMarkdown(content);
+    }
+  }, [reportType, selectedAssessment]);
 
   useEffect(() => {
     loadPatients();
@@ -368,64 +388,109 @@ export const NexusReportCenter: React.FC = () => {
             <div className="p-6 overflow-y-auto max-h-[60vh]">
               {selectedAssessment.data.posture && (
                 <div className="space-y-6">
-                  <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">检测问题</h4>
-                    <div className="space-y-2">
-                      {selectedAssessment.data.posture.issues.map((issue, idx) => (
-                        <div key={idx} className="p-4 bg-slate-50 rounded-2xl">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className={cn(
-                              "px-2 py-1 text-[9px] font-black uppercase rounded-lg",
-                              issue.severity === 'severe' ? 'bg-rose-100 text-rose-600' :
-                              issue.severity === 'moderate' ? 'bg-amber-100 text-amber-600' :
-                              'bg-blue-100 text-blue-600'
-                            )}>
-                              {issue.severity === 'severe' ? '严重' : issue.severity === 'moderate' ? '中度' : '轻度'}
-                            </span>
-                            <span className="font-bold text-slate-900">{issue.title}</span>
-                          </div>
-                          <p className="text-sm text-slate-600">{issue.description}</p>
-                          <p className="text-xs text-slate-400 mt-1">{issue.recommendation}</p>
+                  {/* Summary Header */}
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-400">
+                        <Activity size={24} />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">评估模式</div>
+                        <div className="font-bold text-slate-900">
+                          {selectedAssessment.mode === 'realtime' ? '实时全维度扫描' : '分步定向拍摄'}
                         </div>
-                      ))}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">视角</div>
+                      <div className="font-bold text-slate-900">
+                        {selectedAssessment.data.posture.view === 'front' ? '正面 (Front)' : 
+                         selectedAssessment.data.posture.view === 'side' ? '侧面 (Side)' : 
+                         selectedAssessment.data.posture.view === 'back' ? '背面 (Back)' : '综合视图'}
+                      </div>
                     </div>
                   </div>
+
+                  {selectedAssessment.data.posture.issues && selectedAssessment.data.posture.issues.length > 0 && (
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 px-1">检测到的体态问题</h4>
+                      <div className="space-y-2">
+                        {selectedAssessment.data.posture.issues.map((issue, idx) => (
+                          <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-100 transition-colors">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={cn(
+                                "px-2 py-1 text-[9px] font-black uppercase rounded-lg shadow-sm",
+                                issue.severity === 'severe' ? 'bg-rose-500 text-white' :
+                                issue.severity === 'moderate' ? 'bg-amber-500 text-white' :
+                                'bg-blue-500 text-white'
+                              )}>
+                                {issue.severity === 'severe' ? '严重' : issue.severity === 'moderate' ? '中度' : '轻度'}
+                              </span>
+                              <span className="font-bold text-slate-900">{issue.title}</span>
+                            </div>
+                            <p className="text-sm text-slate-600 leading-relaxed">{issue.description}</p>
+                            {issue.recommendation && (
+                              <div className="mt-3 pt-3 border-t border-slate-200/60 flex items-start gap-2">
+                                <div className="w-4 h-4 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                </div>
+                                <p className="text-xs text-slate-500 italic">{issue.recommendation}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
-                  <div>
-                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">测量指标</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      {Object.entries(selectedAssessment.data.posture.metrics).map(([key, value]) => (
-                        <div key={key} className="bento-card p-4">
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">{key}</div>
-                          <div className="text-lg font-black text-slate-900">
-                            {typeof value === 'number' ? value.toFixed(1) : value}
-                          </div>
-                        </div>
-                      ))}
+                  {selectedAssessment.data.posture.metrics && Object.keys(selectedAssessment.data.posture.metrics).length > 0 && (
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 px-1">生物力学指标</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {Object.entries(selectedAssessment.data.posture.metrics).map(([key, value]) => {
+                          if (key === 'head_axes') return null; // Skip complex objects
+                          return (
+                            <div key={key} className="bento-card p-4 bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all">
+                              <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 truncate" title={key}>
+                                {key.replace(/_/g, ' ')}
+                              </div>
+                              <div className="text-xl font-black text-slate-900 flex items-baseline gap-1">
+                                {typeof value === 'number' ? value.toFixed(1) : String(value)}
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
+                                  {key.toLowerCase().includes('angle') ? '°' : ''}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>
             
             <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-3">
-              {selectedAssessment.data.posture?.markdownReport && (
+              {(selectedAssessment.data.posture?.markdownReport || selectedAssessment.data.posture?.auxiliaryReport) && (
                 <button
                   onClick={() => {
                     const postureData = selectedAssessment.data.posture;
-                    if (postureData && postureData.markdownReport) {
-                      setSelectedReportMarkdown(postureData.markdownReport);
-                      
-                      // Construct PostureReport object for charts
-                      const report: PostureReport = {
-                        id: selectedAssessment.id,
-                        date: selectedAssessment.createdAt,
-                        view: postureData.view || 'unknown',
-                        html: '', // Legacy support
-                        markdown: postureData.markdownReport,
-                        timeSeries: postureData.timeSeries
-                      };
-                      setSelectedReport(report);
+                    if (postureData) {
+                      const reportContent = postureData.markdownReport || postureData.auxiliaryReport;
+                      if (reportContent) {
+                        setSelectedReportMarkdown(reportContent);
+                        
+                        // Construct PostureReport object for charts
+                        const report: PostureReport = {
+                          id: selectedAssessment.id,
+                          date: selectedAssessment.createdAt,
+                          view: postureData.view || 'unknown',
+                          html: '', // Legacy support
+                          markdown: reportContent,
+                          timeSeries: postureData.timeSeries
+                        };
+                        setSelectedReport(report);
+                      }
                     }
                   }}
                   className="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-indigo-200"
@@ -472,20 +537,44 @@ export const NexusReportCenter: React.FC = () => {
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nexus Hub AI Powered Analysis</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all hidden md:block"
-                  title={isFullscreen ? "退出全屏" : "全屏预览"}
-                >
-                  <ArrowUpRight size={20} className={isFullscreen ? "rotate-180" : ""} />
-                </button>
-                <button 
-                  onClick={() => { setSelectedReportMarkdown(null); setSelectedReport(null); setIsFullscreen(false); }}
-                  className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"
-                >
-                  <ChevronDown size={20} className="rotate-180" />
-                </button>
+              <div className="flex items-center gap-4">
+                {selectedAssessment?.data.posture?.auxiliaryReport && selectedAssessment?.data.posture?.markdownReport && (
+                  <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+                    <button
+                      onClick={() => setReportType('auxiliary')}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                        reportType === 'auxiliary' ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                      )}
+                    >
+                      辅助诊断
+                    </button>
+                    <button
+                      onClick={() => setReportType('deep')}
+                      className={cn(
+                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                        reportType === 'deep' ? "bg-white text-purple-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                      )}
+                    >
+                      深度分析
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all hidden md:block"
+                    title={isFullscreen ? "退出全屏" : "全屏预览"}
+                  >
+                    <ArrowUpRight size={20} className={isFullscreen ? "rotate-180" : ""} />
+                  </button>
+                  <button 
+                    onClick={() => { setSelectedReportMarkdown(null); setSelectedReport(null); setIsFullscreen(false); }}
+                    className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"
+                  >
+                    <ChevronDown size={20} className="rotate-180" />
+                  </button>
+                </div>
               </div>
             </div>
             <div ref={reportContainerRef} className="flex-1 overflow-y-auto p-0 bg-slate-900">

@@ -25,43 +25,30 @@ export const useVision3AutoSave = ({
   auxiliaryReport,
   timeSeriesData
 }: UseVision3AutoSaveProps) => {
-  const hasSavedRef = useRef(false);
+  const hasSavedAuxiliaryRef = useRef(false);
+  const hasSavedDeepRef = useRef(false);
   const { currentPatient, patients } = usePatientStore();
   const { sessions, startSession } = useSessionStore();
-  const { addAssessment } = useAssessmentStore();
+  const { addAssessment, updateAssessment } = useAssessmentStore();
+  const currentAssessmentIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const saveAssessment = async () => {
-      // Save if completed AND we have either WS results OR a markdown report
-      if (step === 'completed' && (wsResult || markdownReport || auxiliaryReport) && !hasSavedRef.current) {
-        hasSavedRef.current = true;
+      // Step 1: Save auxiliary report as soon as it's available
+      if (step === 'completed' && auxiliaryReport && !hasSavedAuxiliaryRef.current) {
+        hasSavedAuxiliaryRef.current = true;
         
         try {
-          let patientId = currentPatient?.id;
+          const patientId = currentPatient?.id || patients[0]?.id;
+          if (!patientId) return;
           
-          if (!patientId) {
-            if (patients.length > 0) {
-              patientId = patients[0].id;
-            }
-          }
-          
-          if (!patientId) {
-            console.log('No patient found, skipping assessment save');
-            return;
-          }
-          
-          let sessionId: string | undefined;
-          const patientSessions = sessions.filter(s => s.patientId === patientId);
-          if (patientSessions.length > 0) {
-            sessionId = patientSessions[0].id;
-          }
-          
+          let sessionId = sessions.find(s => s.patientId === patientId)?.id;
           if (!sessionId) {
             const newSession = await startSession(patientId);
             sessionId = newSession.id;
           }
           
-          await addAssessment({
+          const assessment = await addAssessment({
             sessionId,
             patientId,
             type: 'posture',
@@ -73,25 +60,51 @@ export const useVision3AutoSave = ({
                 metrics: wsResult?.metrics,
                 issues: wsResult?.issues,
                 confidence: 0.85,
-                markdownReport: markdownReport || auxiliaryReport || undefined,
+                auxiliaryReport: auxiliaryReport,
                 timeSeries: timeSeriesData || undefined
               }
             }
           });
-          
-          console.log('Assessment saved successfully', { hasWsResult: !!wsResult, hasMarkdownReport: !!markdownReport });
+          currentAssessmentIdRef.current = assessment.id;
+          console.log('Auxiliary assessment saved', assessment.id);
         } catch (error) {
-          console.error('Failed to save assessment:', error);
+          console.error('Failed to save auxiliary assessment:', error);
+        }
+      }
+
+      // Step 2: Update with deep report when it arrives
+      if (markdownReport && !hasSavedDeepRef.current && currentAssessmentIdRef.current) {
+        hasSavedDeepRef.current = true;
+        try {
+          await updateAssessment(currentAssessmentIdRef.current, {
+            data: {
+              posture: {
+                mode: assessmentMode,
+                view: view,
+                metrics: wsResult?.metrics,
+                issues: wsResult?.issues,
+                confidence: 0.85,
+                markdownReport: markdownReport,
+                auxiliaryReport: auxiliaryReport || undefined,
+                timeSeries: timeSeriesData || undefined
+              }
+            }
+          });
+          console.log('Assessment updated with deep report');
+        } catch (error) {
+          console.error('Failed to update assessment with deep report:', error);
         }
       }
     };
     
     saveAssessment();
-  }, [step, wsResult, markdownReport, auxiliaryReport, timeSeriesData, currentPatient, patients, sessions, startSession, addAssessment, assessmentMode, view]);
+  }, [step, wsResult, markdownReport, auxiliaryReport, timeSeriesData, currentPatient, patients, sessions, startSession, addAssessment, updateAssessment, assessmentMode, view]);
 
   useEffect(() => {
     if (step !== 'completed') {
-      hasSavedRef.current = false;
+      hasSavedAuxiliaryRef.current = false;
+      hasSavedDeepRef.current = false;
+      currentAssessmentIdRef.current = null;
     }
   }, [step]);
 };

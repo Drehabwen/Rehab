@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Results } from '@mediapipe/holistic';
+import { Results } from '@/lib/mediapipe-utils';
 import { usePostureWS } from '@/hooks/usePostureWS';
 import { usePostureAssessmentStore } from '../store/usePostureAssessmentStore';
 import { globalMonitor } from '../services/GlobalMonitor';
@@ -14,16 +14,12 @@ import {
 
 interface UsePostureAnalysisProps {
   axesScale: number;
-  activeTab: string;
-  isEntryMode: boolean;
   view: 'front' | 'side' | 'back';
   assessmentMode?: 'realtime' | 'stepped';
 }
 
 export function usePostureAnalysis({ 
   axesScale, 
-  activeTab,
-  isEntryMode,
   view,
   assessmentMode = 'realtime'
 }: UsePostureAnalysisProps) {
@@ -34,6 +30,7 @@ export function usePostureAnalysis({
     analyzeBatch, 
     analyzeStepped,
     markdownReport,
+    auxiliaryReport,
     timeSeriesData
   } = usePostureWS();
 
@@ -127,11 +124,12 @@ export function usePostureAnalysis({
     analyzeBatch,
     analyzeStepped,
     markdownReport,
+    auxiliaryReport,
     onResults,
     captureStatus,
     setCaptureStatus: (value: React.SetStateAction<CaptureStatus>) => {
-      const status = typeof value === 'function' ? (value as any)(captureStatus) : value;
-      switch (status) {
+      const nextStatus = typeof value === 'function' ? value(captureStatus) : value;
+      switch (nextStatus) {
         case 'scanning':
           captureDispatch({ type: 'START_SCAN' });
           break;
@@ -148,7 +146,7 @@ export function usePostureAnalysis({
           captureDispatch({ type: 'RESET' });
           break;
         default:
-          console.warn(`[usePostureAnalysis] Unknown status transition: ${status}`);
+          console.warn(`[usePostureAnalysis] Unknown status transition: ${nextStatus}`);
       }
     },
     captureDispatch,

@@ -88,8 +88,6 @@ describe('usePostureAnalysis', () => {
   it('should initialize with default values', () => {
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));
@@ -105,8 +103,6 @@ describe('usePostureAnalysis', () => {
   it('should call analyze in realtime mode on capture', () => {
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));
@@ -130,8 +126,6 @@ describe('usePostureAnalysis', () => {
   it('should store stepped results in stepped mode', () => {
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'stepped',
-      isEntryMode: false,
       view: 'side',
       assessmentMode: 'stepped'
     }));
@@ -172,8 +166,6 @@ describe('usePostureAnalysis', () => {
 
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));
@@ -192,8 +184,6 @@ describe('usePostureAnalysis', () => {
   it('should register analysis callback with GlobalMonitor', () => {
     renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));
@@ -205,8 +195,6 @@ describe('usePostureAnalysis', () => {
   it('should call analyzeBatch when analysis callback is triggered', () => {
     renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));
@@ -230,8 +218,6 @@ describe('usePostureAnalysis', () => {
   it('should transition to completed step when HTML report is ready', async () => {
     const { rerender } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));
@@ -256,8 +242,6 @@ describe('usePostureAnalysis', () => {
   it('should forward landmarks to capture handler and GlobalMonitor', () => {
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));
@@ -283,8 +267,6 @@ describe('usePostureAnalysis', () => {
   it('should reset headAxes when WebSocket result is null', async () => {
     const { result, rerender } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));
@@ -323,8 +305,6 @@ describe('usePostureAnalysis', () => {
   it('should handle multiple views in stepped mode', () => {
     const { result, rerender } = renderHook(({ view }) => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'stepped',
-      isEntryMode: false,
       view,
       assessmentMode: 'stepped'
     }), { initialProps: { view: 'front' as 'front' | 'side' | 'back' } });
@@ -379,8 +359,6 @@ describe('usePostureAnalysis', () => {
 
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
-      activeTab: 'realtime',
-      isEntryMode: false,
       view: 'front',
       assessmentMode: 'realtime'
     }));

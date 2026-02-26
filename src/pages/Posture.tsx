@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Results, POSE_CONNECTIONS } from '@mediapipe/holistic';
+import { Results, POSE_CONNECTIONS } from '@/lib/mediapipe-utils';
 import { drawConnectors, drawLandmarks } from '@mediapipe/drawing_utils';
 import { Camera as CameraIcon, User, RefreshCw, AlertTriangle } from 'lucide-react';
 import { usePostureWS, VisualAnnotation, PostureIssue, PostureMetrics, Landmark } from '@/hooks/usePostureWS';

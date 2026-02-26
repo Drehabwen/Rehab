@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Results } from '@mediapipe/holistic';
+import type { Results } from '@/lib/mediapipe-utils';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useMediaPipe } from '../useMediaPipe';
 
@@ -9,9 +9,9 @@ const mockOnResults = vi.fn();
 const mockSetOptions = vi.fn();
 const mockClose = vi.fn();
 
-vi.mock('@mediapipe/holistic', () => {
+vi.mock('@mediapipe/pose', () => {
   return {
-    Holistic: vi.fn().mockImplementation(() => ({
+    Pose: vi.fn().mockImplementation(() => ({
       send: mockSend,
       onResults: mockOnResults,
       setOptions: mockSetOptions,
@@ -27,7 +27,8 @@ describe('useMediaPipe', () => {
     vi.useFakeTimers();
     // Clear global singleton state
     if (typeof window !== 'undefined') {
-      delete (window as any)['__NEXUS_HOLISTIC_SINGLETON__'];
+      const globalWindow = window as unknown as Record<string, unknown>;
+      delete globalWindow['__NEXUS_POSE_SINGLETON__'];
     }
     // Mock requestAnimationFrame to prevent recursion issues in tests
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
@@ -50,7 +51,7 @@ describe('useMediaPipe', () => {
     vi.useRealTimers();
   });
 
-  it('should initialize Holistic model and start processing loop', async () => {
+  it('should initialize Pose model and start processing loop', async () => {
     const onResults = vi.fn();
     renderHook(() => useMediaPipe(mockVideo, onResults, true));
 

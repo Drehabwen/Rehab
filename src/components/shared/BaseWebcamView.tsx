@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Results } from '@mediapipe/holistic';
+import { Results } from '@/lib/mediapipe-utils';
 import { Video, VideoOff, Loader2 } from 'lucide-react';
 import { useCameraStream } from '@/hooks/useCameraStream';
 import { useMediaPipe } from '@/hooks/useMediaPipe';
@@ -40,7 +40,6 @@ export default function BaseWebcamView({
   headAxes = null
 }: BaseWebcamViewProps) {
   const [isVideoReady, setIsVideoReady] = useState(false);
-  const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
   const { stream, error: cameraError, isLoading: isCameraLoading } = useCameraStream(isCameraOn);
 
@@ -51,12 +50,6 @@ export default function BaseWebcamView({
     headAxes,
     onResults
   });
-
-  useEffect(() => {
-    if (videoRef.current) {
-      setVideoElement(videoRef.current);
-    }
-  }, [videoRef]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -75,7 +68,7 @@ export default function BaseWebcamView({
   }, [stream, isCameraOn, videoRef]);
 
   const { isLoading: isModelLoading, error: modelError } = useMediaPipe(
-    videoElement,
+    videoRef.current,
     handleResults,
     isCameraOn && !!stream
   );
