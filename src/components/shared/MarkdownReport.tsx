@@ -17,24 +17,25 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
   animate = true 
 }) => {
   const [displayedContent, setDisplayedContent] = useState('');
+  const normalizedContent = typeof content === 'string' ? content.trim() : '';
   
   // Typewriter effect for a more "AI-generating" feel
   useEffect(() => {
-    if (!content) {
+    if (!normalizedContent) {
       setDisplayedContent('');
       return;
     }
 
     if (!animate) {
-      setDisplayedContent(content);
+      setDisplayedContent(normalizedContent);
       return;
     }
 
     // Simple character-by-character animation
     let currentIdx = 0;
     const interval = setInterval(() => {
-      if (currentIdx < content.length) {
-        setDisplayedContent(content.substring(0, currentIdx + 1));
+      if (currentIdx < normalizedContent.length) {
+        setDisplayedContent(normalizedContent.substring(0, currentIdx + 1));
         currentIdx += 10; // Speed up by adding 10 chars at a time
       } else {
         clearInterval(interval);
@@ -42,7 +43,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
     }, 10);
 
     return () => clearInterval(interval);
-  }, [content, animate]);
+  }, [normalizedContent, animate]);
 
   if (loading) {
     return (
@@ -54,7 +55,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
     );
   }
 
-  if (!content) {
+  if (!normalizedContent) {
     return (
       <div className={`flex flex-col items-center justify-center p-12 min-h-[300px] bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed ${className}`}>
         <FileText className="w-12 h-12 text-slate-700 mb-4" />

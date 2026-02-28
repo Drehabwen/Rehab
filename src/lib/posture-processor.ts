@@ -3,7 +3,7 @@ import { Landmark, PostureMetrics } from '@/hooks/usePostureWS';
 export interface StabilityMetrics {
   swayArea: number;
   maxDeviation: number;
-  standardDev: number;
+  sd: number;
   velocity: number;
 }
 
@@ -203,7 +203,7 @@ export class PostureProcessor {
     return {
       swayArea: variance * Math.PI, // Approximation
       maxDeviation: maxDev,
-      standardDev: sd,
+      sd: sd,
       velocity: velocity
     };
   }

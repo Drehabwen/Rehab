@@ -76,11 +76,13 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
           } else if (data.type === 'JOINT_RESULT') {
             setJointResult(data);
           } else if (data.type === 'POSTURE_REPORT') {
-            setMarkdownReport(data.markdown);
-            // Use timeSeries from backend response if available (stepped analysis), otherwise fall back to local ref (batch analysis)
-            const timeSeries = data.timeSeries || lastBatchTimeSeriesRef.current;
+            const markdown = typeof data.markdown === 'string' ? data.markdown : '';
+            const normalized = markdown.trim();
+            const finalMarkdown = normalized ? markdown : '报告生成失败：未收到有效的 Markdown 内容。';
+            setMarkdownReport(finalMarkdown);
+            const timeSeries = Array.isArray(data.timeSeries) ? data.timeSeries : lastBatchTimeSeriesRef.current;
             setTimeSeriesData(timeSeries);
-            savePostureReport(currentViewRef.current, '', data.markdown, timeSeries);
+            savePostureReport(currentViewRef.current, '', finalMarkdown, timeSeries);
           }
         } catch (e) {
           console.error('Failed to parse analysis result:', e);

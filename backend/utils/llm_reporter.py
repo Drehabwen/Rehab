@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import statistics
 from typing import Dict, Any, List, Optional
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -126,7 +127,11 @@ class PostureAgent:
             print("="*50 + "\n", flush=True)
             
             logger.info(f"DeepSeek Response length: {len(raw_content)}")
-            return extract_markdown(raw_content)
+            markdown = extract_markdown(raw_content)
+            if markdown.strip():
+                return markdown
+            fallback = raw_content.strip() if raw_content else ""
+            return fallback if fallback else "生成报告失败：LLM 返回空内容"
         except Exception as e:
             logger.error(f"Error in generate_final_report: {e}")
             return f"生成报告失败: {str(e)}"
@@ -149,6 +154,65 @@ def extract_markdown(text: str) -> str:
         return generic_match.group(1).strip()
     
     return text.strip()
+
+def summarize_time_series(time_series: List[Dict[str, Any]]) -> Dict[str, Dict[str, float]]:
+    metric_values: Dict[str, List[float]] = {}
+    for item in time_series:
+        metrics = item.get("metrics") if isinstance(item, dict) else None
+        if not isinstance(metrics, dict):
+            metrics = item if isinstance(item, dict) else {}
+        for key, value in metrics.items():
+            if key in ("timestamp", "view"):
+                continue
+            if isinstance(value, (int, float)):
+                metric_values.setdefault(key, []).append(float(value))
+    summary: Dict[str, Dict[str, float]] = {}
+    for key, values in metric_values.items():
+        if not values:
+            continue
+        mean = sum(values) / len(values)
+        sd = statistics.pstdev(values) if len(values) > 1 else 0.0
+        summary[key] = {
+            "mean": mean,
+            "min": min(values),
+            "max": max(values),
+            "sd": sd
+        }
+    return summary
+
+def build_narration(view: str, summary: Dict[str, Any]) -> str:
+    lines = [f"评估视角: {view}"]
+    duration = summary.get("duration")
+    frame_count = summary.get("frameCount")
+    if isinstance(duration, (int, float)):
+        lines.append(f"采样时长: {duration:.0f}ms")
+    if isinstance(frame_count, (int, float)):
+        lines.append(f"采样帧数: {int(frame_count)}")
+    averages = summary.get("averages") or {}
+    if isinstance(averages, dict) and averages:
+        lines.append("均值指标:")
+        for key, value in averages.items():
+            if isinstance(value, (int, float)):
+                lines.append(f"- {key}: {value:.4f}")
+    stability = summary.get("stability") or {}
+    if isinstance(stability, dict) and stability:
+        lines.append("稳定性指标:")
+        for key, value in stability.items():
+            if isinstance(value, (int, float)):
+                lines.append(f"- {key}: {value:.4f}")
+    time_series_summary = summary.get("timeSeriesSummary") or {}
+    if isinstance(time_series_summary, dict) and time_series_summary:
+        lines.append("时序统计:")
+        for key, stats in time_series_summary.items():
+            if not isinstance(stats, dict):
+                continue
+            mean = stats.get("mean")
+            sd = stats.get("sd")
+            min_v = stats.get("min")
+            max_v = stats.get("max")
+            if all(isinstance(v, (int, float)) for v in [mean, sd, min_v, max_v]):
+                lines.append(f"- {key}: mean={mean:.4f}, sd={sd:.4f}, min={min_v:.4f}, max={max_v:.4f}")
+    return "\n".join(lines)
 
 def generate_posture_report(analysis_data: Dict[str, Any]) -> str:
     """
@@ -174,9 +238,20 @@ def generate_posture_report(analysis_data: Dict[str, Any]) -> str:
             res = process_time_series(frame["view"], frame["timeSeriesLandmarks"])
             posture_agent.analyze_view(res["narration"], res["stats"])
     else:
-        # Single view or fallback
-        narration = analysis_data.get("narration", "未知视角描述")
-        stats = analysis_data.get("stats", {})
-        posture_agent.analyze_view(narration, stats)
+        view = analysis_data.get("view", "unknown")
+        averages = analysis_data.get("averages") or {}
+        stability = analysis_data.get("stability") or {}
+        time_series = analysis_data.get("timeSeries") or []
+        time_series_summary = summarize_time_series(time_series if isinstance(time_series, list) else [])
+        summary_stats = {
+            "view": view,
+            "duration": analysis_data.get("duration"),
+            "frameCount": analysis_data.get("frameCount") or (len(time_series) if isinstance(time_series, list) else None),
+            "averages": averages,
+            "stability": stability,
+            "timeSeriesSummary": time_series_summary
+        }
+        narration = build_narration(view, summary_stats)
+        posture_agent.analyze_view(narration, summary_stats)
         
     return posture_agent.generate_final_report()

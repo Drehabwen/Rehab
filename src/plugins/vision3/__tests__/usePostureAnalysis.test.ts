@@ -204,7 +204,7 @@ describe('usePostureAnalysis', () => {
       duration: 2000,
       frameCount: 30,
       averages: { swayOffset: 10, shoulderAngle: 0.5, hipAngle: 1.2 },
-      stability: { standardDev: 0.001, maxDeviation: 0.005, velocity: 0.1, swayArea: 0.000005 },
+      stability: { sd: 0.001, maxDeviation: 0.005, velocity: 0.1, swayArea: 0.000005 },
       timeSeries: []
     };
 

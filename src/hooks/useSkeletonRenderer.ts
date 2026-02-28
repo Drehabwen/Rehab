@@ -32,6 +32,8 @@ export function useSkeletonRenderer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastResultsRef = useRef<Results | null>(null);
+  const pendingResultsRef = useRef<Results | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   const draw = useCallback((results: Results | null = null) => {
     const video = videoRef.current;
@@ -68,18 +70,30 @@ export function useSkeletonRenderer({
     }
   }, [isMirrored, showSkeleton, annotations, headAxes]);
 
+  const flushOnResults = useCallback(() => {
+    rafRef.current = null;
+    const res = pendingResultsRef.current;
+    pendingResultsRef.current = null;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (onResults && res && video && canvas) {
+      onResults(res, video, canvas);
+    }
+  }, [onResults]);
+
   const handleResults = useCallback((results: Results) => {
     lastResultsRef.current = results;
     
     // Data-driven drawing: update the canvas immediately when new results arrive
     draw(results);
     
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (onResults && video && canvas) {
-      onResults(results, video, canvas);
+    if (onResults) {
+      pendingResultsRef.current = results;
+      if (rafRef.current === null) {
+        rafRef.current = requestAnimationFrame(flushOnResults);
+      }
     }
-  }, [onResults, draw]);
+  }, [onResults, draw, flushOnResults]);
 
   return {
     videoRef,

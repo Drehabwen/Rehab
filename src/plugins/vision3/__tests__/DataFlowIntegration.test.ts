@@ -82,12 +82,12 @@ describe('DataFlowIntegration', () => {
     const analysisData = DataProcessor.prepareAnalysisData(stableFrames, stableFrames, 'back');
 
     expect(analysisData.stability).toBeDefined();
-    expect(analysisData.stability).toHaveProperty('standardDev');
+    expect(analysisData.stability).toHaveProperty('sd');
     expect(analysisData.stability).toHaveProperty('maxDeviation');
     expect(analysisData.stability).toHaveProperty('velocity');
     expect(analysisData.stability).toHaveProperty('swayArea');
 
-    expect(analysisData.stability.standardDev).toBeGreaterThanOrEqual(0);
+    expect(analysisData.stability.sd).toBeGreaterThanOrEqual(0);
     expect(analysisData.stability.maxDeviation).toBeGreaterThanOrEqual(0);
   });
 
@@ -129,7 +129,7 @@ describe('DataFlowIntegration', () => {
     expect(mockAnalysisData).toBeDefined();
     if (mockAnalysisData) {
       expect(mockAnalysisData.timeSeries.length).toBeGreaterThan(0);
-      expect(mockAnalysisData.stability.standardDev).toBeGreaterThanOrEqual(0);
+      expect(mockAnalysisData.stability.sd).toBeGreaterThanOrEqual(0);
     }
   });
 
@@ -169,7 +169,7 @@ describe('DataFlowIntegration', () => {
     const stableAnalysis = DataProcessor.prepareAnalysisData(stableFrames, stableFrames, 'front');
     const swayingAnalysis = DataProcessor.prepareAnalysisData(swayingFrames, swayingFrames, 'front');
 
-    expect(swayingAnalysis.stability.standardDev).toBeGreaterThan(stableAnalysis.stability.standardDev);
+    expect(swayingAnalysis.stability.sd).toBeGreaterThan(stableAnalysis.stability.sd);
     expect(swayingAnalysis.stability.maxDeviation).toBeGreaterThan(stableAnalysis.stability.maxDeviation);
     expect(swayingAnalysis.stability.swayArea).toBeGreaterThan(stableAnalysis.stability.swayArea);
   });

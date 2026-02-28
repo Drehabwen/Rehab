@@ -71,6 +71,6 @@ describe('DataProcessor', () => {
     expect(analysisData.timeSeries.length).toBe(3);
     expect(analysisData.timeSeries[0]).toHaveProperty('metrics');
     expect(analysisData.averages).toHaveProperty('swayOffset');
-    expect(analysisData.stability).toHaveProperty('standardDev');
+    expect(analysisData.stability).toHaveProperty('sd');
   });
 });

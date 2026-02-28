@@ -226,7 +226,7 @@ export class DataProcessor {
     const velocity = durationSec > 0 ? totalDist / durationSec : 0;
 
     return {
-      standardDev,
+      sd: standardDev,
       maxDeviation: maxDev,
       velocity,
       swayArea: standardDev * maxDev // 粗略估算面积
