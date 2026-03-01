@@ -68,10 +68,13 @@ export const NexusHub: React.FC = () => {
     setSelectedPatient(null);
   };
 
-  const handleStartNewPatient = async (name?: string) => {
-    const newPatient = await addPatient(name);
-    setSelectedPatient(newPatient);
-    setView('toolbox');
+  const handleStartNewPatient = async (patientId: string) => {
+    await loadPatients();
+    const newPatient = usePatientStore.getState().getPatientById(patientId);
+    if (newPatient) {
+      setSelectedPatient(newPatient);
+      setView('toolbox');
+    }
     setShowNewSessionModal(false);
   };
 

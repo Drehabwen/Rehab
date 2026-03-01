@@ -10,7 +10,7 @@ interface PatientState {
   error: string | null;
   
   setCurrentPatient: (patient: Patient | null) => void;
-  addPatient: (name?: string) => Promise<Patient>;
+  addPatient: (name?: string, predefinedId?: string) => Promise<Patient>;
   updatePatient: (id: string, updates: Partial<Patient>) => Promise<void>;
   deletePatient: (id: string) => Promise<void>;
   loadPatients: () => Promise<void>;
@@ -26,10 +26,10 @@ export const usePatientStore = create<PatientState>((set, get) => ({
   
   setCurrentPatient: (patient) => set({ currentPatient: patient }),
   
-  addPatient: async (name?: string): Promise<Patient> => {
+  addPatient: async (name?: string, predefinedId?: string): Promise<Patient> => {
     set({ isLoading: true, error: null });
     
-    let patientId = generatePatientId();
+    let patientId = predefinedId || generatePatientId();
     let exists = await db.patients.get(patientId);
     let attempts = 0;
     

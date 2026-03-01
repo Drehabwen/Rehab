@@ -38,9 +38,9 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
   const handleConfirm = async () => {
     setIsCreating(true);
     try {
-      const patient = await addPatient(name.trim() || undefined);
-      const session = await startSession(patient.id);
-      onStartSession(session.id);
+      const patient = await addPatient(name.trim() || undefined, patientId);
+      await startSession(patient.id);
+      onStartSession(patient.id);
       onClose();
     } catch (error) {
       console.error('Failed to create session:', error);
