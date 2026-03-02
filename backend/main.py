@@ -9,9 +9,14 @@ import uvicorn
 import os
 import sys
 import json
-from dotenv import load_dotenv
 
-load_dotenv()
+# 加载环境变量
+dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+if os.path.exists(dotenv_path):
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path)
+
+from config import config
 
 # Add current directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -159,6 +164,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # Add timeout to prevent blocking forever if client is silent
             # But client sends data, so let's just read
             data = await websocket.receive_text()
+            print(f"[DEBUG] Received WebSocket message: {data[:200]}...", flush=True)
             print(f"Received raw data len: {len(data)}", flush=True)
             
             try:
@@ -277,29 +283,78 @@ async def websocket_endpoint(websocket: WebSocket):
 
             elif message.get("type") == "POSTURE_STEPPED_ANALYSIS":
                 try:
+                    print(f"[DEBUG] Received POSTURE_STEPPED_ANALYSIS message", flush=True)
                     request = SteppedAnalysisRequest(**message)
                     frames = request.frames
+                    assessment_type = request.assessmentType or "standard"
+                    print(f"[DEBUG] Number of frames: {len(frames)}, Assessment type: {assessment_type}", flush=True)
                     
                     if request.mock:
                         markdown_content = "### [MOCK] AI Posture Report\n\n- **Stability**: Excellent\n- **Posture**: Normal\n\nThis is a mock report for testing."
                         print("Generated MOCK report", flush=True)
                     elif len(frames) == 0:
                         markdown_content = "> **⚠️ 警告**：未采集到任何视角数据，请重新采集。"
+                        print("[DEBUG] No frames received", flush=True)
                     else:
                         print(f"Received stepped analysis for {len(frames)} views")
-                        markdown_content = await run_in_threadpool(generate_posture_report, {"frames": [f.model_dump() for f in frames]})
+                        print(f"[DEBUG] Frame details: {[f'view={f.view}, landmarks={len(f.timeSeriesLandmarks)}' for f in frames]}", flush=True)
+                        markdown_content = await run_in_threadpool(generate_posture_report, {"frames": [f.model_dump() for f in frames], "assessment_type": assessment_type})
                     
                     time_series = []
                     if frames and len(frames) > 0:
                         try:
                             time_series = build_time_series(frames)
+                            print(f"[DEBUG] Built time series with {len(time_series)} entries", flush=True)
                         except Exception as e:
                             print(f"Error building time series: {e}", flush=True)
+                    
+                    # Calculate basic metrics from time series
+                    metrics = None
+                    issues = []
+                    if time_series and len(time_series) > 0:
+                        try:
+                            metrics = compute_averages(time_series)
+                            print(f"[DEBUG] Computed averages: {metrics}", flush=True)
+                            
+                            # Generate basic issues from metrics
+                            if metrics.get('shoulderAngle', 0) and abs(metrics['shoulderAngle']) > config.POSTURE_THRESHOLDS['uneven_shoulders']['mild']:
+                                issues.append({
+                                    'id': 'shoulder_imbalance',
+                                    'type': 'alignment',
+                                    'severity': 'moderate' if abs(metrics['shoulderAngle']) > config.POSTURE_THRESHOLDS['uneven_shoulders']['moderate'] else 'mild',
+                                    'title': '肩膀不平衡',
+                                    'description': f'左右肩膀高度差异约 {abs(metrics["shoulderAngle"]):.1f}°',
+                                    'recommendation': '注意保持正确坐姿，避免单侧承重'
+                                })
+                            if metrics.get('headDeviation', 0) and abs(metrics['headDeviation']) > config.POSTURE_THRESHOLDS['midline_shift']['moderate']:
+                                issues.append({
+                                    'id': 'head_deviation',
+                                    'type': 'alignment',
+                                    'severity': 'moderate',
+                                    'title': '头部偏移',
+                                    'description': f'头部相对于中线偏移约 {abs(metrics["headDeviation"]):.1f}cm',
+                                    'recommendation': '注意保持头部中立位，避免长时间侧倾'
+                                })
+                            if metrics.get('headForward', 0) and metrics['headForward'] > config.POSTURE_THRESHOLDS['head_forward']['moderate']:
+                                issues.append({
+                                    'id': 'head_forward',
+                                    'type': 'forward_head',
+                                    'severity': 'moderate' if metrics['headForward'] > config.POSTURE_THRESHOLDS['head_forward']['severe'] else 'mild',
+                                    'title': '头前伸',
+                                    'description': f'头部前倾约 {metrics["headForward"]:.1f}cm',
+                                    'recommendation': '注意调整屏幕高度，保持头部中立位'
+                                })
+                            print(f"[DEBUG] Generated {len(issues)} basic issues", flush=True)
+                        except Exception as e:
+                            print(f"Error computing metrics: {e}", flush=True)
                     
                     report_response = PostureReportResponse(
                         markdown=markdown_content,
                         reportId=str(uuid.uuid4()),
-                        timeSeries=time_series
+                        timeSeries=time_series,
+                        metrics=metrics,
+                        issues=issues if issues else None,
+                        assessmentType=assessment_type
                     )
                     
                     print(f"--- SENDING POSTURE_REPORT ---", flush=True)
@@ -338,5 +393,5 @@ except Exception as e:
 
 if __name__ == "__main__":
     import uvicorn
-    # Use port 8002 to avoid conflicts with zombie processes on 8000
+    # Use port from config to avoid conflicts with zombie processes on 8000
     uvicorn.run(app, host="0.0.0.0", port=8002)

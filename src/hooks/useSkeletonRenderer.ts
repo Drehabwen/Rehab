@@ -40,33 +40,51 @@ export function useSkeletonRenderer({
     const canvas = canvasRef.current;
     const res = results || lastResultsRef.current;
 
-    if (!video || !canvas) return;
-
-    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
+    if (!video || !canvas) {
+      console.warn('[useSkeletonRenderer] Video or canvas not available');
+      return;
     }
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+      }
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('[useSkeletonRenderer] Failed to get 2D context');
+        return;
+      }
 
-    if (showSkeleton && res?.poseLandmarks) {
-      const landmarksToDraw = isMirrored 
-        ? res.poseLandmarks.map(lm => ({ ...lm, x: 1 - lm.x }))
-        : res.poseLandmarks;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      drawConnectors(ctx, landmarksToDraw, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
-      drawLandmarks(ctx, landmarksToDraw, { color: '#FF0000', lineWidth: 2, radius: 4 });
-    }
+      if (showSkeleton && res?.poseLandmarks) {
+        const landmarksToDraw = isMirrored 
+          ? res.poseLandmarks.map(lm => ({ ...lm, x: 1 - lm.x }))
+          : res.poseLandmarks;
 
-    if (annotations && annotations.length > 0) {
-      drawAnnotations(ctx, annotations, canvas.width, canvas.height, isMirrored);
-    }
+        drawConnectors(ctx, landmarksToDraw, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+        drawLandmarks(ctx, landmarksToDraw, { color: '#FF0000', lineWidth: 2, radius: 4 });
+      }
 
-    if (headAxes) {
-      drawHeadAxes(ctx, headAxes, isMirrored ? canvas.width : undefined);
+      if (annotations && annotations.length > 0) {
+        try {
+          drawAnnotations(ctx, annotations, canvas.width, canvas.height, isMirrored);
+        } catch (error) {
+          console.error('[useSkeletonRenderer] Failed to draw annotations:', error);
+        }
+      }
+
+      if (headAxes) {
+        try {
+          drawHeadAxes(ctx, headAxes, isMirrored ? canvas.width : undefined);
+        } catch (error) {
+          console.error('[useSkeletonRenderer] Failed to draw head axes:', error);
+        }
+      }
+    } catch (error) {
+      console.error('[useSkeletonRenderer] Drawing error:', error);
     }
   }, [isMirrored, showSkeleton, annotations, headAxes]);
 
@@ -82,10 +100,19 @@ export function useSkeletonRenderer({
   }, [onResults]);
 
   const handleResults = useCallback((results: Results) => {
+    if (!results || !results.poseLandmarks) {
+      console.warn('[useSkeletonRenderer] Invalid results received');
+      return;
+    }
+
     lastResultsRef.current = results;
     
-    // Data-driven drawing: update the canvas immediately when new results arrive
-    draw(results);
+    // Data-driven drawing: update canvas immediately when new results arrive
+    try {
+      draw(results);
+    } catch (error) {
+      console.error('[useSkeletonRenderer] Failed to draw:', error);
+    }
     
     if (onResults) {
       pendingResultsRef.current = results;

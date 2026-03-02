@@ -89,26 +89,26 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
           <ReactMarkdown 
             remarkPlugins={[remarkGfm]}
             components={{
-              h1: ({...props}) => <h1 className="text-2xl font-bold text-slate-100 mt-8 mb-4 border-b border-slate-800 pb-2" {...props} />,
-              h2: ({...props}) => <h2 className="text-xl font-bold text-slate-100 mt-6 mb-3" {...props} />,
-              h3: ({...props}) => <h3 className="text-lg font-bold text-slate-100 mt-5 mb-2 text-blue-400" {...props} />,
-              p: ({...props}) => <p className="mb-4 text-slate-300 leading-relaxed" {...props} />,
+              h1: ({...props}) => <h1 className="text-2xl font-bold text-white mt-8 mb-4 border-b border-slate-700 pb-2" {...props} />,
+              h2: ({...props}) => <h2 className="text-xl font-bold text-white mt-6 mb-3" {...props} />,
+              h3: ({...props}) => <h3 className="text-lg font-bold text-white mt-5 mb-2 text-blue-300" {...props} />,
+              p: ({...props}) => <p className="mb-4 text-slate-200 leading-relaxed" {...props} />,
               ul: ({...props}) => <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />,
               ol: ({...props}) => <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />,
-              li: ({...props}) => <li className="text-slate-300" {...props} />,
+              li: ({...props}) => <li className="text-slate-200" {...props} />,
               blockquote: ({...props}) => (
-                <blockquote className="border-l-4 border-blue-500 bg-blue-500/5 py-3 px-4 rounded-r-lg italic my-4 text-slate-400" {...props} />
+                <blockquote className="border-l-4 border-blue-400 bg-blue-500/10 py-3 px-4 rounded-r-lg italic my-4 text-slate-300" {...props} />
               ),
               table: ({...props}) => (
                 <div className="overflow-x-auto my-6">
                   <table className="w-full border-collapse text-sm" {...props} />
                 </div>
               ),
-              th: ({...props}) => <th className="bg-slate-800 text-slate-200 px-4 py-2 text-left border border-slate-700 font-bold" {...props} />,
-              td: ({...props}) => <td className="px-4 py-2 border border-slate-800 text-slate-400" {...props} />,
-              strong: ({...props}) => <strong className="text-blue-400 font-semibold" {...props} />,
-              code: ({...props}) => <code className="text-blue-300 bg-slate-800 px-1.5 py-0.5 rounded font-mono text-sm" {...props} />,
-              hr: ({...props}) => <hr className="my-8 border-slate-800" {...props} />,
+              th: ({...props}) => <th className="bg-slate-800 text-slate-100 px-4 py-2 text-left border border-slate-700 font-bold" {...props} />,
+              td: ({...props}) => <td className="px-4 py-2 border border-slate-800 text-slate-300" {...props} />,
+              strong: ({...props}) => <strong className="text-blue-300 font-semibold" {...props} />,
+              code: ({...props}) => <code className="text-blue-200 bg-slate-800 px-1.5 py-0.5 rounded font-mono text-sm" {...props} />,
+              hr: ({...props}) => <hr className="my-8 border-slate-700" {...props} />,
             }}
           >
             {displayedContent}

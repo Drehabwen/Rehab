@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Camera, 
   CheckCircle2, 
@@ -10,6 +10,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PoseLandmark } from '../vision3-utils';
+import { AssessmentType } from '../store/usePostureAssessmentStore';
+import { VIEW_TEXTS, CAPTURE_STATUS_TEXTS, BUTTON_TEXTS, PANEL_TEXTS, POSITION_TEXTS, DATA_CAPTURE_TEXTS, RECORDING_TEXTS } from '../constants/uiText';
+import { COLORS, SIZES, ANIMATIONS, TRANSITIONS, SHADOWS, BACKDROP } from '@/constants/uiStyles';
 
 interface SteppedAssessmentOverlayProps {
   view: 'front' | 'side' | 'back';
@@ -18,18 +21,13 @@ interface SteppedAssessmentOverlayProps {
   recordingProgress: number;
   isInPosition: boolean;
   steppedResults: Record<string, { timeSeriesLandmarks: PoseLandmark[][]; width: number; height: number; timestamp: number }>;
+  assessmentType: AssessmentType;
   onStartCapture: () => void;
-  onNextView: () => void;
+  onNextView: (assessmentType?: AssessmentType) => void;
   onRetake: () => void;
-  onFinish: () => void;
+  onFinish: (assessmentType?: AssessmentType) => void;
   onReset: () => void;
 }
-
-const VIEW_CONFIG = {
-  front: { label: '正视位', desc: '评估高低肩、骨盆倾斜' },
-  side: { label: '侧视位', desc: '评估圆肩驼背、骨盆前倾' },
-  back: { label: '背视位', desc: '评估脊柱侧弯风险' }
-};
 
 export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> = ({
   view,
@@ -38,48 +36,70 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
   recordingProgress,
   isInPosition,
   steppedResults,
+  assessmentType,
   onStartCapture,
   onNextView,
   onRetake,
   onFinish,
   onReset
 }) => {
-  const views: ('front' | 'side' | 'back')[] = ['front', 'side', 'back'];
   const capturedCount = Object.keys(steppedResults).length;
   const currentCaptured = steppedResults[view];
+  
+  const isQuickAssessment = assessmentType === 'quick';
+  const requiredViews = isQuickAssessment ? ['front'] : ['front', 'side', 'back'];
+  const currentViewIndex = requiredViews.indexOf(view);
+  const isLastView = currentViewIndex === requiredViews.length - 1;
+
+  // 成功提示自动隐藏逻辑：3秒后自动隐藏
+  const [showSuccessCard, setShowSuccessCard] = useState(true);
+  
+  useEffect(() => {
+    if (captureStatus === 'completed') {
+      setShowSuccessCard(true);
+      const timer = setTimeout(() => {
+        setShowSuccessCard(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowSuccessCard(true);
+    }
+  }, [captureStatus, view]);
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col items-center pointer-events-none p-12">
+    <div className="absolute inset-0 z-50 flex flex-col items-center pointer-events-none p-4 xs:p-6 md:p-8 lg:p-12">
       {/* 1. 顶部多视角进度 */}
-      <div className="flex items-center gap-4 bg-slate-900/80 px-8 py-4 rounded-[2.5rem] border border-white/20 shadow-2xl animate-in slide-in-from-top-8 duration-700">
-        <div className="flex items-center gap-3 pr-6 border-r border-white/10">
-          <Layers className="text-emerald-400" size={18} />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white">分步拍摄进度</span>
+      <div className={`flex items-center ${SIZES.gap.lg} ${COLORS.neutral.slateBg80} ${SIZES.padding.xl} ${SIZES.radius.pillLg} border ${COLORS.neutral.whiteBorder20} ${SHADOWS.lg} ${ANIMATIONS.slideInTop}`}>
+        <div className={`flex items-center ${SIZES.gap.md} pr-6 border-r ${COLORS.neutral.whiteBorder}`}>
+          <Layers className={COLORS.success.emeraldText} size={18} />
+          <span className={`${SIZES.font.md} font-black uppercase tracking-[0.2em] ${COLORS.neutral.whiteText}`}>
+            {isQuickAssessment ? PANEL_TEXTS.progress.quick : PANEL_TEXTS.progress.standard}
+          </span>
         </div>
         
-        <div className="flex items-center gap-8">
-          {views.map((v) => {
+        <div className="flex items-center gap-4 xs:gap-6 md:gap-8">
+          {requiredViews.map((v) => {
             const isCaptured = !!steppedResults[v];
             const isActive = view === v;
             return (
-              <div key={v} className="flex items-center gap-3 group">
+              <div key={v} className={`flex items-center ${SIZES.gap.md} group`}>
                 <div className={cn(
-                  "w-10 h-10 rounded-xl flex items-center justify-center border transition-all duration-500",
-                  isActive ? "bg-white text-slate-900 border-white shadow-lg scale-110" :
-                  isCaptured ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" :
-                  "bg-white/5 text-white/30 border-white/10"
+                  `${SIZES.size.md} ${SIZES.radius.md} flex items-center justify-center border ${TRANSITIONS.medium}`,
+                  isActive ? `${COLORS.neutral.white} text-slate-900 border-white shadow-lg scale-110` :
+                  isCaptured ? `${COLORS.success.emeraldBg} ${COLORS.success.emeraldText} ${COLORS.success.emeraldBorder}` :
+                  `${COLORS.neutral.whiteBg} text-white/30 ${COLORS.neutral.whiteBorder}`
                 )}>
                   {isCaptured ? <CheckCircle2 size={18} /> : <User size={18} />}
                 </div>
                 <div className="flex flex-col">
                   <span className={cn(
-                    "text-[9px] font-black uppercase tracking-widest",
-                    isActive ? "text-white" : "text-white/40"
+                    `${SIZES.font.sm} font-black uppercase tracking-widest`,
+                    isActive ? COLORS.neutral.whiteText : "text-white/40"
                   )}>{v}</span>
                   <span className={cn(
-                    "text-[11px] font-bold",
-                    isActive ? "text-white" : "text-white/60"
-                  )}>{VIEW_CONFIG[v].label}</span>
+                    `${SIZES.font.lg} font-bold`,
+                    isActive ? COLORS.neutral.whiteText : "text-white/60"
+                  )}>{VIEW_TEXTS[v].label}</span>
                 </div>
               </div>
             );
@@ -90,19 +110,19 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
       <div className="flex-1 flex flex-col items-center justify-center w-full">
         {/* 2. 状态文字 */}
         <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6">
-            <Info size={14} className="text-emerald-400" />
-            <span className="text-[11px] text-white/80 font-medium">{VIEW_CONFIG[view].desc}</span>
+          <div className={`inline-flex items-center ${SIZES.gap.sm} ${SIZES.padding.md} ${SIZES.radius.full} ${COLORS.neutral.whiteBg} border ${COLORS.neutral.whiteBorder} mb-6`}>
+            <Info size={14} className={COLORS.success.emeraldText} />
+            <span className={`${SIZES.font.lg} text-white/80 font-medium`}>{VIEW_TEXTS[view].description}</span>
           </div>
           
           <h2 className="text-5xl font-light text-white tracking-tight drop-shadow-2xl">
-            {captureStatus === 'idle' && `准备拍摄${VIEW_CONFIG[view].label}`}
-            {captureStatus === 'scanning' && (!isInPosition ? '请正对摄像头并保持全身可见' : '已就绪，准备拍摄')}
+            {captureStatus === 'idle' && `准备拍摄${VIEW_TEXTS[view].label}`}
+            {captureStatus === 'scanning' && (!isInPosition ? CAPTURE_STATUS_TEXTS.scanning.notInPosition : CAPTURE_STATUS_TEXTS.scanning.ready)}
             {captureStatus === 'countdown' && (
-              <span className="text-7xl font-black tabular-nums animate-pulse">{countdown}</span>
+              <span className="text-7xl font-black tabular-nums animate-pulse">{CAPTURE_STATUS_TEXTS.countdown(countdown)}</span>
             )}
-            {captureStatus === 'recording' && '正在采集时序数据...'}
-            {captureStatus === 'completed' && `${VIEW_CONFIG[view].label}拍摄完成`}
+            {captureStatus === 'recording' && CAPTURE_STATUS_TEXTS.recording}
+            {captureStatus === 'completed' && CAPTURE_STATUS_TEXTS.completed(VIEW_TEXTS[view].label)}
           </h2>
         </div>
 
@@ -111,82 +131,82 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
           <div className="w-80 space-y-4 animate-in fade-in zoom-in-95 duration-500">
             <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden border border-white/10">
               <div 
-                className="h-full bg-emerald-500 transition-all duration-100 ease-linear shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+                className={`h-full ${COLORS.success.emerald} transition-all duration-100 ease-linear ${COLORS.success.emeraldShadow}`}
                 style={{ width: `${recordingProgress}%` }}
               />
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Recording Skeletal Data</span>
-              <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">{Math.round(recordingProgress)}%</span>
+              <span className={`${SIZES.font.md} font-black ${COLORS.success.emeraldText} uppercase tracking-widest`}>{RECORDING_TEXTS.label}</span>
+              <span className={`${SIZES.font.md} font-black text-white/60 uppercase tracking-widest`}>{Math.round(recordingProgress)}%</span>
             </div>
           </div>
-        ) : captureStatus === 'completed' && currentCaptured ? (
-          <div className="relative w-64 h-96 rounded-[2rem] overflow-hidden border-4 border-emerald-500 bg-slate-900/50 flex flex-col items-center justify-center gap-6 shadow-2xl animate-in zoom-in-95 duration-500">
-            <div className="p-6 bg-emerald-500/20 rounded-full">
-              <CheckCircle2 size={48} className="text-emerald-400" />
+        ) : captureStatus === 'completed' && currentCaptured && showSuccessCard ? (
+          <div className={`relative ${SIZES.size.xl} ${SIZES.radius.pill} overflow-hidden border-4 ${COLORS.success.emerald} bg-slate-900/50 flex flex-col items-center justify-center ${SIZES.gap.lg} ${SHADOWS.lg} animate-in zoom-in-95 duration-500`}>
+            <div className={`p-6 ${COLORS.success.emeraldBg} ${SIZES.radius.full}`}>
+              <CheckCircle2 size={48} className={COLORS.success.emeraldText} />
             </div>
             <div className="text-center px-6">
-              <p className="text-white font-black text-xs uppercase tracking-widest mb-2">Data Captured</p>
-              <p className="text-white/40 text-[10px] leading-relaxed">
-                2秒时序骨架关键点已成功保存，共采集约60帧数据。
+              <p className={`${COLORS.neutral.whiteText} font-black text-xs uppercase tracking-widest mb-2`}>{DATA_CAPTURE_TEXTS.captured}</p>
+              <p className={`text-white/40 ${SIZES.font.md} leading-relaxed`}>
+                {DATA_CAPTURE_TEXTS.description}
               </p>
             </div>
           </div>
         ) : captureStatus === 'scanning' && (
           <div className={cn(
-            "px-8 py-4 rounded-3xl backdrop-blur-3xl border transition-all duration-500 flex items-center gap-4",
+            `${SIZES.padding.xl} ${SIZES.radius.xl} ${BACKDROP.lg} border ${TRANSITIONS.medium} flex items-center ${SIZES.gap.lg}`,
             isInPosition 
-              ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400" 
-              : "bg-white/5 border-white/10 text-white/60"
+              ? `${COLORS.success.emeraldBg} ${COLORS.success.emeraldBorder} ${COLORS.success.emeraldText}` 
+              : `${COLORS.neutral.whiteBg} ${COLORS.neutral.whiteBorder} text-white/60`
           )}>
             <div className={cn(
               "w-3 h-3 rounded-full",
-              isInPosition ? "bg-emerald-400 animate-pulse" : "bg-white/20"
+              isInPosition ? `${COLORS.success.emeraldLight} animate-pulse` : "bg-white/20"
             )} />
             <span className="text-sm font-bold tracking-tight uppercase">
-              {isInPosition ? 'Position Locked - Ready' : 'Scanning for Body Landmarks...'}
+              {isInPosition ? POSITION_TEXTS.locked : POSITION_TEXTS.scanning}
             </span>
           </div>
         )}
       </div>
 
       {/* 4. 底部控制栏 */}
-      <div className="w-full max-w-4xl bg-white/10 backdrop-blur-3xl p-8 rounded-[3.5rem] border border-white/20 flex items-center justify-between pointer-events-auto animate-in slide-in-from-bottom-12 duration-1000">
-        <div className="flex gap-4">
+      <div className={`w-full max-w-4xl ${COLORS.neutral.whiteBg} ${BACKDROP.lg} ${SIZES.padding.xl} ${SIZES.radius.pillXl} border ${COLORS.neutral.whiteBorder20} flex items-center justify-between pointer-events-auto ${ANIMATIONS.slideInBottom}`}>
+        <div className={`flex ${SIZES.gap.lg}`}>
           <button 
             onClick={onReset}
-            className="px-8 py-4 rounded-2xl bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-all font-bold text-sm"
+            className={`${SIZES.padding.xl} ${SIZES.radius.lg} ${COLORS.neutral.whiteBg} text-white/60 hover:bg-white/10 hover:text-white transition-all font-bold ${SIZES.font.xl}`}
           >
-            返回入口
+            {BUTTON_TEXTS.backToEntry}
           </button>
         </div>
 
-        <div className="flex items-center gap-8">
+        <div className={`flex items-center ${SIZES.gap.xxl}`}>
           {captureStatus === 'completed' ? (
-            <div className="flex gap-4">
+            <div className={`flex ${SIZES.gap.lg}`}>
               <button 
                 onClick={onRetake}
-                className="px-8 py-4 rounded-2xl bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-all font-bold text-sm"
+                className={`${SIZES.padding.xl} ${SIZES.radius.lg} ${COLORS.neutral.whiteBg} text-white/60 hover:bg-white/10 hover:text-white transition-all font-bold ${SIZES.font.xl}`}
               >
-                重新拍摄
+                {BUTTON_TEXTS.retake}
               </button>
               
               {/* 灵活选择：立即分析 或 下一步 */}
-              <div className="flex gap-3 bg-white/5 p-1.5 rounded-[2.2rem] border border-white/10">
+              <div className={`flex ${SIZES.gap.md} ${COLORS.neutral.whiteBg} p-1.5 rounded-[2.2rem] border ${COLORS.neutral.whiteBorder}`}>
                 <button 
-                  onClick={onFinish}
-                  className="flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white px-6 py-3.5 rounded-3xl font-bold text-sm transition-all"
+                  onClick={() => onFinish(assessmentType)}
+                  className={`flex items-center ${SIZES.gap.sm} ${COLORS.success.emeraldBg} hover:bg-emerald-500 ${COLORS.success.emeraldText} hover:text-white px-6 py-3.5 ${SIZES.radius.xl} font-bold ${SIZES.font.xl} transition-all`}
                 >
                   <Sparkles size={18} />
-                  <span>立即生成报告</span>
+                  <span>{isQuickAssessment ? BUTTON_TEXTS.generateReport : BUTTON_TEXTS.generateReportNow}</span>
                 </button>
 
-                {view !== 'back' && (
+                {!isQuickAssessment && !isLastView && (
                   <button 
-                    onClick={onNextView}
-                    className="flex items-center gap-2 bg-white text-slate-900 px-8 py-3.5 rounded-3xl font-bold text-sm transition-all shadow-xl hover:scale-105 active:scale-95"
+                    onClick={() => onNextView(assessmentType)}
+                    className={`flex items-center ${SIZES.gap.sm} ${COLORS.neutral.white} text-slate-900 px-8 py-3.5 ${SIZES.radius.xl} font-bold ${SIZES.font.xl} transition-all ${SHADOWS.md} hover:scale-105 active:scale-95`}
                   >
-                    <span>下一步：{VIEW_CONFIG[views[views.indexOf(view) + 1]].label}</span>
+                    <span>{BUTTON_TEXTS.nextStep(VIEW_TEXTS[requiredViews[currentViewIndex + 1]].label)}</span>
                     <ChevronRight size={18} />
                   </button>
                 )}
@@ -197,27 +217,27 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
               onClick={onStartCapture}
               disabled={captureStatus !== 'idle'}
               className={cn(
-                "flex items-center gap-3 px-10 py-5 rounded-[2rem] font-black text-lg transition-all shadow-2xl",
+                `flex items-center ${SIZES.gap.md} ${SIZES.padding.xxl} ${SIZES.radius.pill} font-black ${SIZES.font.xxl} transition-all ${SHADOWS.lg}`,
                 captureStatus === 'idle' 
-                  ? "bg-white text-slate-900 hover:scale-105 active:scale-95" 
-                  : "bg-white/10 text-white/20 cursor-not-allowed"
+                  ? `${COLORS.neutral.white} text-slate-900 hover:scale-105 active:scale-95` 
+                  : `${COLORS.neutral.whiteBg} text-white/20 cursor-not-allowed`
               )}
             >
               <Camera size={24} />
-              <span>{captureStatus === 'idle' ? '开始自动拍摄' : '自动拍摄中...'}</span>
+              <span>{captureStatus === 'idle' ? BUTTON_TEXTS.startAutoCapture : BUTTON_TEXTS.capturing}</span>
             </button>
           )}
         </div>
 
         <div className="flex flex-col items-end">
-          <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Current Progress</span>
+          <span className={`${SIZES.font.md} font-black text-white/40 uppercase tracking-[0.2em] mb-1`}>Current Progress</span>
           <div className="flex gap-1.5">
             {[1, 2, 3].map(i => (
               <div 
                 key={i} 
                 className={cn(
                   "w-8 h-1.5 rounded-full transition-all duration-500",
-                  i <= capturedCount ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]" : "bg-white/10"
+                  i <= capturedCount ? `${COLORS.success.emeraldLight} shadow-[0_0_10px_rgba(52,211,153,0.5)]` : "bg-white/10"
                 )} 
               />
             ))}

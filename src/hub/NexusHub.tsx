@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HubSidebar } from './components/HubSidebar';
-import { Bell, Search, Calendar, Clock, Plus, Users, ClipboardList, ChevronLeft, User, Settings, Database } from 'lucide-react';
+import { Bell, Search, Calendar, Clock, Plus, Users, ClipboardList, ChevronLeft, User, Settings, Database, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
@@ -179,10 +179,16 @@ export const NexusHub: React.FC = () => {
         )}
         
         <header className={cn(
-          "h-20 border-b border-slate-200/60 bg-white/40 backdrop-blur-xl flex items-center justify-between px-8 sticky top-0 z-10",
+          "h-20 border-b border-slate-200/60 bg-white/40 backdrop-blur-xl flex items-center justify-between px-4 md:px-8 sticky top-0 z-10",
           view === 'workspace' && "hidden"
         )}>
           <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="md:hidden p-2 rounded-lg hover:bg-slate-100"
+            >
+              <Menu size={20} />
+            </button>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-antey-primary animate-pulse shadow-[0_0_8px_rgba(13,148,136,0.5)]" />
               <h2 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">
@@ -247,7 +253,7 @@ export const NexusHub: React.FC = () => {
                   </div>
                 </section>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-4">
                   <button 
                     onClick={() => setShowNewSessionModal(true)}
                     className="group bento-card p-6 flex items-center justify-between hover:border-antey-primary/30 transition-all bg-gradient-to-br from-antey-primary/5 to-transparent"
@@ -320,7 +326,7 @@ export const NexusHub: React.FC = () => {
                         <div
                           key={patient.id}
                           onClick={() => handleSelectPatient(patient)}
-                          className="w-full bento-card p-5 flex items-center justify-between hover:border-antey-primary/30 transition-all group cursor-pointer"
+                          className="w-full bento-card p-4 xs:p-5 flex flex-col xs:flex-row items-start xs:items-center justify-between gap-3 hover:border-antey-primary/30 transition-all group cursor-pointer"
                         >
                           <div className="flex items-center gap-5">
                             <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center group-hover:bg-antey-primary/10 transition-colors">

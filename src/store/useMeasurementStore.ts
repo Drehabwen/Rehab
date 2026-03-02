@@ -194,16 +194,40 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
     savedMeasurements: state.savedMeasurements.filter(m => m.id !== id)
   })),
 
-  savePostureReport: (view, html, markdown, timeSeries) => set((state) => ({
-    postureReports: [{
-      id: crypto.randomUUID(),
-      date: Date.now(),
+  savePostureReport: (view, html, markdown, timeSeries) => {
+    console.log('[useMeasurementStore] savePostureReport called:', {
       view,
-      html,
-      markdown,
-      timeSeries
-    }, ...state.postureReports]
-  })),
+      htmlLength: html.length,
+      hasMarkdown: !!markdown,
+      markdownLength: markdown ? markdown.length : 0,
+      hasTimeSeries: timeSeries && timeSeries.length > 0,
+      timeSeriesLength: timeSeries ? timeSeries.length : 0
+    });
+    
+    set((state) => {
+      const newReport = {
+        id: crypto.randomUUID(),
+        date: Date.now(),
+        view,
+        html,
+        markdown,
+        timeSeries
+      };
+      
+      console.log('[useMeasurementStore] New report created:', {
+        id: newReport.id,
+        date: new Date(newReport.date).toLocaleString(),
+        view: newReport.view
+      });
+      
+      const updatedReports = [newReport, ...state.postureReports];
+      console.log('[useMeasurementStore] Updated postureReports length:', updatedReports.length);
+      
+      return {
+        postureReports: updatedReports
+      };
+    });
+  },
 
   deletePostureReport: (id) => set((state) => ({
     postureReports: state.postureReports.filter(r => r.id !== id)

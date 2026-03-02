@@ -1,6 +1,45 @@
 import { create } from 'zustand';
 
 /**
+ * 评估类型定义
+ */
+export type AssessmentType = 'standard' | 'quick';
+
+/**
+ * 评估模式配置
+ */
+export interface AssessmentModeConfig {
+  type: AssessmentType;
+  label: string;
+  description: string;
+  features: string[];
+  estimatedTime: string;
+  requiredViews: ('front' | 'side' | 'back')[];
+}
+
+/**
+ * 评估模式常量
+ */
+export const ASSESSMENT_MODES: Record<AssessmentType, AssessmentModeConfig> = {
+  standard: {
+    type: 'standard',
+    label: '标准评估',
+    description: '前-侧-后三视角完整评估',
+    features: ['数据完整', '诊断准确', '全面分析'],
+    estimatedTime: '3-5 分钟',
+    requiredViews: ['front', 'side', 'back']
+  },
+  quick: {
+    type: 'quick',
+    label: '快速评估',
+    description: '单视角快速筛查',
+    features: ['即时反馈', '快速筛查', '初步检查'],
+    estimatedTime: '1-2 分钟',
+    requiredViews: ['front']
+  }
+};
+
+/**
  * 评估阶段定义
  */
 export type AssessmentStep = 
@@ -34,6 +73,7 @@ export interface PostureResult {
 }
 
 interface PostureAssessmentState {
+  assessmentType: AssessmentType;  // 评估类型：标准评估或快速评估
   step: AssessmentStep;
   countdown: number;          // 实时倒计时
   stabilityProgress: number;  // 稳定性进度 (0-100)
@@ -48,6 +88,7 @@ interface PostureAssessmentState {
   error: string | null;
 
   // Actions
+  setAssessmentType: (type: AssessmentType) => void;
   setStep: (step: AssessmentStep) => void;
   setCountdown: (seconds: number) => void;
   setStabilityProgress: (progress: number) => void;
@@ -63,6 +104,7 @@ interface PostureAssessmentState {
 }
 
 export const usePostureAssessmentStore = create<PostureAssessmentState>((set) => ({
+  assessmentType: 'standard',
   step: 'idle',
   countdown: 0,
   stabilityProgress: 0,
@@ -72,6 +114,7 @@ export const usePostureAssessmentStore = create<PostureAssessmentState>((set) =>
   result: null,
   error: null,
 
+  setAssessmentType: (type) => set({ assessmentType: type }),
   setStep: (step) => set({ step }),
   setCountdown: (seconds) => set({ countdown: seconds }),
   setStabilityProgress: (progress) => set({ stabilityProgress: progress }),
@@ -89,6 +132,7 @@ export const usePostureAssessmentStore = create<PostureAssessmentState>((set) =>
   setError: (error) => set({ error, step: 'error' }),
 
   reset: () => set({
+    assessmentType: 'standard',
     step: 'idle',
     countdown: 0,
     stabilityProgress: 0,

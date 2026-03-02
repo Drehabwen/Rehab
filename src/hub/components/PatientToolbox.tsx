@@ -192,7 +192,7 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
           <FileText size={14} />
           工具箱
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
           {tools.map((tool, idx) => {
             const count = getToolCount(tool.id);
             const lastTime = getLastAssessmentTime(tool.id);
@@ -204,7 +204,7 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
                 onClick={() => tool.available && onSelectTool(tool.id)}
                 disabled={!tool.available}
                 className={cn(
-                  "group relative bento-card p-4 text-left transition-all duration-300 hover:scale-[1.02]",
+                  "group relative bento-card p-3 xs:p-4 md:p-4 text-left transition-all duration-300 hover:scale-[1.02]",
                   tool.available 
                     ? "hover:border-antey-primary/30 hover:shadow-lg cursor-pointer" 
                     : "opacity-50 cursor-not-allowed"

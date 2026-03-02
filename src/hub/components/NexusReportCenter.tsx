@@ -306,7 +306,7 @@ export const NexusReportCenter: React.FC = () => {
                         <div className="flex items-center gap-3 text-slate-400 text-[10px] font-medium">
                           <span className="flex items-center gap-1">
                             <Calendar size={10} />
-                            {new Date(assessment.createdAt).toLocaleDateString()}
+                            {new Date(assessment.createdAt).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                           </span>
                           <span className="flex items-center gap-1">
                             <User size={10} />

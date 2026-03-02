@@ -7,6 +7,7 @@ import {
   BrainCircuit
 } from 'lucide-react';
 import { MarkdownReport } from '@/components/shared/MarkdownReport';
+import { REPORT_TEXTS, SYSTEM_TEXTS } from '../constants/uiText';
 
 interface PostureReportProps {
   markdownReport?: string;
@@ -21,9 +22,9 @@ export const PostureReport: React.FC<PostureReportProps> = ({ markdownReport, on
           <div className="w-20 h-20 rounded-3xl bg-antey-primary/10 flex items-center justify-center mb-6 animate-pulse">
             <BrainCircuit className="text-antey-primary" size={40} />
           </div>
-          <h4 className="text-lg font-black text-slate-900 uppercase tracking-[0.2em] mb-3">AI 报告生成中</h4>
+          <h4 className="text-lg font-black text-slate-900 uppercase tracking-[0.2em] mb-3">{REPORT_TEXTS.generating}</h4>
           <p className="text-[11px] text-slate-400 font-bold max-w-[240px] leading-relaxed">
-            正在通过 LLM 深度分析您的生物力学数据，请稍候...
+            {REPORT_TEXTS.generatingDescription}
           </p>
           <div className="mt-8 flex gap-2">
             {[0, 1, 2].map(i => (
@@ -40,7 +41,7 @@ export const PostureReport: React.FC<PostureReportProps> = ({ markdownReport, on
                 <CheckCircle className="text-emerald-500" size={20} />
               </div>
               <div>
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">智能诊断报告</h3>
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">{REPORT_TEXTS.intelligentReport}</h3>
                 <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">AI Analysis Ready</p>
               </div>
             </div>
@@ -65,7 +66,7 @@ export const PostureReport: React.FC<PostureReportProps> = ({ markdownReport, on
               className="flex-1 bg-white text-slate-900 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-slate-50 transition-all border border-slate-200 flex items-center justify-center gap-3"
             >
               <RotateCcw size={16} />
-              重新评估
+              {SYSTEM_TEXTS.reevaluate}
             </button>
           </div>
         </div>

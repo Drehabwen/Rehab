@@ -7,6 +7,7 @@ import {
   AnalysisResult, 
   VisualAnnotation 
 } from '@/utils/posture-report-utils';
+import { CONFIG } from '@/config';
 
 // Re-export types for backward compatibility
 export type { PostureMetrics, PostureIssue, Landmark, AnalysisResult, VisualAnnotation };
@@ -24,7 +25,7 @@ export interface SteppedFrame {
   timestamp: number;
 }
 
-export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
+export function usePostureWS(url: string = CONFIG.websocket.url) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
   const [markdownReport, setMarkdownReport] = useState<string | null>(null);
@@ -47,10 +48,13 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
 
   const sendMessage = useCallback((payload: Record<string, unknown>) => {
     const message = JSON.stringify(payload);
+    console.log('[usePostureWS] sendMessage called, readyState:', ws.current?.readyState, 'OPEN:', WebSocket.OPEN);
     if (ws.current?.readyState === WebSocket.OPEN) {
+      console.log('[usePostureWS] Sending message via WebSocket');
       ws.current.send(message);
       return;
     }
+    console.log('[usePostureWS] WebSocket not ready, adding to pending queue');
     pendingMessages.current.push(message);
   }, []);
 
@@ -69,6 +73,8 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
       const handleMessage = (event: MessageEvent) => {
         try {
           const data = JSON.parse(event.data);
+          console.log('[usePostureWS] Received message:', data.type);
+          console.log('[usePostureWS] Full data:', data);
           if (data.type === 'ANALYSIS_RESULT') {
             setResult(data);
             const auxReport = generateAuxiliaryReport(data);
@@ -79,10 +85,37 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
             const markdown = typeof data.markdown === 'string' ? data.markdown : '';
             const normalized = markdown.trim();
             const finalMarkdown = normalized ? markdown : '报告生成失败：未收到有效的 Markdown 内容。';
+            console.log('[usePostureWS] Setting markdownReport, length:', finalMarkdown.length);
             setMarkdownReport(finalMarkdown);
             const timeSeries = Array.isArray(data.timeSeries) ? data.timeSeries : lastBatchTimeSeriesRef.current;
             setTimeSeriesData(timeSeries);
-            savePostureReport(currentViewRef.current, '', finalMarkdown, timeSeries);
+            
+            // Set basic metrics and issues if available
+            if (data.metrics) {
+              console.log('[usePostureWS] Received basic metrics:', data.metrics);
+              setResult({
+                metrics: data.metrics,
+                issues: data.issues || [],
+                timestamp: data.timestamp || Date.now()
+              });
+            }
+            
+            console.log('[usePostureWS] Saving posture report:', {
+              view: currentViewRef.current,
+              reportLength: finalMarkdown.length,
+              hasTimeSeries: timeSeries && timeSeries.length > 0,
+              timeSeriesLength: timeSeries ? timeSeries.length : 0
+            });
+            
+            savePostureReport(currentViewRef.current, finalMarkdown, finalMarkdown, timeSeries);
+            console.log('[usePostureWS] Posture report saved successfully');
+            
+            // Log the current report state
+            console.log('[usePostureWS] Current report state:', {
+              markdownReport: markdownReport ? 'exists' : 'null',
+              auxiliaryReport: auxiliaryReport ? 'exists' : 'null',
+              timeSeriesData: timeSeriesData ? 'exists' : 'null'
+            });
           }
         } catch (e) {
           console.error('Failed to parse analysis result:', e);
@@ -167,17 +200,59 @@ export function usePostureWS(url: string = 'ws://localhost:8002/ws/analyze') {
     });
   }, [sendMessage]);
 
-  const analyzeStepped = useCallback((frames: SteppedFrame[]) => {
+  const analyzeStepped = useCallback((frames: SteppedFrame[], assessmentType: string = 'standard') => {
+    console.log('[usePostureWS] ========== analyzeStepped START ==========');
+    console.log('[usePostureWS] frames count:', frames.length);
+    console.log('[usePostureWS] assessmentType:', assessmentType);
+    
+    if (frames.length > 0) {
+      console.log('[usePostureWS] frames detail:', frames.map(f => ({ 
+        view: f.view, 
+        landmarkFrames: f.timeSeriesLandmarks?.length,
+        width: f.width,
+        height: f.height
+      })));
+    }
+    
     setMarkdownReport(null);
     setResult(null);
-    if (frames.length) {
-      currentViewRef.current = frames[0].view;
+    
+    if (frames.length === 0) {
+      console.error('[usePostureWS] ERROR: No frames to analyze!');
+      return;
     }
-    sendMessage({
+    
+    currentViewRef.current = frames[0].view;
+    
+    const message = {
       type: 'POSTURE_STEPPED_ANALYSIS',
-      frames
-    });
-  }, [sendMessage]);
+      frames,
+      assessmentType
+    };
+    
+    const readyState = ws.current?.readyState;
+    console.log('[usePostureWS] WebSocket readyState:', readyState, '(0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)');
+    
+    if (readyState !== WebSocket.OPEN) {
+      console.error('[usePostureWS] ERROR: WebSocket not open! Current state:', readyState);
+      console.log('[usePostureWS] Attempting to reconnect...');
+      connect();
+      setTimeout(() => {
+        console.log('[usePostureWS] Retrying after reconnect, readyState:', ws.current?.readyState);
+        if (ws.current?.readyState === WebSocket.OPEN) {
+          sendMessage(message);
+          console.log('[usePostureWS] Message sent after reconnect');
+        } else {
+          console.error('[usePostureWS] Reconnect failed, readyState still:', ws.current?.readyState);
+        }
+      }, 1000);
+      return;
+    }
+    
+    sendMessage(message);
+    console.log('[usePostureWS] Message sent successfully');
+    console.log('[usePostureWS] ========== analyzeStepped END ==========');
+  }, [sendMessage, connect]);
 
   return {
     result,

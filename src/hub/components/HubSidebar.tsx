@@ -18,7 +18,7 @@ const navItems = [
 export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isCollapsed, onToggle, onSettingsClick }) => {
   return (
     <aside className={cn(
-      "h-screen bg-slate-900 text-white transition-all duration-500 flex flex-col border-r border-white/5 relative z-20 shadow-2xl",
+      "h-screen bg-slate-900 text-white transition-all duration-500 flex flex-col border-r border-white/5 relative z-20 shadow-2xl hidden md:flex",
       isCollapsed ? "w-24" : "w-72"
     )}>
       {/* Brand Logo */}

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Results } from '@/lib/mediapipe-utils';
 import { usePostureWS } from '@/hooks/usePostureWS';
-import { usePostureAssessmentStore } from '../store/usePostureAssessmentStore';
+import { usePostureAssessmentStore, AssessmentType } from '../store/usePostureAssessmentStore';
 import { globalMonitor } from '../services/GlobalMonitor';
 import { useCaptureStateMachine, CaptureStatus } from './useCaptureStateMachine';
 import { 
@@ -11,17 +11,21 @@ import {
   HeadAxes,
   PoseLandmark
 } from '../vision3-utils';
+import AssessmentFallbackHandler from '@/utils/assessmentFallback';
+import { CONFIG } from '@/config';
 
 interface UsePostureAnalysisProps {
   axesScale: number;
   view: 'front' | 'side' | 'back';
   assessmentMode?: 'realtime' | 'stepped';
+  assessmentType: AssessmentType;
 }
 
 export function usePostureAnalysis({ 
   axesScale, 
   view,
-  assessmentMode = 'realtime'
+  assessmentMode = 'realtime',
+  assessmentType
 }: UsePostureAnalysisProps) {
   const { setStep } = usePostureAssessmentStore();
   const { 
@@ -29,12 +33,16 @@ export function usePostureAnalysis({
     analyze, 
     analyzeBatch, 
     analyzeStepped,
-    markdownReport,
+    markdownReport: wsMarkdownReport,
     auxiliaryReport,
     timeSeriesData
   } = usePostureWS();
 
   const [steppedResults, setSteppedResults] = useState<Record<string, { timeSeriesLandmarks: PoseLandmark[][]; width: number; height: number; timestamp: number }>>({});
+  const [localMarkdownReport, setLocalMarkdownReport] = useState<string | null>(null);
+  
+  // Combine WebSocket report with local fallback report
+  const markdownReport = wsMarkdownReport || localMarkdownReport;
 
   // Handle Capture Completion
   const onCapture = useCallback((data: { 
@@ -70,11 +78,38 @@ export function usePostureAnalysis({
     if (wsResult && assessmentMode === 'realtime' && captureStatus === 'analyzing') {
       captureDispatch({ type: 'ANALYSIS_COMPLETE' });
     }
-    // 分步模式：录制完成后直接标记为该视角拍摄完成（预览状态）
-    if (assessmentMode === 'stepped' && captureStatus === 'analyzing') {
+    // 分步模式：等待后端返回 markdownReport 后再完成
+    if (markdownReport && assessmentMode === 'stepped' && captureStatus === 'analyzing') {
       captureDispatch({ type: 'ANALYSIS_COMPLETE' });
     }
-  }, [wsResult, assessmentMode, captureStatus, captureDispatch]);
+  }, [wsResult, markdownReport, assessmentMode, captureStatus, captureDispatch]);
+
+  // --- Fallback Handling for Analysis Timeout ---
+  useEffect(() => {
+    if (captureStatus !== 'analyzing') return;
+
+    const timeout = setTimeout(() => {
+      console.warn('[usePostureAnalysis] Analysis timeout, using fallback report');
+      
+      // Generate fallback report with basic data
+      const fallbackReport = AssessmentFallbackHandler.generateFallbackReport({
+        reason: 'llm_timeout',
+        view,
+        assessmentType,
+        metrics: wsResult?.metrics
+      });
+
+      console.log('[usePostureAnalysis] Fallback report generated:', fallbackReport.markdown?.substring(0, 100));
+      
+      // Set fallback markdown
+      setLocalMarkdownReport(fallbackReport.markdown);
+      
+      // Complete analysis
+      captureDispatch({ type: 'ANALYSIS_COMPLETE' });
+    }, CONFIG.analysis.timeout); // Analysis timeout
+
+    return () => clearTimeout(timeout);
+  }, [captureStatus, view, assessmentType, wsResult?.metrics]);
 
   // --- Analysis Visualization Logic ---
   const [headAxes, setHeadAxes] = useState<HeadAxes | null>(null);
@@ -110,8 +145,8 @@ export function usePostureAnalysis({
     if (results.poseLandmarks) {
       const landmarks = results.poseLandmarks as PoseLandmark[];
       // 获取当前画面的实际尺寸
-      const width = results.image?.width || 640;
-      const height = results.image?.height || 480;
+      const width = results.image?.width || CONFIG.video.defaultWidth;
+      const height = results.image?.height || CONFIG.video.defaultHeight;
       
       processLandmarks(landmarks, width, height);
       globalMonitor.onFrame(landmarks);
@@ -174,8 +209,8 @@ export function usePostureAnalysis({
       
       onCapture({
         timeSeriesLandmarks: mockFrames,
-        width: 640,
-        height: 480,
+        width: CONFIG.video.defaultWidth,
+        height: CONFIG.video.defaultHeight,
         timestamp: Date.now()
       });
     }

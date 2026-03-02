@@ -105,6 +105,7 @@ class TemporalAnalysisRequest(BaseModel):
 class SteppedAnalysisRequest(BaseModel):
     type: str = "POSTURE_STEPPED_ANALYSIS"
     frames: List[SteppedFrame]
+    assessmentType: str = "standard"  # 'standard' or 'quick'
     mock: bool = False
 
 class PostureReportResponse(BaseModel):
@@ -112,4 +113,7 @@ class PostureReportResponse(BaseModel):
     markdown: str
     reportId: str
     timeSeries: Optional[List[Dict[str, Any]]] = None
+    metrics: Optional[Dict[str, Any]] = None
+    issues: Optional[List[Dict[str, Any]]] = None
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
+    assessmentType: str = "standard"

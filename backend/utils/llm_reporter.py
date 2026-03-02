@@ -4,10 +4,14 @@ import logging
 import re
 import statistics
 from typing import Dict, Any, List, Optional
-from openai import OpenAI
-from dotenv import load_dotenv
 
-load_dotenv()
+# 加载环境变量
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+if os.path.exists(dotenv_path):
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path)
+
+from openai import OpenAI
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,9 +51,12 @@ class PostureAgent:
         # For now, we'll collect them all for the final summary to save tokens and simplify.
         return f"已记录视角数据，当前累计视角数: {len(self.observations)}"
 
-    def generate_final_report(self) -> str:
+    def generate_final_report(self, assessment_type: str = "standard") -> str:
         """
-        Generates the holistic final report based on all accumulated observations.
+        Generates holistic final report based on all accumulated observations.
+        
+        Args:
+            assessment_type: 'standard' for full 3-view analysis, 'quick' for single-view screening
         """
         if not client:
             return "Deepseek API key not found."
@@ -58,8 +65,26 @@ class PostureAgent:
         for i, obs in enumerate(self.observations):
             history_context += f"\n--- 视角 {i+1} 数据 ---\n{obs['narration']}\n"
 
+        # Adjust prompt based on assessment type
+        if assessment_type == "quick":
+            assessment_context = """
+            ### 评估类型：快速评估（单视角筛查）
+            - 本评估仅基于单视角（正面）数据
+            - 适合快速筛查和初步检查
+            - 建议进行完整评估以获得更准确的诊断
+            """
+        else:
+            assessment_context = """
+            ### 评估类型：标准评估（三视角完整评估）
+            - 本评估基于正面、侧面、背面三视角数据
+            - 提供全面、准确的体态分析
+            - 适合需要详细诊断的场景
+            """
+
         prompt = f"""
         你是一位极其挑剔且专业的康复评估专家。你正在对一位患者进行多视角（正面、侧面、背面）的体态汇总分析。
+        
+        {assessment_context}
         
         ### 历史观测记录 (数值与自然语言描述)
         {history_context}
@@ -214,17 +239,21 @@ def build_narration(view: str, summary: Dict[str, Any]) -> str:
                 lines.append(f"- {key}: mean={mean:.4f}, sd={sd:.4f}, min={min_v:.4f}, max={max_v:.4f}")
     return "\n".join(lines)
 
-def generate_posture_report(analysis_data: Dict[str, Any]) -> str:
+def generate_posture_report(analysis_data: Dict[str, Any], assessment_type: str = "standard") -> str:
     """
     Compatibility wrapper for existing calls.
-    Now uses the PostureAgent to generate a report.
+    Now uses PostureAgent to generate a report.
+    
+    Args:
+        analysis_data: Dictionary containing frames or other analysis data
+        assessment_type: 'standard' for full 3-view analysis, 'quick' for single-view screening
     """
     # If it's a batch/stepped request, it usually comes with multiple frames.
     # We should clear the agent and feed it everything.
     posture_agent.clear()
     
-    # In the new flow, analysis_data might contain the narration and stats directly.
-    # Or it might be the old format. Let's handle both.
+    # In new flow, analysis_data might contain narration and stats directly.
+    # Or it might be old format. Let's handle both.
     
     if "frames" in analysis_data:
         # New stepped flow
@@ -254,4 +283,4 @@ def generate_posture_report(analysis_data: Dict[str, Any]) -> str:
         narration = build_narration(view, summary_stats)
         posture_agent.analyze_view(narration, summary_stats)
         
-    return posture_agent.generate_final_report()
+    return posture_agent.generate_final_report(assessment_type)

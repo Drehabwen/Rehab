@@ -3,6 +3,7 @@ import { TrendingUp, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { THRESHOLDS, SYSTEM_CONFIG } from '../config';
 import type { PostureMetrics } from '@/hooks/usePostureWS';
+import { DATA_QUALITY_TEXTS } from '../constants/uiText';
 
 interface MetricsSidebarProps {
   isVisible: boolean;
@@ -87,8 +88,8 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
             {stability && stability.sd < THRESHOLDS.stability.clinical 
-              ? "数据采集质量极高，已达到临床级分析标准。" 
-              : "建议保持更稳定的站姿，以获得更精准的关节受力分析。"}
+              ? DATA_QUALITY_TEXTS.excellent 
+              : DATA_QUALITY_TEXTS.suggestion}
           </p>
         </div>
       </div>

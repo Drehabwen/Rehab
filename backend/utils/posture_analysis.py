@@ -2,6 +2,7 @@ import math
 import numpy as np
 from typing import List, Dict, Any, Optional
 from models import Landmark, PostureIssue, PostureMetrics, AnalysisResponse, VisualAnnotation
+from config import config
 
 LANDMARKS = {
     "NOSE": 0,
@@ -179,8 +180,8 @@ def analyze_posture(
             label="肩峰垂线"
         ))
 
-        if forward_ratio > 0.25:
-            severity = 'severe' if forward_ratio > 0.45 else 'moderate'
+        if forward_ratio > config.POSTURE_THRESHOLDS['head_forward']['moderate']:
+            severity = 'severe' if forward_ratio > config.POSTURE_THRESHOLDS['head_forward']['severe'] else 'moderate'
             issues.append(PostureIssue(
                 id='head-forward',
                 type='head-forward',
@@ -218,7 +219,7 @@ def analyze_posture(
             lineWidth=2
         ))
 
-        if kyphosis_ratio > 0.15:
+        if kyphosis_ratio > config.POSTURE_THRESHOLDS['shoulder_rounded']['mild']:
             issues.append(PostureIssue(
                 id='rounded-shoulders',
                 type='posture',
@@ -280,12 +281,12 @@ def analyze_posture(
         ear_slope = dy_e / dx_e
         head_tilt_angle = round(math.atan(ear_slope) * (180 / math.pi), 1)
         
-        if ear_slope > 0.03:
+        if ear_slope > config.POSTURE_THRESHOLDS['head_tilt']['mild']:
             is_left_high = l_ear["y"] < r_ear["y"]
             issues.append(PostureIssue(
                 id='head-tilt',
                 type='imbalance',
-                severity='moderate' if ear_slope > 0.08 else 'mild',
+                severity='moderate' if ear_slope > config.POSTURE_THRESHOLDS['head_tilt']['moderate'] else 'mild',
                 title='头部侧倾',
                 description=f"头部向{'右' if is_left_high else '左'}侧倾斜约 {head_tilt_angle}°。",
                 recommendation='建议进行颈部侧向拉伸，平衡两侧斜角肌力量。',
@@ -298,12 +299,12 @@ def analyze_posture(
                 label=f"头倾斜: {head_tilt_angle}°"
             ))
 
-        if shoulder_slope > 0.03:
+        if shoulder_slope > config.POSTURE_THRESHOLDS['uneven_shoulders']['mild']:
             is_left_high = l_shoulder["y"] < r_shoulder["y"]
             issues.append(PostureIssue(
                 id='uneven-shoulders',
                 type='imbalance',
-                severity='moderate' if shoulder_slope > 0.08 else 'mild',
+                severity='moderate' if shoulder_slope > config.POSTURE_THRESHOLDS['uneven_shoulders']['moderate'] else 'mild',
                 title='高低肩',
                 description=f"{'左' if is_left_high else '右'}肩较高。可能由背包习惯或脊柱侧弯引起。",
                 recommendation='建议平衡双侧斜方肌力量，检查是否有脊柱侧弯风险。',
@@ -322,12 +323,12 @@ def analyze_posture(
         hip_slope = dy_h / dx_h
         metrics.hipAngle = round(math.atan(hip_slope) * (180 / math.pi), 1)
 
-        if hip_slope > 0.03:
+        if hip_slope > config.POSTURE_THRESHOLDS['uneven_hips']['mild']:
             is_left_high = l_hip["y"] < r_hip["y"]
             issues.append(PostureIssue(
                 id='uneven-hips',
                 type='imbalance',
-                severity='moderate' if hip_slope > 0.08 else 'mild',
+                severity='moderate' if hip_slope > config.POSTURE_THRESHOLDS['uneven_hips']['moderate'] else 'mild',
                 title='骨盆侧倾',
                 description=f"{'左' if is_left_high else '右'}侧骨盆较高。可能存在长短腿或核心肌力不平衡。",
                 recommendation='建议加强臀中肌和核心肌群，必要时进行步态分析。',
@@ -358,7 +359,7 @@ def analyze_posture(
             label="身体中轴线"
         ))
 
-        if deviation_ratio > 0.08:
+        if deviation_ratio > config.POSTURE_THRESHOLDS['midline_shift']['moderate']:
             issues.append(PostureIssue(
                 id='midline-shift',
                 type='alignment',

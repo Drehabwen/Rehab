@@ -8,6 +8,9 @@ import { AssessmentOverlay } from './AssessmentOverlay';
 import { SteppedAssessmentOverlay } from './SteppedAssessmentOverlay';
 import { VisualAnnotation, HeadAxes, PoseLandmark } from '../vision3-utils';
 import { ActiveMeasurement } from '@/store/useMeasurementStore';
+import { AssessmentType } from '../store/usePostureAssessmentStore';
+import { BUTTON_TEXTS, CAPTURE_STATUS_TEXTS, CAMERA_TEXTS, MEASUREMENT_TEXTS } from '../constants/uiText';
+import { COLORS, SIZES, ANIMATIONS, TRANSITIONS, SHADOWS, BACKDROP } from '@/constants/uiStyles';
 
 export type ViewType = 'front' | 'side' | 'back';
 export type CaptureStatus = 'idle' | 'scanning' | 'countdown' | 'recording' | 'analyzing' | 'completed' | 'error';
@@ -34,6 +37,7 @@ interface Vision3CameraStageProps {
   onResults?: (results: unknown, videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement) => void;
   activeTab: 'posture' | 'rom';
   assessmentMode: AssessmentMode;
+  assessmentType: AssessmentType;
   captureStatus: CaptureStatus;
   step: string;
   countdown: number;
@@ -45,8 +49,8 @@ interface Vision3CameraStageProps {
   setCaptureStatus: React.Dispatch<React.SetStateAction<CaptureStatus>>;
   toggleFullscreen: () => void;
   handleStartCapture: () => void;
-  handleNextView: () => void;
-  handleFinishStepped: () => void;
+  handleNextView: (assessmentType?: AssessmentType) => void;
+  handleFinishStepped: (assessmentType?: AssessmentType) => void;
   handleResetToEntry: () => void;
   activeMeasurements: ActiveMeasurement[];
   isMeasuring: boolean;
@@ -69,6 +73,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
   onResults,
   activeTab,
   assessmentMode,
+  assessmentType,
   captureStatus,
   step,
   countdown,
@@ -94,7 +99,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
 }) => {
   return (
     <div ref={videoContainerRef} className={cn(
-      "bento-card glow-border !rounded-[3.5rem] group bg-black overflow-hidden relative transition-all duration-700",
+      "bento-card glow-border !rounded-[3.5rem] group bg-black overflow-hidden relative transition-all duration-700 min-h-[300px] xs:min-h-[400px] md:min-h-[500px]",
       isFullscreen ? "fixed inset-0 z-50 !rounded-none" : "col-span-12 lg:col-span-8 row-span-4 lg:row-span-6"
     )}>
       {/* Subtle Grid Background */}
@@ -125,6 +130,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
             recordingProgress={recordingProgress}
             isInPosition={isInPosition}
             steppedResults={steppedResults}
+            assessmentType={assessmentType}
             onStartCapture={handleStartCapture}
             onNextView={handleNextView}
             onRetake={() => {
@@ -142,7 +148,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       {/* Fullscreen Toggle Button */}
       <button 
         onClick={toggleFullscreen}
-        className="absolute top-6 right-6 p-3 bg-black/40 backdrop-blur-md text-white/60 hover:text-white hover:bg-black/60 rounded-2xl border border-white/10 transition-all z-40 opacity-0 group-hover:opacity-100"
+        className={`absolute top-6 right-6 p-3 bg-black/40 ${BACKDROP.sm} text-white/60 hover:text-white hover:bg-black/60 ${SIZES.radius.lg} border ${COLORS.neutral.whiteBorder} ${TRANSITIONS.default} z-40 opacity-0 group-hover:opacity-100`}
       >
         {isFullscreen ? <Maximize2 size={20} className="rotate-180" /> : <Maximize2 size={20} />}
       </button>
@@ -162,17 +168,17 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       )}
       
       {/* Bento Overlay: Status Indicator */}
-      <div className="absolute top-10 left-10 flex items-center gap-4">
-        <div className="px-6 py-3 bg-black/60 rounded-2xl border border-white/10 flex items-center gap-4 shadow-2xl">
+      <div className={`absolute top-10 left-10 flex items-center ${SIZES.gap.lg}`}>
+        <div className={`${SIZES.padding.lg} bg-black/60 ${SIZES.radius.lg} border ${COLORS.neutral.whiteBorder} flex items-center ${SIZES.gap.lg} ${SHADOWS.lg}`}>
           <div className="relative">
-            <div className={cn("w-2 h-2 rounded-full", isCameraOn ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" : "bg-rose-500")} />
+            <div className={cn(`${SIZES.size.sm} ${SIZES.radius.full}`, isCameraOn ? `${COLORS.success.emeraldLight} shadow-[0_0_12px_rgba(52,211,153,0.8)]` : "bg-rose-500")} />
             {isCameraOn && <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-40" />}
           </div>
           <div className="flex flex-col">
-            <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] leading-none mb-1">
+            <span className={`${SIZES.font.sm} font-black text-white/40 uppercase tracking-[0.3em] leading-none mb-1`}>
               Engine Status
             </span>
-            <span className="text-[11px] font-black text-white uppercase tracking-[0.2em] leading-none">
+            <span className={`${SIZES.font.lg} font-black text-white uppercase tracking-[0.2em] leading-none`}>
               {activeTab === 'posture' ? 'Posture AI Core' : 'Joint ROM Engine'} v3.2
             </span>
           </div>
@@ -183,7 +189,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
                 simulateMockCapture();
               }}
               className="ml-2 px-3 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-500 text-[10px] font-black rounded-lg border border-amber-500/30 transition-all uppercase"
-              title="模拟测试数据"
+              title={CAMERA_TEXTS.mockTest}
             >
               Mock
             </button>
@@ -209,76 +215,76 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
 
       {/* Floating Controls: Ultra Premium Glassmorphism (Only in Real-time mode) */}
       {assessmentMode === 'realtime' && (
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-8 p-6 bg-slate-900/90 rounded-[3rem] border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-700 translate-y-8 group-hover:translate-y-0 shadow-[0_40px_100px_rgba(0,0,0,0.5)] ring-1 ring-white/10 z-30">
-          <div className="flex items-center gap-4">
+        <div className={`absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center ${SIZES.gap.xxl} ${SIZES.padding.lg} ${COLORS.neutral.slateBg80} ${SIZES.radius.pillXl} border ${COLORS.neutral.whiteBorder20} opacity-0 group-hover:opacity-100 transition-all duration-700 translate-y-8 group-hover:translate-y-0 shadow-[0_40px_100px_rgba(0,0,0,0.5)] ring-1 ring-white/10 z-30`}>
+          <div className={`flex items-center ${SIZES.gap.lg}`}>
             <button 
               onClick={() => setIsCameraOn(!isCameraOn)}
               className={cn(
-                "w-16 h-16 rounded-[1.5rem] flex flex-col items-center justify-center gap-1.5 transition-all duration-500 relative group/btn",
+                `w-16 h-16 rounded-[1.5rem] flex flex-col items-center justify-center gap-1.5 ${TRANSITIONS.medium} relative group/btn`,
                 isCameraOn ? "bg-white/10 text-white hover:bg-white/20 hover:scale-110" : "bg-rose-500/80 text-white shadow-2xl shadow-rose-500/40 hover:scale-110"
               )}
             >
               {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
-              <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">{isCameraOn ? '关闭' : '开启'}</span>
-              {isCameraOn && <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />}
+              <span className={`${SIZES.font.xs} font-black uppercase tracking-tighter opacity-60`}>{isCameraOn ? CAMERA_TEXTS.close : CAMERA_TEXTS.open}</span>
+              {isCameraOn && <span className={`absolute top-2 right-2 ${SIZES.size.sm} ${COLORS.success.emeraldLight} ${SIZES.radius.full} animate-pulse`} />}
             </button>
           </div>
           
           <div className="w-px h-14 bg-white/10" />
           
           {activeTab === 'posture' ? (
-            <div className="flex items-center gap-6">
+            <div className={`flex items-center ${SIZES.gap.xl}`}>
               <button 
                 onClick={() => setCaptureStatus('countdown')}
                 disabled={captureStatus !== 'idle'}
                 className={cn(
-                  "px-10 h-16 rounded-[1.5rem] flex items-center gap-4 font-black text-sm uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl",
+                  `px-10 h-16 rounded-[1.5rem] flex items-center ${SIZES.gap.lg} font-black text-sm uppercase tracking-[0.2em] ${TRANSITIONS.medium} ${SHADOWS.lg}`,
                   captureStatus === 'idle' 
                     ? "bg-antey-primary text-white hover:bg-antey-primary/80 hover:scale-105 hover:shadow-antey-primary/40" 
                     : "bg-white/10 text-white/40 cursor-not-allowed"
                 )}
               >
                 <Scan size={24} className={cn(captureStatus === 'scanning' && "animate-spin")} />
-                {captureStatus === 'idle' ? '开始全维度扫描' : captureStatus === 'countdown' ? '准备拍照...' : '分析中...'}
+                {captureStatus === 'idle' ? BUTTON_TEXTS.startScan : captureStatus === 'countdown' ? BUTTON_TEXTS.preparing : CAPTURE_STATUS_TEXTS.analyzing}
               </button>
               
               <button 
                 onClick={() => setView(view === 'front' ? 'side' : view === 'side' ? 'back' : 'front')}
-                className="w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110"
+                className={`w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110`}
               >
                 <RotateCcw size={20} className="rotate-180" />
-                <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">切换视图</span>
+                <span className={`${SIZES.font.xs} font-black uppercase tracking-tighter opacity-60`}>{MEASUREMENT_TEXTS.switchView}</span>
               </button>
 
               <button 
                 onClick={handleResetToEntry}
-                className="w-16 h-16 rounded-[1.5rem] bg-white/5 text-white/40 flex flex-col items-center justify-center gap-1.5 hover:bg-white/10 hover:text-white transition-all hover:scale-110"
+                className={`w-16 h-16 rounded-[1.5rem] bg-white/5 text-white/40 flex flex-col items-center justify-center gap-1.5 hover:bg-white/10 hover:text-white transition-all hover:scale-110`}
               >
                 <ArrowLeft size={20} />
-                <span className="text-[8px] font-black uppercase tracking-tighter">返回</span>
+                <span className={`${SIZES.font.xs} font-black uppercase tracking-tighter`}>{MEASUREMENT_TEXTS.back}</span>
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-6">
+            <div className={`flex items-center ${SIZES.gap.xl}`}>
               <button 
                 onClick={() => isMeasuring ? stopMeasurement() : startMeasurement()}
                 className={cn(
-                  "px-10 h-16 rounded-[1.5rem] flex items-center gap-4 font-black text-sm uppercase tracking-[0.2em] transition-all duration-500 shadow-2xl",
+                  `px-10 h-16 rounded-[1.5rem] flex items-center ${SIZES.gap.lg} font-black text-sm uppercase tracking-[0.2em] ${TRANSITIONS.medium} ${SHADOWS.lg}`,
                   isMeasuring 
                     ? "bg-rose-500 text-white hover:bg-rose-500/80 hover:scale-105" 
                     : "bg-antey-accent text-white hover:bg-antey-accent/80 hover:scale-105 shadow-antey-accent/40"
                 )}
               >
                 {isMeasuring ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
-                {isMeasuring ? '结束测量任务' : '启动关节采集'}
+                {isMeasuring ? MEASUREMENT_TEXTS.stop : MEASUREMENT_TEXTS.start}
               </button>
 
               <button 
                 onClick={() => resetMeasurement()}
-                className="w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110"
+                className={`w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110`}
               >
                 <RefreshCw size={20} />
-                <span className="text-[8px] font-black uppercase tracking-tighter opacity-60">重置</span>
+                <span className={`${SIZES.font.xs} font-black uppercase tracking-tighter opacity-60`}>{MEASUREMENT_TEXTS.reset}</span>
               </button>
             </div>
           )}

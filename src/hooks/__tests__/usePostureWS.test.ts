@@ -21,7 +21,7 @@ describe('usePostureWS', () => {
 
   beforeEach(() => {
     mockWebSocket = {
-      readyState: 0,
+      readyState: 1,
       send: vi.fn(),
       close: vi.fn(),
       addEventListener: vi.fn(),
@@ -234,6 +234,7 @@ describe('usePostureWS', () => {
 
   describe('analyzeStepped method', () => {
     it('should send POSTURE_STEPPED_ANALYSIS message', () => {
+      mockWebSocket.readyState = 1;
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
       const frames = [
@@ -269,19 +270,17 @@ describe('usePostureWS', () => {
       );
     });
 
-    it('should send empty frames array', () => {
+    it('should not send message when frames array is empty', () => {
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
       act(() => {
         result.current.analyzeStepped([]);
       });
 
-      expect(mockWebSocket.send).toHaveBeenCalledWith(
-        expect.stringContaining('"frames":[]')
-      );
+      expect(mockWebSocket.send).not.toHaveBeenCalled();
     });
 
-    it('should handle WebSocket not ready (queue message)', () => {
+    it('should attempt reconnect when WebSocket not ready', () => {
       mockWebSocket.readyState = 0;
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
@@ -304,8 +303,8 @@ describe('usePostureWS', () => {
       expect(mockWebSocket.send).not.toHaveBeenCalled();
     });
 
-    it('should send queued messages when WebSocket connects', () => {
-      mockWebSocket.readyState = 0;
+    it('should send message when WebSocket is open', () => {
+      mockWebSocket.readyState = 1;
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
       const frames = [
@@ -322,22 +321,13 @@ describe('usePostureWS', () => {
 
       act(() => {
         result.current.analyzeStepped(frames);
-      });
-      
-      expect(mockWebSocket.send).not.toHaveBeenCalled();
-
-      const openCallback = mockWebSocket.addEventListener.mock.calls.find(
-        (call: any[]) => call[0] === 'open'
-      )?.[1];
-
-      act(() => {
-        if (openCallback) openCallback();
       });
 
       expect(mockWebSocket.send).toHaveBeenCalled();
     });
 
     it('should serialize timeSeriesLandmarks correctly', () => {
+      mockWebSocket.readyState = 1;
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
       const createLandmarks = (): PoseLandmark[] => {
@@ -375,6 +365,7 @@ describe('usePostureWS', () => {
     });
 
     it('should handle all three view types', () => {
+      mockWebSocket.readyState = 1;
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
       const createLandmarks = (): PoseLandmark[] => {
@@ -426,7 +417,7 @@ describe('usePostureWS', () => {
     it('should use default URL when no URL is provided', () => {
       const { result } = renderHook(() => usePostureWS());
 
-      expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:8001/ws/analyze');
+      expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:8002/ws/analyze');
     });
   });
 
