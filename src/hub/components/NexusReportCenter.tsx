@@ -15,6 +15,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { MarkdownReport } from '@/components/shared/MarkdownReport';
+import { PostureReportViewer } from '@/components/shared/PostureReportViewer';
 import { cn } from '@/lib/utils';
 import { PostureReport } from '@/store/useMeasurementStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
@@ -50,7 +51,7 @@ export const NexusReportCenter: React.FC = () => {
     if (postureData) {
       if (postureData.markdownReport) {
         setReportType('deep');
-      } else if (postureData.auxiliaryReport) {
+      } else if (postureData.auxiliaryDiagnosis) {
         setReportType('auxiliary');
       }
     }
@@ -59,7 +60,7 @@ export const NexusReportCenter: React.FC = () => {
   useEffect(() => {
     const postureData = selectedAssessment?.data.posture;
     if (postureData) {
-      const content = reportType === 'deep' ? (postureData.markdownReport || postureData.auxiliaryReport) : (postureData.auxiliaryReport || postureData.markdownReport);
+      const content = reportType === 'deep' ? (postureData.markdownReport || postureData.auxiliaryDiagnosis) : (postureData.auxiliaryDiagnosis || postureData.markdownReport);
       if (content) setSelectedReportMarkdown(content);
     }
   }, [reportType, selectedAssessment]);
@@ -131,6 +132,16 @@ export const NexusReportCenter: React.FC = () => {
     ? assessments.filter(a => a.patientId === selectedPatientId)
     : assessments;
 
+  const getAssessmentTypeLabel = (type: string) => {
+    switch (type) {
+      case 'posture': return '体态评估';
+      case 'rom': return '关节活动度评估';
+      case 'medvoice': return '语音接诊评估';
+      case 'combined': return '综合评估';
+      default: return '未知评估';
+    }
+  };
+
   const stats = [
     { label: '总评估数', value: assessments.length, icon: Database, color: 'text-blue-500', bg: 'bg-blue-50' },
     { label: '患者总数', value: patients.length, icon: User, color: 'text-emerald-500', bg: 'bg-emerald-50' },
@@ -149,18 +160,39 @@ export const NexusReportCenter: React.FC = () => {
   };
 
   const exportToCsv = (assessment: Assessment) => {
-    const metrics = assessment.data.posture?.metrics;
-    if (!metrics) return;
-    const rows = Object.entries(metrics).map(([key, value]) => [key, value]);
-    const csvContent = 'metric,value\n' + rows.map(r => r.join(',')).join('\n');
+    let csvContent = '';
     
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `assessment-${assessment.id}-${new Date(assessment.createdAt).toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (assessment.data.posture?.metrics) {
+      const metrics = assessment.data.posture.metrics;
+      const rows = Object.entries(metrics).map(([key, value]) => [key, value]);
+      csvContent = 'metric,value\n' + rows.map(r => r.join(',')).join('\n');
+    } else if (assessment.data.medvoice) {
+      const medvoice = assessment.data.medvoice;
+      csvContent = 'field,value\n';
+      csvContent += `patient_name,${medvoice.patientInfo.name}\n`;
+      csvContent += `patient_gender,${medvoice.patientInfo.gender}\n`;
+      csvContent += `patient_age,${medvoice.patientInfo.age}\n`;
+      csvContent += `case_id,${medvoice.patientInfo.case_id}\n`;
+      csvContent += `visit_date,${medvoice.patientInfo.visit_date}\n`;
+      csvContent += `view_mode,${medvoice.viewMode}\n`;
+      if (medvoice.structuredCase) {
+        Object.entries(medvoice.structuredCase).forEach(([key, value]) => {
+          if (value) {
+            csvContent += `${key},${value.replace(/\n/g, ' ')}\n`;
+          }
+        });
+      }
+    }
+    
+    if (csvContent) {
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `assessment-${assessment.id}-${new Date(assessment.createdAt).toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   return (
@@ -292,7 +324,7 @@ export const NexusReportCenter: React.FC = () => {
                       <div>
                         <div className="flex items-center gap-3 mb-1">
                           <span className="text-sm font-black text-slate-900">
-                            {assessment.type === 'posture' ? '体态评估' : '关节活动度评估'}
+                            {getAssessmentTypeLabel(assessment.type)}
                           </span>
                           <span className={cn(
                             "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider",
@@ -386,6 +418,7 @@ export const NexusReportCenter: React.FC = () => {
             </div>
             
             <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {/* Posture Assessment */}
               {selectedAssessment.data.posture && (
                 <div className="space-y-6">
                   {/* Summary Header */}
@@ -397,7 +430,7 @@ export const NexusReportCenter: React.FC = () => {
                       <div>
                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">评估模式</div>
                         <div className="font-bold text-slate-900">
-                          {selectedAssessment.mode === 'realtime' ? '实时全维度扫描' : '分步定向拍摄'}
+                          {selectedAssessment.mode === 'realtime' ? '实时全维度扫描' : selectedAssessment.mode === 'stepped' ? '分步定向拍摄' : '其他模式'}
                         </div>
                       </div>
                     </div>
@@ -468,15 +501,96 @@ export const NexusReportCenter: React.FC = () => {
                   )}
                 </div>
               )}
+
+              {/* MedVoice Assessment */}
+              {selectedAssessment.data.medvoice && (
+                <div className="space-y-6">
+                  {/* Summary Header */}
+                  <div className="flex items-center justify-between p-4 bg-purple-50 rounded-2xl border border-purple-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-purple-400">
+                        <Activity size={24} />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">评估模式</div>
+                        <div className="font-bold text-slate-900">
+                          语音接诊评估
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">视图模式</div>
+                      <div className="font-bold text-slate-900">
+                        {selectedAssessment.data.medvoice.viewMode === 'standard' ? '标准模式' : 'SOAP模式'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Patient Info */}
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 px-1">患者信息</h4>
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">姓名</div>
+                          <div className="font-bold text-slate-900">{selectedAssessment.data.medvoice.patientInfo.name}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">性别</div>
+                          <div className="font-bold text-slate-900">{selectedAssessment.data.medvoice.patientInfo.gender}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">年龄</div>
+                          <div className="font-bold text-slate-900">{selectedAssessment.data.medvoice.patientInfo.age}</div>
+                        </div>
+                        <div>
+                          <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">病历号</div>
+                          <div className="font-bold text-slate-900">{selectedAssessment.data.medvoice.patientInfo.case_id}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Structured Case */}
+                  {selectedAssessment.data.medvoice.structuredCase && (
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 px-1">结构化病历</h4>
+                      <div className="space-y-3">
+                        {Object.entries(selectedAssessment.data.medvoice.structuredCase).map(([key, value]) => {
+                          if (!value) return null;
+                          return (
+                            <div key={key} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-purple-100 transition-colors">
+                              <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{key}</div>
+                              <div className="text-sm text-slate-600 leading-relaxed">{value}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Transcript */}
+                  {selectedAssessment.data.medvoice.transcript && (
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 px-1">对话记录</h4>
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                          {selectedAssessment.data.medvoice.transcript}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             
             <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-3">
-              {(selectedAssessment.data.posture?.markdownReport || selectedAssessment.data.posture?.auxiliaryReport) && (
+              {selectedAssessment.data.posture && (selectedAssessment.data.posture.markdownReport || selectedAssessment.data.posture.auxiliaryDiagnosis) && (
                 <button
                   onClick={() => {
                     const postureData = selectedAssessment.data.posture;
                     if (postureData) {
-                      const reportContent = postureData.markdownReport || postureData.auxiliaryReport;
+                      const reportContent = postureData.markdownReport || postureData.auxiliaryDiagnosis;
                       if (reportContent) {
                         setSelectedReportMarkdown(reportContent);
                         
@@ -521,67 +635,18 @@ export const NexusReportCenter: React.FC = () => {
       {selectedReportMarkdown && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 md:p-8 animate-in fade-in duration-300">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => { setSelectedReportMarkdown(null); setSelectedReport(null); setIsFullscreen(false); }} />
-          <div className={cn(
-            "relative bg-white shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ease-in-out",
-            isFullscreen 
-              ? "w-full h-full rounded-none" 
-              : "w-full max-w-5xl h-[90vh] rounded-[2.5rem] animate-in zoom-in-95 duration-300"
-          )}>
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-10">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-500">
-                  <Activity size={20} />
-                </div>
-                <div>
-                  <h3 className="font-black text-slate-900 uppercase tracking-tight">体态深度评估报告</h3>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nexus Hub AI Powered Analysis</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                {selectedAssessment?.data.posture?.auxiliaryReport && selectedAssessment?.data.posture?.markdownReport && (
-                  <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
-                    <button
-                      onClick={() => setReportType('auxiliary')}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
-                        reportType === 'auxiliary' ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                      )}
-                    >
-                      辅助诊断
-                    </button>
-                    <button
-                      onClick={() => setReportType('deep')}
-                      className={cn(
-                        "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
-                        reportType === 'deep' ? "bg-white text-purple-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                      )}
-                    >
-                      深度分析
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={() => setIsFullscreen(!isFullscreen)}
-                    className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all hidden md:block"
-                    title={isFullscreen ? "退出全屏" : "全屏预览"}
-                  >
-                    <ArrowUpRight size={20} className={isFullscreen ? "rotate-180" : ""} />
-                  </button>
-                  <button 
-                    onClick={() => { setSelectedReportMarkdown(null); setSelectedReport(null); setIsFullscreen(false); }}
-                    className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"
-                  >
-                    <ChevronDown size={20} className="rotate-180" />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div ref={reportContainerRef} className="flex-1 overflow-y-auto p-0 bg-slate-900">
-              <MarkdownReport content={selectedReportMarkdown} animate={false} className="border-none rounded-none h-full" />
-            </div>
-            {chartPortals}
-          </div>
+          <PostureReportViewer
+            auxiliaryDiagnosis={selectedAssessment?.data.posture?.auxiliaryDiagnosis}
+            markdownReport={selectedAssessment?.data.posture?.markdownReport}
+            reportType={reportType}
+            setReportType={setReportType}
+            isFullscreen={isFullscreen}
+            setIsFullscreen={setIsFullscreen}
+            onClose={() => { setSelectedReportMarkdown(null); setSelectedReport(null); setIsFullscreen(false); }}
+            title="体态评估报告"
+            subtitle="NEXUS HUB AI POWERED ANALYSIS"
+          />
+          {chartPortals}
         </div>
       )}
     </div>

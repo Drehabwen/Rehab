@@ -260,7 +260,25 @@ ws.onmessage = (event) => {
       "shoulderAngle": 5.2,
       "hipAngle": 3.8
     }
-  ]
+  ],
+  "metrics": {
+    "shoulderAngle": 5.2,
+    "hipAngle": 3.8,
+    "headForward": 2.1
+  },
+  "auxiliaryDiagnosis": "根据分析，您存在轻微的头前伸问题",
+  "issues": [
+    {
+      "id": "head_forward",
+      "type": "forward_head",
+      "severity": "mild",
+      "title": "头前伸",
+      "description": "头部前倾约 2.1cm",
+      "recommendation": "注意调整屏幕高度，保持头部中立位"
+    }
+  ],
+  "timestamp": 1234567890123,
+  "assessmentType": "standard"
 }
 ```
 
@@ -271,6 +289,11 @@ ws.onmessage = (event) => {
 | `markdown` | string | Markdown 格式的评估报告 |
 | `reportId` | string | 唯一报告标识符（UUID） |
 | `timeSeries` | array | 时序分析数据（可选） |
+| `metrics` | object | 体态指标数据（可选） |
+| `auxiliaryDiagnosis` | string | 辅助诊断信息（可选） |
+| `issues` | array | 体态问题列表（可选） |
+| `timestamp` | number | 响应时间戳（毫秒） |
+| `assessmentType` | string | 评估类型：standard / quick |
 
 ---
 
@@ -385,22 +408,27 @@ try {
 **文件**: `src/store/useMeasurementStore.ts`
 
 ```typescript
-interface PostureAssessment {
+interface PostureReport {
   id: string;
-  patientId: string;
-  timestamp: number;
-  assessmentType: AssessmentType;
+  date: number;
   view: string;
-  markdown: string;
-  timeSeries: TemporalAnalysis['timeSeries'];
+  html: string;
+  markdown?: string;
+  timeSeries?: TemporalAnalysis['timeSeries'];
+  metrics?: PostureMetrics;
+  issues?: PostureIssue[];
+  auxiliaryDiagnosis?: string;
 }
 
 savePostureReport(
   view: string,
-  assessmentType: string,
-  markdown: string,
-  timeSeries: TemporalAnalysis['timeSeries']
-): Promise<void>
+  html: string,
+  markdown?: string,
+  timeSeries?: TemporalAnalysis['timeSeries'],
+  metrics?: PostureMetrics,
+  issues?: PostureIssue[],
+  auxiliaryDiagnosis?: string
+): void
 ```
 
 ---
@@ -464,6 +492,7 @@ savePostureReport(
 
 | 版本 | 日期 | 变更 |
 |--------|------|------|
+| 1.0.1 | 2026-03-02 | 更新接口文档，与实际实现一致 |
 | 1.0.0 | 2026-03-01 | 初始版本，支持标准和快速评估模式 |
 
 ---

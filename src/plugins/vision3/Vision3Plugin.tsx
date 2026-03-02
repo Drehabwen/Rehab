@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Results } from '@/lib/mediapipe-utils';
 import { PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
@@ -21,7 +21,6 @@ import { Vision3Header } from './components/Vision3Header';
 import { Vision3CameraStage } from './components/Vision3CameraStage';
 import { Vision3AnalysisPanel } from './components/Vision3AnalysisPanel';
 import Vision3ErrorBoundary from '@/components/shared/Vision3ErrorBoundary';
-import AssessmentFallbackHandler from '@/utils/assessmentFallback';
 export const Vision3Plugin: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'posture' | 'rom'>('posture');
   const [isEntryMode, setIsEntryMode] = useState(true);
@@ -31,6 +30,7 @@ export const Vision3Plugin: React.FC = () => {
   const [axesScale, setAxesScale] = useState(1);
   const [activePanel, setActivePanel] = useState<'dashboard' | 'report'>('dashboard');
   const [reportType, setReportType] = useState<'auxiliary' | 'deep'>('auxiliary');
+  const [isLoadingDeepReport, setIsLoadingDeepReport] = useState(false);
   
   // Custom Hooks
   const {
@@ -60,11 +60,14 @@ export const Vision3Plugin: React.FC = () => {
     steppedResults,
     setSteppedResults,
     analyzeStepped,
+    requestDeepAnalysis,
     headAxes,
     annotations,
     markdownReport,
-    auxiliaryReport,
+    auxiliaryDiagnosis,
     timeSeriesData,
+    streamingReport,
+    isStreamingReport,
     simulateMockCapture
   } = usePostureAnalysis({
     axesScale,
@@ -94,8 +97,6 @@ export const Vision3Plugin: React.FC = () => {
     setAssessmentType
   });
 
-  // Posture States
-  const [result, setResult] = useState<{ issues: PostureIssue[]; metrics: PostureMetrics } | null>(null);
   const reportCanvasRef = useRef<HTMLCanvasElement>(null);
   
   // ROM States (from store)
@@ -104,8 +105,48 @@ export const Vision3Plugin: React.FC = () => {
     startMeasurement,
     stopMeasurement,
     resetMeasurement,
-    activeMeasurements
+    activeMeasurements,
+    postureReports
   } = useMeasurementStore();
+
+  // Get the latest report for current view
+  const currentReport = postureReports.find(r => r.view === view);
+  
+  // Debug: Log postureReports changes
+  useEffect(() => {
+    console.log('[Vision3Plugin] postureReports changed:', {
+      count: postureReports.length,
+      reports: postureReports.map(r => ({ view: r.view, date: r.date, hasMarkdown: !!r.markdown, hasAuxiliary: !!r.auxiliaryDiagnosis }))
+    });
+    console.log('[Vision3Plugin] currentReport:', currentReport ? {
+      view: currentReport.view,
+      hasMarkdown: !!currentReport.markdown,
+      markdownLength: currentReport.markdown?.length,
+      hasAuxiliary: !!currentReport.auxiliaryDiagnosis,
+      auxiliaryDiagnosisLength: currentReport.auxiliaryDiagnosis?.length
+    } : 'null');
+    console.log('[Vision3Plugin] current view:', view);
+  }, [postureReports, currentReport, view]);
+  
+  // Use data from currentReport if available (for displaying saved reports)
+  const displayResult = currentReport?.metrics ? {
+    metrics: currentReport.metrics,
+    issues: currentReport.issues || [],
+    timestamp: currentReport.date
+  } : wsResult;
+  
+  const displayMarkdownReport = currentReport?.markdown || markdownReport;
+  const displayAuxiliaryDiagnosis = currentReport?.auxiliaryDiagnosis || auxiliaryDiagnosis;
+  
+  useEffect(() => {
+    console.log('[Vision3Plugin] displayMarkdownReport or displayAuxiliaryDiagnosis changed:', {
+      hasDisplayMarkdown: !!displayMarkdownReport,
+      displayMarkdownLength: displayMarkdownReport?.length,
+      hasDisplayAuxiliary: !!displayAuxiliaryDiagnosis,
+      displayAuxiliaryLength: displayAuxiliaryDiagnosis?.length,
+      source: currentReport?.auxiliaryDiagnosis ? 'currentReport' : auxiliaryDiagnosis ? 'auxiliaryDiagnosis' : 'none'
+    });
+  }, [displayMarkdownReport, displayAuxiliaryDiagnosis, currentReport?.auxiliaryDiagnosis, auxiliaryDiagnosis]);
 
   useVision3AutoSave({
     step,
@@ -113,7 +154,7 @@ export const Vision3Plugin: React.FC = () => {
     assessmentMode,
     view,
     markdownReport,
-    auxiliaryReport,
+    auxiliaryDiagnosis,
     timeSeriesData
   });
 
@@ -125,45 +166,63 @@ export const Vision3Plugin: React.FC = () => {
     }
   }, [captureStatus]);
 
-  // Sync WebSocket result to local state
-  useEffect(() => {
-    if (wsResult) {
-      setResult({
-        issues: wsResult.issues,
-        metrics: wsResult.metrics
-      });
-    }
-  }, [wsResult]);
+  // 处理深度分析请求
+  const handleRequestDeepAnalysis = useCallback(() => {
+    console.log('[Vision3Plugin] handleRequestDeepAnalysis called');
+    setIsLoadingDeepReport(true);
+    requestDeepAnalysis();
+  }, [requestDeepAnalysis]);
 
+  // 当深度报告到达时，停止加载状态
   useEffect(() => {
     if (markdownReport) {
-      console.log("Deep AI report received, switching to report panel");
-      setReportType('deep');
-      setActivePanel('report');
+      setIsLoadingDeepReport(false);
     }
   }, [markdownReport]);
 
   useEffect(() => {
-    if (auxiliaryReport && !markdownReport) {
+    console.log('[Vision3Plugin] markdownReport or auxiliaryDiagnosis changed:', { markdownReport: markdownReport ? 'exists' : 'null', auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null' });
+    if (markdownReport) {
+      // 检查是否是LLM报告（深度报告）
+      const isLLMReport = !markdownReport.includes('API链接失败') && !markdownReport.includes('生成报告失败');
+      if (isLLMReport) {
+        // 如果是LLM报告，显示深度报告
+        console.log("Deep AI report received, switching to report panel");
+        setReportType('deep');
+        setActivePanel('report');
+        setCaptureStatus('completed');
+      } else {
+        // 如果是API失败报告，显示错误信息
+        console.log("API failure report received, switching to report panel");
+        setReportType('deep');
+        setActivePanel('report');
+        setCaptureStatus('completed');
+      }
+    } else if (auxiliaryDiagnosis) {
+      // 如果没有markdownReport但有辅助诊断，显示基础报告
+      console.log("Auxiliary diagnosis available, switching to report panel");
       setReportType('auxiliary');
       setActivePanel('report');
+      setCaptureStatus('completed');
     }
-  }, [auxiliaryReport, markdownReport]);
+  }, [markdownReport, auxiliaryDiagnosis, setReportType, setActivePanel, setCaptureStatus]);
 
   // 当分析完成时，自动切换到报告面板
   useEffect(() => {
+    console.log('[Vision3Plugin] captureStatus changed:', captureStatus);
     if (captureStatus === 'completed') {
       console.log('[Vision3Plugin] Analysis completed, switching to report panel');
-      // 如果有深度报告，优先显示深度报告
       if (markdownReport) {
+        // 优先显示markdownReport（包括API失败报告）
         setReportType('deep');
         setActivePanel('report');
-      } else if (auxiliaryReport) {
+      } else if (auxiliaryDiagnosis) {
+        // 否则显示辅助诊断
         setReportType('auxiliary');
         setActivePanel('report');
       }
     }
-  }, [captureStatus, markdownReport, auxiliaryReport]);
+  }, [captureStatus, markdownReport, auxiliaryDiagnosis, setReportType, setActivePanel]);
 
   const handleResults = React.useCallback((results: Results) => {
     onResults(results);
@@ -178,7 +237,7 @@ export const Vision3Plugin: React.FC = () => {
       <div className="h-full flex flex-col gap-6 animate-in fade-in duration-500 overflow-hidden relative">
         <MetricsSidebar 
           isVisible={step === 'completed'}  
-          metrics={wsResult?.metrics}
+          metrics={displayResult?.metrics}
           stability={wsResult?.stability}
         />
 
@@ -259,16 +318,18 @@ export const Vision3Plugin: React.FC = () => {
                   ? 'w-full lg:w-8/12 flex-1 min-h-0'
                   : 'col-span-12 lg:col-span-4 row-span-6'
               }`}>
-                <Vision3AnalysisPanel 
+                <Vision3AnalysisPanel
                   activePanel={activePanel}
                   setActivePanel={setActivePanel}
                   reportType={reportType}
                   setReportType={setReportType}
                   captureStatus={captureStatus}
-                  markdownReport={markdownReport}
-                  auxiliaryReport={auxiliaryReport}
+                  markdownReport={displayMarkdownReport}
+                  streamingReport={streamingReport}
+                  isStreamingReport={isStreamingReport}
+                  auxiliaryDiagnosis={displayAuxiliaryDiagnosis}
                   activeTab={activeTab}
-                  result={result}
+                  result={displayResult}
                   showHeadAxes={showHeadAxes}
                   setShowHeadAxes={setShowHeadAxes}
                   axesScale={axesScale}
@@ -278,6 +339,8 @@ export const Vision3Plugin: React.FC = () => {
                   getHipStatus={getHipStatus}
                   getSeverityLabel={getSeverityLabel}
                   assessmentType={assessmentType}
+                  isLoadingDeepReport={isLoadingDeepReport}
+                  onRequestDeepAnalysis={handleRequestDeepAnalysis}
                 />
               </div>
             </div>

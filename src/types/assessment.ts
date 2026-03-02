@@ -1,7 +1,8 @@
 import type { Landmark, PostureIssue, PostureMetrics } from './posture';
 import type { TemporalAnalysis } from '@/lib/posture-processor';
+import type { StructuredCase, PatientInfo } from '@/store/useCaseStore';
 
-export type AssessmentMode = 'realtime' | 'stepped';
+export type AssessmentMode = 'realtime' | 'stepped' | 'voice';
 
 export type AssessmentView = 'front' | 'side' | 'back';
 
@@ -12,8 +13,10 @@ export interface PostureAssessmentData {
   issues?: PostureIssue[];
   landmarks?: Landmark[];
   confidence: number;
+  /** 深度报告 - LLM解析的报告 */
   markdownReport?: string;
-  auxiliaryReport?: string;
+  /** 基础报告 - 根据规则得出的结论 */
+  auxiliaryDiagnosis?: string;
   timeSeries?: TemporalAnalysis['timeSeries'];
 }
 
@@ -24,16 +27,25 @@ export interface RomAssessmentData {
   landmarks?: Landmark[];
 }
 
+export interface MedVoiceAssessmentData {
+  mode: AssessmentMode;
+  transcript: string;
+  structuredCase: StructuredCase;
+  patientInfo: PatientInfo;
+  viewMode: 'standard' | 'soap';
+}
+
 export interface Assessment {
   id: string;
   sessionId: string;
   patientId: string;
-  type: 'posture' | 'rom' | 'combined';
+  type: 'posture' | 'rom' | 'medvoice' | 'combined';
   mode: AssessmentMode;
   createdAt: number;
   data: {
     posture?: PostureAssessmentData;
     rom?: RomAssessmentData;
+    medvoice?: MedVoiceAssessmentData;
   };
   notes?: string;
   status: 'pending' | 'completed' | 'reviewed';

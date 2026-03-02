@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Zap, Layers } from 'lucide-react';
+import { Loader2, Zap, Layers, Sparkles } from 'lucide-react';
 import { MarkdownReport } from '@/components/shared/MarkdownReport';
 import { Vision3Dashboard } from './Vision3Dashboard';
 import { PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
@@ -13,8 +13,14 @@ interface Vision3AnalysisPanelProps {
   reportType: 'auxiliary' | 'deep';
   setReportType: (type: 'auxiliary' | 'deep') => void;
   captureStatus: string;
+  /** 深度报告 - LLM 解析的报告 */
   markdownReport: string | null;
-  auxiliaryReport: string | null;
+  /** 流式报告内容 - 用于实时显示 LLM 输出 */
+  streamingReport?: string;
+  /** 是否正在生成流式报告 */
+  isStreamingReport?: boolean;
+  /** 基础报告 - 根据规则得出的结论 */
+  auxiliaryDiagnosis: string | null;
   activeTab: 'posture' | 'rom';
   result: { issues: PostureIssue[]; metrics: PostureMetrics } | null;
   showHeadAxes: boolean;
@@ -26,6 +32,10 @@ interface Vision3AnalysisPanelProps {
   getHipStatus: (angle: number) => { text: string; color: string; bgColor: string };
   getSeverityLabel: (severity: string) => string;
   assessmentType: AssessmentType;
+  /** 是否正在加载深度报告 */
+  isLoadingDeepReport?: boolean;
+  /** 请求深度报告回调 */
+  onRequestDeepAnalysis?: () => void;
 }
 
 export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
@@ -35,7 +45,9 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
   setReportType,
   captureStatus,
   markdownReport,
-  auxiliaryReport,
+  streamingReport,
+  isStreamingReport,
+  auxiliaryDiagnosis,
   activeTab,
   result,
   showHeadAxes,
@@ -46,10 +58,23 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
   getHeadStatus,
   getHipStatus,
   getSeverityLabel,
-  assessmentType
+  assessmentType,
+  isLoadingDeepReport,
+  onRequestDeepAnalysis
 }) => {
+  console.log('[Vision3AnalysisPanel] Props:', {
+    activePanel,
+    reportType,
+    captureStatus,
+    hasMarkdownReport: !!markdownReport,
+    hasAuxiliaryDiagnosis: !!auxiliaryDiagnosis,
+    auxiliaryDiagnosisLength: auxiliaryDiagnosis?.length,
+    hasStreamingReport: !!streamingReport,
+    isStreamingReport
+  });
+  
   return (
-    <div className="h-full flex flex-col gap-4">
+    <div className={`h-full flex flex-col ${COLORS.neutral.light.bg} ${SIZES.radius.lg} ${COLORS.neutral.light.border} p-6 shadow-xl`}>
       {/* Assessment Type Badge */}
       <div className="flex items-center gap-2 self-start">
         {assessmentType === 'quick' ? (
@@ -66,16 +91,16 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
       </div>
 
       {/* Panel Toggle Header */}
-      <div className={`flex p-1 ${COLORS.neutral.slateBg} ${SIZES.radius.md} border ${COLORS.neutral.slateBorder} backdrop-blur-sm self-start`}>
+      <div className={`flex p-1 ${COLORS.neutral.light.bgSoft} ${SIZES.radius.md} border ${COLORS.neutral.light.borderSoft} backdrop-blur-sm self-start`}>
         <button
           onClick={() => setActivePanel('dashboard')}
           className={`flex items-center ${SIZES.gap.sm} ${SIZES.padding.md} ${SIZES.radius.sm} ${SIZES.font.xl} font-medium ${TRANSITIONS.default} ${
             activePanel === 'dashboard' 
               ? `${COLORS.primary.blueBg} ${COLORS.primary.blueText} ${COLORS.primary.blueShadow}` 
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              : COLORS.neutral.light.buttonInactive
           }`}
         >
-          <div className={`${SIZES.size.xs} ${SIZES.radius.full} ${activePanel === 'dashboard' ? `${COLORS.primary.blueLight} animate-pulse` : 'bg-slate-600'}`} />
+          <div className={`${SIZES.size.xs} ${SIZES.radius.full} ${activePanel === 'dashboard' ? `${COLORS.primary.blueLight} ${COLORS.neutral.light.indicatorActive}` : COLORS.neutral.light.indicator}`} />
           {PANEL_TEXTS.dataPanel}
         </button>
         <button
@@ -83,53 +108,74 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
           className={`flex items-center ${SIZES.gap.sm} ${SIZES.padding.md} ${SIZES.radius.sm} ${SIZES.font.xl} font-medium ${TRANSITIONS.default} ${
             activePanel === 'report' 
               ? `${COLORS.secondary.purpleBg} ${COLORS.secondary.purpleText} ${COLORS.secondary.purpleShadow}` 
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+              : COLORS.neutral.light.buttonInactive
           }`}
         >
-          <div className={`${SIZES.size.xs} ${SIZES.radius.full} ${activePanel === 'report' ? `${COLORS.secondary.purpleLight} animate-pulse` : 'bg-slate-600'}`} />
+          <div className={`${SIZES.size.xs} ${SIZES.radius.full} ${activePanel === 'report' ? `${COLORS.secondary.purpleLight} ${COLORS.neutral.light.indicatorActive}` : COLORS.neutral.light.indicator}`} />
           {PANEL_TEXTS.aiReport}
-          {captureStatus === 'analyzing' && <Loader2 className="w-3 h-3 animate-spin" />}
         </button>
       </div>
 
-      {/* Analysis Action Buttons */}
+      {/* Analysis Action Buttons - Only Deep Analysis */}
       {captureStatus === 'completed' && (
-        <div className={`flex ${SIZES.gap.sm} p-1 ${COLORS.neutral.slateBg} ${SIZES.radius.md} border ${COLORS.neutral.slateBorder30} backdrop-blur-sm mt-2`}>
-          <button
-            onClick={() => {
-              setReportType('auxiliary');
-              setActivePanel('report');
-            }}
-            className={`flex-1 flex items-center justify-center ${SIZES.gap.sm} py-2 ${SIZES.radius.sm} ${SIZES.font.md} font-black uppercase tracking-wider ${TRANSITIONS.default} ${
-              reportType === 'auxiliary' && activePanel === 'report'
-                ? `${COLORS.primary.blue} text-white shadow-lg ${COLORS.primary.blueShadow}`
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            {PANEL_TEXTS.auxiliaryDiagnosis}
-          </button>
-          <button
-            onClick={() => {
-              setReportType('deep');
-              setActivePanel('report');
-            }}
-            className={`flex-1 flex items-center justify-center ${SIZES.gap.sm} py-2 ${SIZES.radius.sm} ${SIZES.font.md} font-black uppercase tracking-wider ${TRANSITIONS.default} ${
-              reportType === 'deep' && activePanel === 'report'
-                ? `${COLORS.secondary.purple} text-white shadow-lg ${COLORS.secondary.purpleShadow}`
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-            }`}
-          >
-            {PANEL_TEXTS.deepAnalysis}
-          </button>
+        <div className={`flex ${SIZES.gap.sm} p-1 ${COLORS.neutral.light.bgSoft} ${SIZES.radius.md} border ${COLORS.neutral.light.borderSoft} backdrop-blur-sm mt-2`}>
+          {/* 深度报告按钮 - 如果没有深度报告，显示获取按钮 */}
+          {!markdownReport && onRequestDeepAnalysis ? (
+            <button
+              onClick={() => {
+                onRequestDeepAnalysis();
+                setReportType('deep');
+                setActivePanel('report');
+              }}
+              disabled={isLoadingDeepReport}
+              className={`flex-1 flex items-center justify-center ${SIZES.gap.sm} py-2 ${SIZES.radius.sm} ${SIZES.font.md} font-black uppercase tracking-wider ${TRANSITIONS.default} ${
+                isLoadingDeepReport
+                  ? COLORS.neutral.light.buttonDisabled
+                  : `${COLORS.secondary.purple} text-white shadow-lg ${COLORS.secondary.purpleShadow} hover:opacity-90`
+              }`}
+            >
+              {isLoadingDeepReport ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  {PANEL_TEXTS.deepAnalysis}
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setReportType('deep');
+                setActivePanel('report');
+              }}
+              className={`flex-1 flex items-center justify-center ${SIZES.gap.sm} py-2 ${SIZES.radius.sm} ${SIZES.font.md} font-black uppercase tracking-wider ${TRANSITIONS.default} ${
+                reportType === 'deep' && activePanel === 'report'
+                  ? `${COLORS.secondary.purple} text-white shadow-lg ${COLORS.secondary.purpleShadow}`
+                  : COLORS.neutral.light.buttonInactive
+              }`}
+            >
+              {PANEL_TEXTS.deepAnalysis}
+            </button>
+          )}
         </div>
       )}
 
       <div className="flex-1 overflow-hidden min-h-0 mt-4">
         {activePanel === 'report' ? (
-          <div className={`h-full ${ANIMATIONS.fadeIn} ${ANIMATIONS.slideInRight}`}>
+          <div className={`h-full ${ANIMATIONS.fadeIn} ${ANIMATIONS.slideInRight} ${SIZES.radius.lg} overflow-auto`}>
             <MarkdownReport 
-              content={reportType === 'deep' ? markdownReport : auxiliaryReport} 
-              loading={captureStatus === 'analyzing' && !(reportType === 'deep' ? markdownReport : auxiliaryReport)} 
+              content={
+                reportType === 'deep' && isStreamingReport 
+                  ? streamingReport || markdownReport 
+                  : reportType === 'deep' 
+                    ? markdownReport 
+                    : auxiliaryDiagnosis
+              } 
+              loading={false}
             />
           </div>
         ) : (

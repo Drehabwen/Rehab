@@ -67,8 +67,8 @@ export const BUTTON_TEXTS = {
 
 // 面板文本
 export const PANEL_TEXTS = {
-  dataPanel: '数据面板',
-  aiReport: 'AI 报告',
+  dataPanel: '基础报告',
+  aiReport: '深度报告',
   auxiliaryDiagnosis: '辅助诊断',
   deepAnalysis: '深度分析',
   progress: {

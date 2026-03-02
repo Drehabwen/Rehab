@@ -1,4 +1,4 @@
-// UI样式常量
+// UI 样式常量
 export const COLORS = {
   // 主题颜色
   primary: {
@@ -48,6 +48,7 @@ export const COLORS = {
     roseBorder: 'border-rose-500/30',
   },
   neutral: {
+    // 深色主题
     white: 'bg-white',
     whiteText: 'text-white',
     whiteBg: 'bg-white/5',
@@ -63,6 +64,25 @@ export const COLORS = {
     slate200: 'bg-slate-200',
     slate500: 'text-slate-500',
     slate600: 'text-slate-600',
+    // 浅色主题（用于报告等明亮区域）
+    light: {
+      bg: 'bg-white',
+      bgSoft: 'bg-slate-50',
+      text: 'text-slate-900',
+      textSoft: 'text-slate-800',
+      textMuted: 'text-slate-600',
+      textLight: 'text-slate-400',
+      border: 'border-slate-200',
+      borderSoft: 'border-slate-100',
+      hover: 'hover:bg-slate-50',
+      selected: 'bg-slate-100',
+      // 按钮状态
+      buttonDisabled: 'bg-slate-700 text-slate-500 cursor-not-allowed',
+      buttonInactive: 'text-slate-400 hover:text-slate-600 hover:bg-slate-50',
+      // 指示器
+      indicator: 'bg-slate-600',
+      indicatorActive: 'animate-pulse',
+    }
   },
   antey: {
     primary: 'bg-antey-primary',

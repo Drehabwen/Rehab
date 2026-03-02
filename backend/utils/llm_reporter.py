@@ -24,7 +24,7 @@ if api_key:
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
-        timeout=120.0
+        timeout=300.0  # Increased timeout to 5 minutes
     )
 
 class PostureAgent:
@@ -58,8 +58,12 @@ class PostureAgent:
         Args:
             assessment_type: 'standard' for full 3-view analysis, 'quick' for single-view screening
         """
+        print(f"[generate_final_report] Starting with assessment_type: {assessment_type}", flush=True)
+        print(f"[generate_final_report] Observations count: {len(self.observations)}", flush=True)
+        
         if not client:
-            return "Deepseek API key not found."
+            print("[generate_final_report] ERROR: No client available", flush=True)
+            return "API链接失败：未找到Deepseek API密钥"
 
         history_context = ""
         for i, obs in enumerate(self.observations):
@@ -135,31 +139,176 @@ class PostureAgent:
         """
 
         try:
+            print(f"[generate_final_report] Calling LLM API...", flush=True)
             response = client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[
                     {"role": "system", "content": "你是一个具有批判性思维的医疗专家。你的目标是揭示体态问题背后的深层代偿逻辑，而非简单描述。你必须严格遵循推理链可视化的要求，展示从原始数值到最终结论的完整推导过程。严禁省略推理步骤或降低数值的重要性。"},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.4
+                temperature=0.4,
+                timeout=300
             )
+            print(f"[generate_final_report] LLM API call completed", flush=True)
             
-            raw_content = response.choices[0].message.content
+            # Debug: Print raw response
+            print(f"[generate_final_report] Raw response type: {type(response)}", flush=True)
+            
+            # Check response structure - safely
+            try:
+                print(f"[generate_final_report] Response has choices: {hasattr(response, 'choices')}", flush=True)
+                if hasattr(response, 'choices'):
+                    print(f"[generate_final_report] Choices count: {len(response.choices) if response.choices else 0}", flush=True)
+                    if response.choices and len(response.choices) > 0:
+                        print(f"[generate_final_report] First choice type: {type(response.choices[0])}", flush=True)
+                        if hasattr(response.choices[0], 'message'):
+                            print(f"[generate_final_report] Message type: {type(response.choices[0].message)}", flush=True)
+                            if hasattr(response.choices[0].message, 'content'):
+                                raw_content = response.choices[0].message.content
+                                print(f"[generate_final_report] Content length: {len(raw_content) if raw_content else 0}", flush=True)
+                            else:
+                                print(f"[generate_final_report] ERROR: No content attribute", flush=True)
+                                return "生成报告失败：LLM 返回无内容"
+                        else:
+                            print(f"[generate_final_report] ERROR: No message attribute", flush=True)
+                            return "生成报告失败：LLM 返回无消息"
+                    else:
+                        print(f"[generate_final_report] ERROR: No choices", flush=True)
+                        return "生成报告失败：LLM 返回空响应"
+                else:
+                    print(f"[generate_final_report] ERROR: No choices attribute", flush=True)
+                    return "生成报告失败：LLM 返回格式错误"
+            except Exception as access_error:
+                print(f"[generate_final_report] ERROR accessing response: {access_error}", flush=True)
+                import traceback
+                traceback.print_exc()
+                return f"生成报告失败：访问响应出错 - {str(access_error)}"
+            
+            if not raw_content:
+                print(f"[generate_final_report] ERROR: Empty content in message", flush=True)
+                return "生成报告失败：LLM 返回空内容"
+            
             print("\n" + "="*50)
             print("--- RAW LLM RESPONSE START ---")
-            print(raw_content)
+            print(raw_content[:500])
             print("--- RAW LLM RESPONSE END ---")
             print("="*50 + "\n", flush=True)
             
             logger.info(f"DeepSeek Response length: {len(raw_content)}")
             markdown = extract_markdown(raw_content)
             if markdown.strip():
+                print(f"[generate_final_report] Returning markdown: {len(markdown)} chars", flush=True)
                 return markdown
             fallback = raw_content.strip() if raw_content else ""
+            print(f"[generate_final_report] Returning fallback: {len(fallback)} chars", flush=True)
             return fallback if fallback else "生成报告失败：LLM 返回空内容"
         except Exception as e:
             logger.error(f"Error in generate_final_report: {e}")
+            print(f"[generate_final_report] ERROR: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             return f"生成报告失败: {str(e)}"
+        finally:
+            print(f"[generate_final_report] Function completed", flush=True)
+
+    async def generate_final_report_stream(self, assessment_type: str = "standard", websocket=None):
+        """
+        Stream version of generate_final_report for real-time LLM output.
+        Yields chunks of markdown content as they are received from the LLM.
+        
+        Args:
+            assessment_type: 'standard' for full analysis, 'quick' for single-view
+            websocket: WebSocket connection for streaming chunks
+        """
+        global client
+        
+        if not self.observations:
+            yield "⚠️ 未检测到体态数据，请重新进行姿态采集"
+            return
+        
+        if not client:
+            yield "API 链接失败：未找到 Deepseek API 密钥"
+            return
+        
+        # Build prompt from observations
+        prompt_parts = ["请基于以下体态评估数据生成深度分析报告：\n"]
+        for i, obs in enumerate(self.observations, 1):
+            prompt_parts.append(f"\n【视角 {i}】\n{obs['narration']}")
+        
+        prompt = "\n".join(prompt_parts)
+        
+        try:
+            print(f"[generate_final_report_stream] Calling LLM API with streaming...", flush=True)
+            
+            # Call LLM with streaming enabled
+            stream = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[
+                    {"role": "system", "content": "你是一个具有批判性思维的医疗专家。你的目标是揭示体态问题背后的深层代偿逻辑，而非简单描述。你必须严格遵循推理链可视化的要求，展示从原始数值到最终结论的完整推导过程。严禁省略推理步骤或降低数值的重要性。"},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.4,
+                stream=True,  # Enable streaming
+                timeout=300
+            )
+            
+            full_content = ""
+            chunk_count = 0
+            
+            # Process stream chunks
+            for chunk in stream:
+                if chunk.choices and len(chunk.choices) > 0:
+                    delta = chunk.choices[0].delta
+                    if delta and delta.content:
+                        content = delta.content
+                        full_content += content
+                        chunk_count += 1
+                        
+                        # Send chunk via WebSocket if available
+                        if websocket:
+                            try:
+                                await websocket.send_json({
+                                    "type": "DEEP_REPORT_STREAM",
+                                    "content": content,
+                                    "chunkIndex": chunk_count
+                                })
+                            except Exception as send_error:
+                                print(f"[generate_final_report_stream] WebSocket send error: {send_error}", flush=True)
+                                # Continue streaming even if WebSocket fails
+            
+            print(f"[generate_final_report_stream] Stream completed. Total chunks: {chunk_count}, Content length: {len(full_content)}", flush=True)
+            
+            # Process final content
+            if full_content:
+                print("\n" + "="*50)
+                print("--- RAW STREAMED CONTENT START ---")
+                print(full_content[:500])
+                print("--- RAW STREAMED CONTENT END ---")
+                print("="*50 + "\n", flush=True)
+                
+                logger.info(f"Streamed Response length: {len(full_content)}")
+                markdown = extract_markdown(full_content)
+                
+                if markdown.strip():
+                    print(f"[generate_final_report_stream] Returning markdown: {len(markdown)} chars", flush=True)
+                    yield markdown
+                    return
+                
+                fallback = full_content.strip()
+                print(f"[generate_final_report_stream] Returning fallback: {len(fallback)} chars", flush=True)
+                yield fallback if fallback else "生成报告失败：LLM 返回空内容"
+            else:
+                print(f"[generate_final_report_stream] ERROR: Empty content received", flush=True)
+                yield "生成报告失败：LLM 返回空内容"
+                
+        except Exception as e:
+            logger.error(f"Error in generate_final_report_stream: {e}")
+            print(f"[generate_final_report_stream] ERROR: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            yield f"生成报告失败：{str(e)}"
+        finally:
+            print(f"[generate_final_report_stream] Function completed", flush=True)
 
 # Global instance for the session (simplified)
 posture_agent = PostureAgent()
@@ -248,6 +397,11 @@ def generate_posture_report(analysis_data: Dict[str, Any], assessment_type: str 
         analysis_data: Dictionary containing frames or other analysis data
         assessment_type: 'standard' for full 3-view analysis, 'quick' for single-view screening
     """
+    # If assessment_type is in analysis_data, use it
+    if isinstance(analysis_data, dict) and "assessment_type" in analysis_data:
+        assessment_type = analysis_data.pop("assessment_type")
+        print(f"[generate_posture_report] Using assessment_type from data: {assessment_type}", flush=True)
+    
     # If it's a batch/stepped request, it usually comes with multiple frames.
     # We should clear the agent and feed it everything.
     posture_agent.clear()
@@ -261,11 +415,21 @@ def generate_posture_report(analysis_data: Dict[str, Any], assessment_type: str 
             from backend.utils.narrator import process_time_series
         except ImportError:
             from utils.narrator import process_time_series # Fallback for different contexts
-            
+        
+        import traceback
         for frame in analysis_data["frames"]:
-            # frame is a dict from model_dump()
-            res = process_time_series(frame["view"], frame["timeSeriesLandmarks"])
-            posture_agent.analyze_view(res["narration"], res["stats"])
+            try:
+                # frame is a dict from model_dump()
+                print(f"[generate_posture_report] Processing frame for view: {frame.get('view', 'unknown')}", flush=True)
+                print(f"[generate_posture_report] timeSeriesLandmarks count: {len(frame.get('timeSeriesLandmarks', []))}", flush=True)
+                res = process_time_series(frame["view"], frame["timeSeriesLandmarks"])
+                print(f"[generate_posture_report] process_time_series completed, narration length: {len(res.get('narration', ''))}", flush=True)
+                posture_agent.analyze_view(res["narration"], res["stats"])
+            except Exception as e:
+                print(f"[generate_posture_report] Error processing frame: {e}", flush=True)
+                traceback.print_exc()
+                # Continue with next frame instead of failing completely
+                continue
     else:
         view = analysis_data.get("view", "unknown")
         averages = analysis_data.get("averages") or {}
@@ -282,5 +446,8 @@ def generate_posture_report(analysis_data: Dict[str, Any], assessment_type: str 
         }
         narration = build_narration(view, summary_stats)
         posture_agent.analyze_view(narration, summary_stats)
-        
-    return posture_agent.generate_final_report(assessment_type)
+    
+    print(f"[generate_posture_report] Calling generate_final_report with assessment_type: {assessment_type}", flush=True)
+    result = posture_agent.generate_final_report(assessment_type)
+    print(f"[generate_posture_report] generate_final_report returned: {len(result)} chars", flush=True)
+    return result

@@ -28,21 +28,43 @@ export interface SteppedFrame {
 export function usePostureWS(url: string = CONFIG.websocket.url) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
+  /** 深度报告 - LLM 解析的报告 */
   const [markdownReport, setMarkdownReport] = useState<string | null>(null);
-  const [auxiliaryReport, setAuxiliaryReport] = useState<string | null>(null);
+  /** 流式报告内容 - 用于实时显示 LLM 输出 */
+  const [streamingReport, setStreamingReport] = useState<string>('');
+  /** 是否正在生成流式报告 */
+  const [isStreamingReport, setIsStreamingReport] = useState<boolean>(false);
+  /** 基础报告 - 根据规则得出的结论 */
+  const [auxiliaryDiagnosis, setAuxiliaryDiagnosis] = useState<string | null>(null);
   const [timeSeriesData, setTimeSeriesData] = useState<TemporalAnalysis['timeSeries'] | null>(null);
+  const [analysisAckAt, setAnalysisAckAt] = useState<number | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
+  // 存储最后一次分析的原始帧数据，用于深度分析请求
+  const [rawFramesData, setRawFramesData] = useState<Array<{
+    view: 'front' | 'side' | 'back';
+    timeSeriesLandmarks: Landmark[][];
+  }>>([]);
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout>();
   const pendingMessages = useRef<string[]>([]);
   const savePostureReport = useMeasurementStore(state => state.savePostureReport);
   const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
   const lastBatchTimeSeriesRef = useRef<TemporalAnalysis['timeSeries']>([]);
+  const currentRequestIdRef = useRef<string | null>(null);
+  // 存储最后一次分析的原始数据，用于深度分析请求
+  const lastAnalysisDataRef = useRef<{
+    view: 'front' | 'side' | 'back';
+    timeSeriesLandmarks: Landmark[][];
+    width: number;
+    height: number;
+  } | null>(null);
 
   const flushPending = useCallback(() => {
+    console.log('[usePostureWS] Flushing pending messages, count:', pendingMessages.current.length);
     if (ws.current?.readyState === WebSocket.OPEN && pendingMessages.current.length) {
       pendingMessages.current.forEach(message => ws.current?.send(message));
       pendingMessages.current = [];
+      console.log('[usePostureWS] Pending messages flushed');
     }
   }, []);
 
@@ -50,17 +72,18 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     const message = JSON.stringify(payload);
     console.log('[usePostureWS] sendMessage called, readyState:', ws.current?.readyState, 'OPEN:', WebSocket.OPEN);
     if (ws.current?.readyState === WebSocket.OPEN) {
-      console.log('[usePostureWS] Sending message via WebSocket');
+      console.log('[usePostureWS] Sending message via WebSocket:', payload.type);
       ws.current.send(message);
       return;
     }
-    console.log('[usePostureWS] WebSocket not ready, adding to pending queue');
+    console.log('[usePostureWS] WebSocket not ready, adding to pending queue:', payload.type);
     pendingMessages.current.push(message);
   }, []);
 
   const connect = useCallback(() => {
     try {
       setStatus('connecting');
+      console.log('[usePostureWS] Connecting to WebSocket:', url);
       const socket = new WebSocket(url);
       ws.current = socket;
 
@@ -72,21 +95,38 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
 
       const handleMessage = (event: MessageEvent) => {
         try {
+          console.log('[usePostureWS] Received message:', event.data.substring(0, 100) + '...');
           const data = JSON.parse(event.data);
-          console.log('[usePostureWS] Received message:', data.type);
-          console.log('[usePostureWS] Full data:', data);
+          console.log('[usePostureWS] Received message type:', data.type);
           if (data.type === 'ANALYSIS_RESULT') {
             setResult(data);
             const auxReport = generateAuxiliaryReport(data);
-            setAuxiliaryReport(auxReport);
+            setAuxiliaryDiagnosis(auxReport);
+          } else if (data.type === 'POSTURE_ACK') {
+            if (data.requestId && currentRequestIdRef.current && data.requestId !== currentRequestIdRef.current) {
+              return;
+            }
+            setAnalysisAckAt(Date.now());
           } else if (data.type === 'JOINT_RESULT') {
             setJointResult(data);
           } else if (data.type === 'POSTURE_REPORT') {
+            console.log('[usePostureWS] Received POSTURE_REPORT message');
+            
+            // 处理深度报告 (markdown) - 只有非空时才设置
             const markdown = typeof data.markdown === 'string' ? data.markdown : '';
             const normalized = markdown.trim();
-            const finalMarkdown = normalized ? markdown : '报告生成失败：未收到有效的 Markdown 内容。';
-            console.log('[usePostureWS] Setting markdownReport, length:', finalMarkdown.length);
-            setMarkdownReport(finalMarkdown);
+            if (normalized) {
+              console.log('[usePostureWS] Setting markdownReport, length:', normalized.length);
+              console.log('[usePostureWS] Markdown content snippet:', normalized.substring(0, 100) + '...');
+              setMarkdownReport(markdown);
+            } else {
+              console.log('[usePostureWS] No markdown report, clearing...');
+              setMarkdownReport(null);
+            }
+            
+            // 清除流式状态
+            setIsStreamingReport(false);
+            setStreamingReport('');
             const timeSeries = Array.isArray(data.timeSeries) ? data.timeSeries : lastBatchTimeSeriesRef.current;
             setTimeSeriesData(timeSeries);
             
@@ -100,25 +140,51 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
               });
             }
             
+            // Set auxiliary diagnosis from backend (基础报告)
+            if (data.auxiliaryDiagnosis) {
+              console.log('[usePostureWS] Received auxiliaryDiagnosis, length:', data.auxiliaryDiagnosis.length);
+              console.log('[usePostureWS] AuxiliaryDiagnosis content snippet:', data.auxiliaryDiagnosis.substring(0, 100) + '...');
+              setAuxiliaryDiagnosis(data.auxiliaryDiagnosis);
+            }
+            
             console.log('[usePostureWS] Saving posture report:', {
               view: currentViewRef.current,
-              reportLength: finalMarkdown.length,
+              hasMarkdown: !!normalized,
               hasTimeSeries: timeSeries && timeSeries.length > 0,
-              timeSeriesLength: timeSeries ? timeSeries.length : 0
+              timeSeriesLength: timeSeries ? timeSeries.length : 0,
+              hasAuxiliaryDiagnosis: !!data.auxiliaryDiagnosis
             });
             
-            savePostureReport(currentViewRef.current, finalMarkdown, finalMarkdown, timeSeries);
+            // Save both auxiliary diagnosis and markdown report with metrics and issues
+            savePostureReport(
+              currentViewRef.current, 
+              data.auxiliaryDiagnosis || normalized, 
+              normalized || null, 
+              timeSeries,
+              data.metrics,
+              data.issues,
+              data.auxiliaryDiagnosis
+            );
             console.log('[usePostureWS] Posture report saved successfully');
             
             // Log the current report state
             console.log('[usePostureWS] Current report state:', {
               markdownReport: markdownReport ? 'exists' : 'null',
-              auxiliaryReport: auxiliaryReport ? 'exists' : 'null',
+              auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
               timeSeriesData: timeSeriesData ? 'exists' : 'null'
             });
+          } else if (data.type === 'DEEP_REPORT_STREAM') {
+            // Handle streaming chunks from LLM
+            console.log('[usePostureWS] Received DEEP_REPORT_STREAM chunk');
+            const content = typeof data.content === 'string' ? data.content : '';
+            if (content) {
+              setStreamingReport(prev => prev + content);
+              setIsStreamingReport(true);
+            }
           }
         } catch (e) {
           console.error('Failed to parse analysis result:', e);
+          console.error('Original message:', event.data);
         }
       };
 
@@ -149,27 +215,34 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       console.error('Connection error:', e);
       setStatus('error');
     }
-  }, [url, savePostureReport, flushPending]);
+  }, [url, flushPending]); // Removed savePostureReport from dependencies as it's a stable store method
 
   useEffect(() => {
+    console.log('[usePostureWS] Initializing WebSocket connection');
     connect();
     return () => {
+      console.log('[usePostureWS] Cleaning up WebSocket connection');
       if (ws.current) ws.current.close();
       if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
     };
   }, [connect]);
 
   const analyze = useCallback((view: 'front' | 'side' | 'back', timeSeriesLandmarks: Landmark[][], width: number, height: number) => {
+    console.log('[usePostureWS] analyze called:', { view, landmarksCount: timeSeriesLandmarks.length, width, height });
     setMarkdownReport(null);
     setResult(null);
     currentViewRef.current = view;
-    sendMessage({
+    // 保存分析数据用于后续深度分析请求
+    lastAnalysisDataRef.current = { view, timeSeriesLandmarks, width, height };
+    const message = {
       type: 'POSTURE_SYNC',
       view,
       width,
       height,
       timeSeriesLandmarks
-    });
+    };
+    console.log('[usePostureWS] Sending POSTURE_SYNC message');
+    sendMessage(message);
   }, [sendMessage]);
 
   const analyzeJoint = useCallback((
@@ -189,7 +262,8 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     });
   }, [sendMessage]);
 
-  const analyzeBatch = useCallback((analysis: TemporalAnalysis) => {
+  const analyzeBatch = useCallback((analysis: TemporalAnalysis & { timeSeriesLandmarks?: Landmark[][] }) => {
+    console.log('[usePostureWS] analyzeBatch called:', { view: analysis.view, landmarksCount: analysis.timeSeriesLandmarks?.length || 0 });
     setMarkdownReport(null);
     setResult(null);
     currentViewRef.current = analysis.view;
@@ -214,8 +288,18 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       })));
     }
     
+    // 存储原始帧数据，用于后续的深度分析请求
+    const framesData = frames.map(f => ({
+      view: f.view,
+      timeSeriesLandmarks: f.timeSeriesLandmarks
+    }));
+    setRawFramesData(framesData);
+    console.log('[usePostureWS] Stored raw frames data for deep analysis:', framesData.length, 'frames');
+    
+    // 清除之前的报告状态
     setMarkdownReport(null);
     setResult(null);
+    setAuxiliaryDiagnosis(null);
     
     if (frames.length === 0) {
       console.error('[usePostureWS] ERROR: No frames to analyze!');
@@ -223,11 +307,14 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     }
     
     currentViewRef.current = frames[0].view;
+    setAnalysisAckAt(null);
+    currentRequestIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     
     const message = {
       type: 'POSTURE_STEPPED_ANALYSIS',
       frames,
-      assessmentType
+      assessmentType,
+      requestId: currentRequestIdRef.current
     };
     
     const readyState = ws.current?.readyState;
@@ -254,17 +341,48 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     console.log('[usePostureWS] ========== analyzeStepped END ==========');
   }, [sendMessage, connect]);
 
+  // 新增：请求深度报告
+  const requestDeepAnalysis = useCallback(() => {
+    if (!rawFramesData || rawFramesData.length === 0) {
+      console.error('[usePostureWS] requestDeepAnalysis: No frames data available');
+      return;
+    }
+    
+    console.log('[usePostureWS] requestDeepAnalysis called:', { 
+      framesCount: rawFramesData.length,
+      frames: rawFramesData.map(f => ({ view: f.view, landmarksCount: f.timeSeriesLandmarks.length }))
+    });
+    
+    // 清除之前的深度报告，准备接收新的流式报告
+    setMarkdownReport(null);
+    setIsStreamingReport(true);
+    setStreamingReport('');
+    
+    const message = {
+      type: 'POSTURE_DEEP_ANALYSIS',
+      frames: rawFramesData,
+      assessmentType: 'quick',
+      requestId: `deep-${Date.now()}`
+    };
+    console.log('[usePostureWS] Sending POSTURE_DEEP_ANALYSIS message');
+    sendMessage(message);
+  }, [sendMessage, rawFramesData]);
+
   return {
     result,
     jointResult,
     markdownReport,
-    auxiliaryReport,
+    streamingReport,
+    isStreamingReport,
+    auxiliaryDiagnosis,
     timeSeriesData,
     status,
     analyze,
     analyzeBatch,
     analyzeStepped,
     analyzeJoint,
+    requestDeepAnalysis,
+    analysisAckAt,
     connect,
     disconnect: () => {
       ws.current?.close();

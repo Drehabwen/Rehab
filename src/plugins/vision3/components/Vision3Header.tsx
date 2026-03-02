@@ -25,17 +25,17 @@ export const Vision3Header: React.FC<Vision3HeaderProps> = ({
   setView
 }) => {
   return (
-    <div className={`flex items-center justify-between bg-white/40 ${BACKDROP.md} p-3 ${SIZES.radius.pill} border border-white/60 ${SHADOWS.sm}`}>
+    <div className={`flex items-center justify-between ${COLORS.neutral.light.bgSoft}/40 ${BACKDROP.md} p-3 ${SIZES.radius.pill} border border-white/60 ${SHADOWS.sm}`}>
       <div className={`flex items-center ${SIZES.gap.lg}`}>
         {isEntryMode ? (
-          <div className="flex p-1.5 bg-slate-100/50 rounded-2xl">
+          <div className={`flex p-1.5 ${COLORS.neutral.light.bgSoft}/50 rounded-2xl`}>
             <button 
               onClick={() => { setActiveTab('posture'); setIsEntryMode(true); }}
               className={cn(
                 `${SIZES.padding.xl} ${SIZES.radius.md} ${SIZES.font.lg} font-black uppercase tracking-[0.2em] ${TRANSITIONS.medium} flex items-center ${SIZES.gap.md}`,
                 activeTab === 'posture' 
                   ? `${COLORS.neutral.white} ${COLORS.antey.primaryText} ${SHADOWS.lg} shadow-antey-primary/5 ring-1 ring-slate-200` 
-                  : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
+                  : COLORS.neutral.light.buttonInactive
               )}
             >
               <Activity size={16} className={cn("transition-transform duration-500", activeTab === 'posture' && "scale-110")} />
@@ -47,7 +47,7 @@ export const Vision3Header: React.FC<Vision3HeaderProps> = ({
                 `${SIZES.padding.xl} ${SIZES.radius.md} ${SIZES.font.lg} font-black uppercase tracking-[0.2em] ${TRANSITIONS.medium} flex items-center ${SIZES.gap.md}`,
                 activeTab === 'rom' 
                   ? `${COLORS.neutral.white} ${COLORS.antey.accentText} ${SHADOWS.lg} shadow-antey-accent/5 ring-1 ring-slate-200` 
-                  : "text-slate-400 hover:text-slate-600 hover:bg-white/50"
+                  : COLORS.neutral.light.buttonInactive
               )}
             >
               <TrendingUp size={16} className={cn("transition-transform duration-500", activeTab === 'rom' && "scale-110")} />
@@ -58,15 +58,15 @@ export const Vision3Header: React.FC<Vision3HeaderProps> = ({
           <div className={`flex items-center ${SIZES.gap.md}`}>
             <button 
               onClick={() => setIsEntryMode(true)}
-              className="group flex items-center gap-3 px-6 py-3 bg-white text-slate-900 rounded-2xl border border-slate-200 shadow-sm hover:bg-slate-50 transition-all duration-300"
+              className={`group flex items-center gap-3 px-6 py-3 ${COLORS.neutral.light.bg} ${COLORS.neutral.light.text} rounded-2xl ${COLORS.neutral.light.border} shadow-sm ${COLORS.neutral.light.hover} transition-all duration-300`}
             >
               <RotateCcw size={16} className="text-antey-primary group-hover:rotate-[-45deg] transition-transform" />
               <span className={`${SIZES.font.lg} font-black uppercase tracking-widest`}>返回中心概览</span>
             </button>
             
-            <div className="w-px h-8 bg-slate-200 mx-2" />
+            <div className={`w-px h-8 ${COLORS.neutral.light.border.replace('border', 'bg')}`} />
             
-            <div className="flex p-1.5 bg-slate-100/50 rounded-2xl">
+            <div className={`flex p-1.5 ${COLORS.neutral.light.bgSoft}/50 rounded-2xl`}>
               {(['front', 'side', 'back'] as const).map((v) => (
                 <button
                   key={v}
@@ -75,10 +75,10 @@ export const Vision3Header: React.FC<Vision3HeaderProps> = ({
                     `${SIZES.padding.lg} ${SIZES.radius.md} ${SIZES.font.md} font-black uppercase tracking-[0.2em] ${TRANSITIONS.slow} flex items-center ${SIZES.gap.sm}`,
                     view === v 
                       ? `${COLORS.neutral.white} ${COLORS.antey.primaryText} ${SHADOWS.md} ring-1 ring-slate-200` 
-                      : "text-slate-400 hover:text-slate-600"
+                      : COLORS.neutral.light.buttonInactive.replace('hover:bg-slate-50', '')
                   )}
                 >
-                  <div className={cn(`${SIZES.size.xs} ${SIZES.radius.full}`, view === v ? COLORS.antey.primary : "bg-slate-300")} />
+                  <div className={cn(`${SIZES.size.xs} ${SIZES.radius.full}`, view === v ? COLORS.antey.primary : 'bg-slate-300')} />
                   {VIEW_LABEL_TEXTS[v]}
                 </button>
               ))}
@@ -91,11 +91,11 @@ export const Vision3Header: React.FC<Vision3HeaderProps> = ({
         <div className={`flex items-center ${SIZES.gap.md} ${SIZES.font.md} font-black ${COLORS.neutral.slateText} uppercase tracking-widest`}>
           <div className={`${SIZES.size.xs} ${SIZES.radius.full} ${COLORS.success.emerald} animate-pulse`} />
           {SYSTEM_TEXTS.ready}
-          <span className="w-px h-4 bg-slate-200 mx-2" />
+          <span className={`w-px h-4 ${COLORS.neutral.light.border.replace('border', 'bg')} mx-2`} />
           <History size={14} className="text-slate-300" />
           {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.')}
         </div>
-        <button className="p-2.5 text-slate-400 hover:bg-white hover:text-antey-primary hover:shadow-sm rounded-xl transition-all duration-300">
+        <button className={`p-2.5 ${COLORS.neutral.light.textLight} ${COLORS.neutral.light.hover} ${COLORS.neutral.light.text} hover:text-antey-primary hover:shadow-sm rounded-xl transition-all duration-300`}>
           <Settings2 size={18} />
         </button>
       </div>

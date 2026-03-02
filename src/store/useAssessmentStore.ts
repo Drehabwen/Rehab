@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { db } from '@/lib/db';
-import type { Assessment, PostureAssessmentData, RomAssessmentData, AssessmentMode } from '@/types/assessment';
+import type { Assessment, PostureAssessmentData, RomAssessmentData, MedVoiceAssessmentData, AssessmentMode } from '@/types/assessment';
 import { nanoid } from 'nanoid';
 
 interface AssessmentState {
@@ -13,11 +13,12 @@ interface AssessmentState {
   addAssessment: (data: {
     sessionId: string;
     patientId: string;
-    type: 'posture' | 'rom' | 'combined';
+    type: 'posture' | 'rom' | 'medvoice' | 'combined';
     mode: AssessmentMode;
     data: {
       posture?: PostureAssessmentData;
       rom?: RomAssessmentData;
+      medvoice?: MedVoiceAssessmentData;
     };
     notes?: string;
   }) => Promise<Assessment>;

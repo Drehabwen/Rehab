@@ -14,6 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { useCaseStore, StructuredCase } from '@/store/useCaseStore';
+import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { GlobalExport } from '@/components/GlobalExport';
 
@@ -45,7 +46,9 @@ export const MedVoicePlugin: React.FC = () => {
   const [viewMode, setViewMode] = useState<'standard' | 'soap'>('standard');
   const [transcript, setTranscript] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const { structuredCase, setStructuredCase } = useCaseStore();
+  const [isSaving, setIsSaving] = useState(false);
+  const { structuredCase, setStructuredCase, patientInfo } = useCaseStore();
+  const { addAssessment } = useAssessmentStore();
   const [activeSection, setActiveSection] = useState<string>('主诉');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -142,6 +145,36 @@ export const MedVoicePlugin: React.FC = () => {
       console.error('Structuring failed', err);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleSaveToAssessment = async () => {
+    if (!structuredCase || !transcript) return;
+    
+    setIsSaving(true);
+    try {
+      await addAssessment({
+        sessionId: `session_${Date.now()}`,
+        patientId: patientInfo.case_id,
+        type: 'medvoice',
+        mode: 'voice',
+        data: {
+          medvoice: {
+            mode: 'voice',
+            transcript,
+            structuredCase,
+            patientInfo,
+            viewMode
+          }
+        }
+      });
+      
+      alert('保存成功！数据已添加到报告中心');
+    } catch (error) {
+      console.error('保存失败:', error);
+      alert('保存失败，请重试');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -310,9 +343,13 @@ export const MedVoicePlugin: React.FC = () => {
                 </span>
                 <div className="flex items-center gap-3">
                   <GlobalExport />
-                  <button className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 hover:bg-antey-primary hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all group shadow-sm hover:shadow-lg hover:shadow-antey-primary/20">
-                    <Plus size={16} className="group-hover:rotate-90 transition-transform duration-500" />
-                    保存并同步
+                  <button 
+                    onClick={handleSaveToAssessment}
+                    disabled={!structuredCase || !transcript || isSaving}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-slate-50 hover:bg-antey-primary hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all group shadow-sm hover:shadow-lg hover:shadow-antey-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save size={16} className={cn("group-hover:scale-110 transition-transform duration-500", isSaving && "animate-spin")} />
+                    {isSaving ? '保存中...' : '保存到报告中心'}
                   </button>
                 </div>
               </div>

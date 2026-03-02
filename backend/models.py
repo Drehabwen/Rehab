@@ -23,6 +23,7 @@ class AnalysisRequest(BaseModel):
     height: int
     timeSeriesLandmarks: List[List[Landmark]]
     image: Optional[str] = Field(None, description="Base64 encoded image data for snapshot analysis")
+    requestId: Optional[str] = None
 
 class PostureIssue(BaseModel):
     id: str
@@ -101,19 +102,24 @@ class TemporalAnalysisRequest(BaseModel):
     stability: Optional[TemporalStability] = None
     timeSeries: Optional[List[Dict[str, Any]]] = None
     frames: Optional[List[SteppedFrame]] = None # Added for batch processing from frames
+    assessmentType: str = "standard"  # 'standard' or 'quick'
+    requestId: Optional[str] = None
 
 class SteppedAnalysisRequest(BaseModel):
     type: str = "POSTURE_STEPPED_ANALYSIS"
     frames: List[SteppedFrame]
     assessmentType: str = "standard"  # 'standard' or 'quick'
     mock: bool = False
+    requestId: Optional[str] = None
 
 class PostureReportResponse(BaseModel):
     type: str = "POSTURE_REPORT"
     markdown: str
     reportId: str
     timeSeries: Optional[List[Dict[str, Any]]] = None
-    metrics: Optional[Dict[str, Any]] = None
-    issues: Optional[List[Dict[str, Any]]] = None
+    metrics: Dict[str, float] = {}
+    auxiliaryDiagnosis: str = ""
+    issues: List[Dict[str, Any]] = []
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
     assessmentType: str = "standard"
+    isDeepReport: bool = False  # True for LLM deep report, False for basic report

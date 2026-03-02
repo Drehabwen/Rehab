@@ -11,7 +11,6 @@ import {
   HeadAxes,
   PoseLandmark
 } from '../vision3-utils';
-import AssessmentFallbackHandler from '@/utils/assessmentFallback';
 import { CONFIG } from '@/config';
 
 interface UsePostureAnalysisProps {
@@ -28,21 +27,26 @@ export function usePostureAnalysis({
   assessmentType
 }: UsePostureAnalysisProps) {
   const { setStep } = usePostureAssessmentStore();
-  const { 
-    result: wsResult, 
-    analyze, 
-    analyzeBatch, 
+  const {
+    result: wsResult,
+    analyze,
+    analyzeBatch,
     analyzeStepped,
+    requestDeepAnalysis,
     markdownReport: wsMarkdownReport,
-    auxiliaryReport,
-    timeSeriesData
+    streamingReport,
+    isStreamingReport,
+    auxiliaryDiagnosis,
+    timeSeriesData,
+    analysisAckAt
   } = usePostureWS();
 
   const [steppedResults, setSteppedResults] = useState<Record<string, { timeSeriesLandmarks: PoseLandmark[][]; width: number; height: number; timestamp: number }>>({});
-  const [localMarkdownReport, setLocalMarkdownReport] = useState<string | null>(null);
+  const analysisTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ackedRef = useRef(false);
   
-  // Combine WebSocket report with local fallback report
-  const markdownReport = wsMarkdownReport || localMarkdownReport;
+  // Only use WebSocket report, no fallback
+  const markdownReport = wsMarkdownReport;
 
   // Handle Capture Completion
   const onCapture = useCallback((data: { 
@@ -51,17 +55,42 @@ export function usePostureAnalysis({
     height: number; 
     timestamp: number 
   }) => {
+    console.log('[usePostureAnalysis] onCapture called:', { assessmentMode, view, landmarksCount: data.timeSeriesLandmarks.length });
     if (assessmentMode === 'realtime') {
       // 实时模式下直接分析全部时序数据
+      console.log('[usePostureAnalysis] Calling analyze for realtime mode');
       analyze(view, data.timeSeriesLandmarks, data.width, data.height);
     } else {
       // 分步模式下存入结果
-      setSteppedResults(prev => ({
-        ...prev,
-        [view]: data
-      }));
+      console.log('[usePostureAnalysis] Storing result for stepped mode');
+      setSteppedResults(prev => {
+        const newResults = {
+          ...prev,
+          [view]: data
+        };
+        
+        // 快速评估模式：采集完立刻触发分析（不管几个视角）
+        if (assessmentType === 'quick') {
+          console.log('[usePostureAnalysis] Quick assessment: auto-triggering analysis after capture');
+          // 延迟一帧，确保状态更新完成
+          setTimeout(() => {
+            // 将当前视角的数据转换为 SteppedFrame 格式并发送分析
+            const frames = Object.entries(newResults).map(([v, result]) => ({
+              view: v as 'front' | 'side' | 'back',
+              timeSeriesLandmarks: result.timeSeriesLandmarks,
+              width: result.width,
+              height: result.height,
+              timestamp: result.timestamp
+            }));
+            console.log('[usePostureAnalysis] Calling analyzeStepped with frames:', frames.length);
+            analyzeStepped(frames, assessmentType);
+          }, 100);
+        }
+        
+        return newResults;
+      });
     }
-  }, [assessmentMode, analyze, view]);
+  }, [assessmentMode, assessmentType, analyze, view, analyzeStepped]);
 
   // --- Capture Logic (StateMachine) ---
   const {
@@ -74,42 +103,49 @@ export function usePostureAnalysis({
   } = useCaptureStateMachine(onCapture);
 
   useEffect(() => {
-    // 实时模式：等到后端返回结果后再完成
-    if (wsResult && assessmentMode === 'realtime' && captureStatus === 'analyzing') {
-      captureDispatch({ type: 'ANALYSIS_COMPLETE' });
+    console.log('[usePostureAnalysis] markdownReport changed:', markdownReport ? 'exists' : 'null');
+    if (markdownReport) {
+      console.log('[usePostureAnalysis] Setting step to completed');
+      setStep('completed');
     }
-    // 分步模式：等待后端返回 markdownReport 后再完成
-    if (markdownReport && assessmentMode === 'stepped' && captureStatus === 'analyzing') {
-      captureDispatch({ type: 'ANALYSIS_COMPLETE' });
-    }
-  }, [wsResult, markdownReport, assessmentMode, captureStatus, captureDispatch]);
+  }, [markdownReport, setStep]);
 
-  // --- Fallback Handling for Analysis Timeout ---
   useEffect(() => {
-    if (captureStatus !== 'analyzing') return;
-
-    const timeout = setTimeout(() => {
-      console.warn('[usePostureAnalysis] Analysis timeout, using fallback report');
-      
-      // Generate fallback report with basic data
-      const fallbackReport = AssessmentFallbackHandler.generateFallbackReport({
-        reason: 'llm_timeout',
-        view,
-        assessmentType,
-        metrics: wsResult?.metrics
-      });
-
-      console.log('[usePostureAnalysis] Fallback report generated:', fallbackReport.markdown?.substring(0, 100));
-      
-      // Set fallback markdown
-      setLocalMarkdownReport(fallbackReport.markdown);
-      
-      // Complete analysis
+    console.log('[usePostureAnalysis] Checking analysis completion:', { markdownReport: markdownReport ? 'exists' : 'null', captureStatus });
+    // 所有模式：等待后端返回 markdownReport 后再完成
+    if (markdownReport && captureStatus === 'analyzing') {
+      console.log('[usePostureAnalysis] Dispatching ANALYSIS_COMPLETE');
       captureDispatch({ type: 'ANALYSIS_COMPLETE' });
-    }, CONFIG.analysis.timeout); // Analysis timeout
+    }
+  }, [markdownReport, captureStatus, captureDispatch]);
 
-    return () => clearTimeout(timeout);
-  }, [captureStatus, view, assessmentType, wsResult?.metrics]);
+  useEffect(() => {
+    if (captureStatus === 'analyzing') {
+      ackedRef.current = false;
+      if (analysisTimeoutRef.current) clearTimeout(analysisTimeoutRef.current);
+      // 不再生成fallback报告，只设置超时
+      analysisTimeoutRef.current = setTimeout(() => {
+        // 超时后直接完成分析，后端会返回API链接失败信息
+        captureDispatch({ type: 'ANALYSIS_COMPLETE' });
+      }, CONFIG.analysis.timeout);
+      return;
+    }
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+      analysisTimeoutRef.current = null;
+    }
+  }, [captureStatus, captureDispatch]);
+
+  useEffect(() => {
+    if (captureStatus !== 'analyzing' || !analysisAckAt || ackedRef.current) return;
+    ackedRef.current = true;
+    if (analysisTimeoutRef.current) clearTimeout(analysisTimeoutRef.current);
+    // 不再生成fallback报告，只设置超时
+    analysisTimeoutRef.current = setTimeout(() => {
+      // 超时后直接完成分析，后端会返回API链接失败信息
+      captureDispatch({ type: 'ANALYSIS_COMPLETE' });
+    }, CONFIG.analysis.timeout);
+  }, [analysisAckAt, captureStatus, captureDispatch]);
 
   // --- Analysis Visualization Logic ---
   const [headAxes, setHeadAxes] = useState<HeadAxes | null>(null);
@@ -138,8 +174,14 @@ export function usePostureAnalysis({
   }, [analyzeBatch]);
 
   useEffect(() => {
-    if (wsResult) setStep('completed');
-  }, [wsResult, setStep]);
+    if (captureStatus === 'completed') {
+      setStep('completed');
+    } else if (captureStatus === 'analyzing') {
+      setStep('analyzing');
+    } else if (captureStatus === 'idle') {
+      setStep('idle');
+    }
+  }, [captureStatus, setStep]);
 
   const onResults = useCallback((results: Results) => {
     if (results.poseLandmarks) {
@@ -158,8 +200,11 @@ export function usePostureAnalysis({
     analyze,
     analyzeBatch,
     analyzeStepped,
+    requestDeepAnalysis,
     markdownReport,
-    auxiliaryReport,
+    streamingReport,
+    isStreamingReport,
+    auxiliaryDiagnosis,
     onResults,
     captureStatus,
     setCaptureStatus: (value: React.SetStateAction<CaptureStatus>) => {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { JointType, MovementDirection } from '@/types/posture';
+import { JointType, MovementDirection, PostureMetrics, PostureIssue } from '@/types/posture';
 import { TemporalAnalysis } from '@/lib/posture-processor';
 
 export interface MeasurementDataPoint {
@@ -27,6 +27,9 @@ export interface PostureReport {
   html: string;
   markdown?: string;
   timeSeries?: TemporalAnalysis['timeSeries'];
+  metrics?: PostureMetrics;
+  issues?: PostureIssue[];
+  auxiliaryDiagnosis?: string;
 }
 
 interface MeasurementState {
@@ -50,7 +53,7 @@ interface MeasurementState {
   resetMeasurement: () => void;
   saveMeasurement: () => void;
   deleteSavedMeasurement: (id: string) => void;
-  savePostureReport: (view: string, html: string, markdown?: string, timeSeries?: TemporalAnalysis['timeSeries']) => void;
+  savePostureReport: (view: string, html: string, markdown?: string, timeSeries?: TemporalAnalysis['timeSeries'], metrics?: PostureMetrics, issues?: PostureIssue[], auxiliaryDiagnosis?: string) => void;
   deletePostureReport: (id: string) => void;
 }
 
@@ -194,14 +197,18 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
     savedMeasurements: state.savedMeasurements.filter(m => m.id !== id)
   })),
 
-  savePostureReport: (view, html, markdown, timeSeries) => {
+  savePostureReport: (view, html, markdown, timeSeries, metrics, issues, auxiliaryDiagnosis) => {
     console.log('[useMeasurementStore] savePostureReport called:', {
       view,
       htmlLength: html.length,
       hasMarkdown: !!markdown,
       markdownLength: markdown ? markdown.length : 0,
       hasTimeSeries: timeSeries && timeSeries.length > 0,
-      timeSeriesLength: timeSeries ? timeSeries.length : 0
+      timeSeriesLength: timeSeries ? timeSeries.length : 0,
+      hasMetrics: !!metrics,
+      hasIssues: issues && issues.length > 0,
+      issuesCount: issues ? issues.length : 0,
+      hasAuxiliaryDiagnosis: !!auxiliaryDiagnosis
     });
     
     set((state) => {
@@ -211,13 +218,18 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
         view,
         html,
         markdown,
-        timeSeries
+        timeSeries,
+        metrics,
+        issues,
+        auxiliaryDiagnosis
       };
       
       console.log('[useMeasurementStore] New report created:', {
         id: newReport.id,
         date: new Date(newReport.date).toLocaleString(),
-        view: newReport.view
+        view: newReport.view,
+        hasMetrics: !!newReport.metrics,
+        hasIssues: newReport.issues && newReport.issues.length > 0
       });
       
       const updatedReports = [newReport, ...state.postureReports];

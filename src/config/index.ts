@@ -13,7 +13,7 @@ export const CONFIG = {
   
   // 分析配置
   analysis: {
-    timeout: 60000, // 60秒
+    timeout: 120000, // 120秒
     confidenceThreshold: 0.5,
   },
   

@@ -47,7 +47,7 @@ describe('WebcamView', () => {
       analyzeStepped: vi.fn(),
       jointResult: { results: [], timestamp: 0 },
       markdownReport: '',
-      auxiliaryReport: '',
+      auxiliaryDiagnosis: '',
       timeSeriesData: [],
       connect: vi.fn(),
       disconnect: vi.fn()

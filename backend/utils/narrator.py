@@ -119,16 +119,27 @@ def process_time_series(view: str, landmarks_sequence: List[List[Dict[str, float
     """
     Full pipeline: Centering -> Statistics -> Narration.
     """
-    narrator = PostureNarrator()
-    # 1. Coordinate Centering
-    centered = narrator.center_coordinates(landmarks_sequence)
-    # 2. Statistics
-    stats = narrator.calculate_statistics(centered)
-    # 3. Narration
-    narration = narrator.narrate(view, stats)
-    
-    return {
-        "view": view,
-        "stats": stats,
-        "narration": narration
-    }
+    import traceback
+    try:
+        narrator = PostureNarrator()
+        # 1. Coordinate Centering
+        centered = narrator.center_coordinates(landmarks_sequence)
+        # 2. Statistics
+        stats = narrator.calculate_statistics(centered)
+        # 3. Narration
+        narration = narrator.narrate(view, stats)
+        
+        return {
+            "view": view,
+            "stats": stats,
+            "narration": narration
+        }
+    except Exception as e:
+        print(f"[ERROR] process_time_series failed: {e}", flush=True)
+        traceback.print_exc()
+        # Return empty result on error
+        return {
+            "view": view,
+            "stats": {},
+            "narration": f"处理失败: {str(e)}"
+        }

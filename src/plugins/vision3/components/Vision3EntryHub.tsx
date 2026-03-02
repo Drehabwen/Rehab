@@ -48,20 +48,22 @@ export const Vision3EntryHub: React.FC<EntryHubProps> = ({ onSelectMode }) => {
             
             <div 
               onClick={() => onSelectMode('stepped', 'front', mode.id)}
-              className="group relative bento-card-glass p-6 flex flex-col items-start text-left transition-all duration-500 bg-white/40 border-white/60 cursor-pointer hover:bg-white/60 hover:shadow-2xl active:scale-[0.98]"
+              className={`group relative bento-card-glass p-6 flex flex-col items-start text-left transition-all duration-500 ${COLORS.neutral.light.bgSoft}/40 border-white/60 cursor-pointer ${COLORS.neutral.light.hover}/60 hover:shadow-2xl active:scale-[0.98]`}
             >
               <div className={cn(`${SIZES.size.lg} rounded-[1.5rem] flex items-center justify-center mb-4 ${SHADOWS.lg} group-hover:scale-110 transition-transform duration-500 bg-gradient-to-br text-white`, mode.color)}>
                 <mode.icon size={32} />
               </div>
               
-              <h3 className="text-xl font-black text-slate-900 mb-2 tracking-tight group-hover:text-antey-primary transition-colors">{ASSESSMENT_TEXTS[mode.id].label}</h3>
-              <p className="text-[13px] font-medium text-slate-600/80 leading-relaxed mb-4">
+              <h3 className={`text-xl font-black ${COLORS.neutral.light.text} mb-2 tracking-tight group-hover:text-antey-primary transition-colors`}>
+                {ASSESSMENT_TEXTS[mode.id].label}
+              </h3>
+              <p className={`text-[13px] font-medium ${COLORS.neutral.light.textMuted}/80 leading-relaxed mb-4`}>
                 {ASSESSMENT_TEXTS[mode.id].fullDescription}
               </p>
 
               <div className={`flex flex-wrap ${SIZES.gap.sm} mb-4`}>
                 {ASSESSMENT_TEXTS[mode.id].features.map(f => (
-                  <span key={f} className={`px-4 py-2 bg-slate-100/80 rounded-xl text-[11px] font-bold text-slate-500 border border-slate-200/50`}>
+                  <span key={f} className={`px-4 py-2 ${COLORS.neutral.light.bgSoft}/80 rounded-xl text-[11px] font-bold ${COLORS.neutral.light.textMuted} border ${COLORS.neutral.light.borderSoft}/50`}>
                     {f}
                   </span>
                 ))}
