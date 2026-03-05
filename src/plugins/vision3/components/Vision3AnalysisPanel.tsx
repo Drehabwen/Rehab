@@ -10,8 +10,6 @@ import { COLORS, SIZES, ANIMATIONS, TRANSITIONS } from '@/constants/uiStyles';
 interface Vision3AnalysisPanelProps {
   activePanel: 'dashboard' | 'report';
   setActivePanel: (panel: 'dashboard' | 'report') => void;
-  reportType: 'auxiliary' | 'deep';
-  setReportType: (type: 'auxiliary' | 'deep') => void;
   captureStatus: string;
   /** 深度报告 - LLM 解析的报告 */
   markdownReport: string | null;
@@ -41,8 +39,6 @@ interface Vision3AnalysisPanelProps {
 export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
   activePanel,
   setActivePanel,
-  reportType,
-  setReportType,
   captureStatus,
   markdownReport,
   streamingReport,
@@ -64,10 +60,9 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
 }) => {
   console.log('[Vision3AnalysisPanel] Props:', {
     activePanel,
-    reportType,
     captureStatus,
     hasMarkdownReport: !!markdownReport,
-    hasAuxiliaryDiagnosis: !!auxiliaryDiagnosis,
+    hasAuxiliaryDiagnosis: auxiliaryDiagnosis !== null,
     auxiliaryDiagnosisLength: auxiliaryDiagnosis?.length,
     hasStreamingReport: !!streamingReport,
     isStreamingReport
@@ -124,7 +119,6 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
             <button
               onClick={() => {
                 onRequestDeepAnalysis();
-                setReportType('deep');
                 setActivePanel('report');
               }}
               disabled={isLoadingDeepReport}
@@ -146,37 +140,47 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                 </>
               )}
             </button>
-          ) : (
-            <button
-              onClick={() => {
-                setReportType('deep');
-                setActivePanel('report');
-              }}
-              className={`flex-1 flex items-center justify-center ${SIZES.gap.sm} py-2 ${SIZES.radius.sm} ${SIZES.font.md} font-black uppercase tracking-wider ${TRANSITIONS.default} ${
-                reportType === 'deep' && activePanel === 'report'
-                  ? `${COLORS.secondary.purple} text-white shadow-lg ${COLORS.secondary.purpleShadow}`
-                  : COLORS.neutral.light.buttonInactive
-              }`}
-            >
-              {PANEL_TEXTS.deepAnalysis}
-            </button>
-          )}
+          ) : null}
         </div>
       )}
 
       <div className="flex-1 overflow-hidden min-h-0 mt-4">
         {activePanel === 'report' ? (
           <div className={`h-full ${ANIMATIONS.fadeIn} ${ANIMATIONS.slideInRight} ${SIZES.radius.lg} overflow-auto`}>
-            <MarkdownReport 
-              content={
-                reportType === 'deep' && isStreamingReport 
-                  ? streamingReport || markdownReport 
-                  : reportType === 'deep' 
-                    ? markdownReport 
-                    : auxiliaryDiagnosis
-              } 
-              loading={false}
-            />
+            {/* 基础报告 */}
+            {auxiliaryDiagnosis && (
+              <div className={`mb-6 p-4 ${COLORS.neutral.light.bgSoft} ${SIZES.radius.lg} border ${COLORS.neutral.light.borderSoft}`}>
+                <h3 className={`mb-3 ${SIZES.font.lg} font-bold ${COLORS.neutral.slateText} flex items-center gap-2`}>
+                  <Zap size={18} className={COLORS.info.cyanText} />
+                  基础评估报告
+                </h3>
+                <MarkdownReport 
+                  content={auxiliaryDiagnosis} 
+                  loading={false}
+                />
+              </div>
+            )}
+            
+            {/* 深度报告 */}
+            {(markdownReport || streamingReport) && (
+              <div className={`p-4 ${COLORS.neutral.light.bgSoft} ${SIZES.radius.lg} border ${COLORS.neutral.light.borderSoft}`}>
+                <h3 className={`mb-3 ${SIZES.font.lg} font-bold ${COLORS.neutral.slateText} flex items-center gap-2`}>
+                  <Sparkles size={18} className={COLORS.secondary.purpleText} />
+                  深度分析报告
+                </h3>
+                <MarkdownReport 
+                  content={isStreamingReport ? streamingReport || '' : markdownReport || ''} 
+                  loading={false}
+                />
+              </div>
+            )}
+            
+            {/* 无报告提示 */}
+            {!auxiliaryDiagnosis && !markdownReport && !streamingReport && (
+              <div className={`h-full flex items-center justify-center ${COLORS.neutral.light.bgSoft} ${SIZES.radius.lg} border ${COLORS.neutral.light.borderSoft}`}>
+                <p className={`${SIZES.font.md} ${COLORS.neutral.slateText}`}>暂无报告数据</p>
+              </div>
+            )}
           </div>
         ) : (
           <div className={`h-full ${ANIMATIONS.fadeIn} ${ANIMATIONS.slideInLeft}`}>

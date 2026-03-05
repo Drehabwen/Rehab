@@ -53,6 +53,13 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
                 style={{ width: `${Math.min(100, Math.abs(metrics?.swayOffset || 0) * SYSTEM_CONFIG.chartScaling.swayOffset)}%` }}
               />
             </div>
+            <div className="mt-3">
+              <p className={`text-[9px] ${COLORS.neutral.light.textMuted} leading-relaxed`}>
+                <strong>含义：</strong>身体重心偏离中立位置的距离<br/>
+                <strong>正常范围：</strong>0-5mm（优秀）<br/>
+                <strong>临床意义：</strong>过大的重心偏移可能导致姿势不稳，增加跌倒风险
+              </p>
+            </div>
           </div>
 
           <div className={`p-4 ${COLORS.neutral.light.bgSoft}/40 rounded-2xl border border-white/60 group hover:border-antey-primary/30 transition-all duration-500`}>
@@ -69,15 +76,35 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
               <span className={`text-3xl font-light ${COLORS.neutral.light.text} tracking-tighter`}>{(metrics?.shoulderAngle || 0).toFixed(1)}</span>
               <span className={`text-[10px] font-bold ${COLORS.neutral.light.textLight} mb-1.5 uppercase tracking-widest`}>°</span>
             </div>
+            <div className="mt-3">
+              <p className={`text-[9px] ${COLORS.neutral.light.textMuted} leading-relaxed`}>
+                <strong>含义：</strong>左右肩膀高度差异的角度<br/>
+                <strong>正常范围：</strong>0-2°（平衡）<br/>
+                <strong>临床意义：</strong>肩部不平衡可能导致颈椎和胸椎问题，影响姿势对称性
+              </p>
+            </div>
           </div>
 
           <div className={`p-4 ${COLORS.neutral.light.bgSoft}/40 rounded-2xl border border-white/60 group hover:border-antey-primary/30 transition-all duration-500`}>
             <div className="flex justify-between items-center mb-2">
               <span className={`text-[10px] font-black ${COLORS.neutral.light.textLight} uppercase tracking-widest`}>骨盆对称性</span>
+              <span className={cn(
+                "text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tighter",
+                Math.abs(metrics?.hipAngle || 0) < 2 ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"
+              )}>
+                {Math.abs(metrics?.hipAngle || 0) < 2 ? 'Symmetric' : 'Asymmetric'}
+              </span>
             </div>
             <div className="flex items-end gap-2">
               <span className={`text-3xl font-light ${COLORS.neutral.light.text} tracking-tighter`}>{(metrics?.hipAngle || 0).toFixed(1)}</span>
               <span className={`text-[10px] font-bold ${COLORS.neutral.light.textLight} mb-1.5 uppercase tracking-widest`}>°</span>
+            </div>
+            <div className="mt-3">
+              <p className={`text-[9px] ${COLORS.neutral.light.textMuted} leading-relaxed`}>
+                <strong>含义：</strong>左右骨盆高度差异的角度<br/>
+                <strong>正常范围：</strong>0-2°（对称）<br/>
+                <strong>临床意义：</strong>骨盆不对称可能导致腰痛、膝盖疼痛等问题，影响整体姿势
+              </p>
             </div>
           </div>
         </div>

@@ -29,7 +29,6 @@ export const Vision3Plugin: React.FC = () => {
   const [showHeadAxes, setShowHeadAxes] = useState(true);
   const [axesScale, setAxesScale] = useState(1);
   const [activePanel, setActivePanel] = useState<'dashboard' | 'report'>('dashboard');
-  const [reportType, setReportType] = useState<'auxiliary' | 'deep'>('auxiliary');
   const [isLoadingDeepReport, setIsLoadingDeepReport] = useState(false);
   
   // Custom Hooks
@@ -182,47 +181,22 @@ export const Vision3Plugin: React.FC = () => {
 
   useEffect(() => {
     console.log('[Vision3Plugin] markdownReport or auxiliaryDiagnosis changed:', { markdownReport: markdownReport ? 'exists' : 'null', auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null' });
-    if (markdownReport) {
-      // 检查是否是LLM报告（深度报告）
-      const isLLMReport = !markdownReport.includes('API链接失败') && !markdownReport.includes('生成报告失败');
-      if (isLLMReport) {
-        // 如果是LLM报告，显示深度报告
-        console.log("Deep AI report received, switching to report panel");
-        setReportType('deep');
-        setActivePanel('report');
-        setCaptureStatus('completed');
-      } else {
-        // 如果是API失败报告，显示错误信息
-        console.log("API failure report received, switching to report panel");
-        setReportType('deep');
-        setActivePanel('report');
-        setCaptureStatus('completed');
-      }
-    } else if (auxiliaryDiagnosis) {
-      // 如果没有markdownReport但有辅助诊断，显示基础报告
-      console.log("Auxiliary diagnosis available, switching to report panel");
-      setReportType('auxiliary');
+    if (markdownReport || auxiliaryDiagnosis) {
+      // 如果有任何报告，显示报告面板
+      console.log("Report received, switching to report panel");
       setActivePanel('report');
       setCaptureStatus('completed');
     }
-  }, [markdownReport, auxiliaryDiagnosis, setReportType, setActivePanel, setCaptureStatus]);
+  }, [markdownReport, auxiliaryDiagnosis, setActivePanel, setCaptureStatus]);
 
   // 当分析完成时，自动切换到报告面板
   useEffect(() => {
     console.log('[Vision3Plugin] captureStatus changed:', captureStatus);
     if (captureStatus === 'completed') {
       console.log('[Vision3Plugin] Analysis completed, switching to report panel');
-      if (markdownReport) {
-        // 优先显示markdownReport（包括API失败报告）
-        setReportType('deep');
-        setActivePanel('report');
-      } else if (auxiliaryDiagnosis) {
-        // 否则显示辅助诊断
-        setReportType('auxiliary');
-        setActivePanel('report');
-      }
+      setActivePanel('report');
     }
-  }, [captureStatus, markdownReport, auxiliaryDiagnosis, setReportType, setActivePanel]);
+  }, [captureStatus, setActivePanel]);
 
   const handleResults = React.useCallback((results: Results) => {
     onResults(results);
@@ -321,8 +295,6 @@ export const Vision3Plugin: React.FC = () => {
                 <Vision3AnalysisPanel
                   activePanel={activePanel}
                   setActivePanel={setActivePanel}
-                  reportType={reportType}
-                  setReportType={setReportType}
                   captureStatus={captureStatus}
                   markdownReport={displayMarkdownReport}
                   streamingReport={streamingReport}

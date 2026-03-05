@@ -16,10 +16,10 @@ if os.path.exists(dotenv_path):
     from dotenv import load_dotenv
     load_dotenv(dotenv_path)
 
-from config import config
-
 # Add current directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from config import config
 
 from models import (
     AnalysisRequest, AnalysisResponse, PostureMetrics, 
@@ -314,9 +314,14 @@ async def websocket_endpoint(websocket: WebSocket):
                                     ]
                                     landmarks_sequence.append(landmark_dicts)
                                 
+                                print(f"[DEBUG] Processing frame {frame.view} with {len(landmarks_sequence)} time series landmarks", flush=True)
                                 res = process_time_series(frame.view, landmarks_sequence)
+                                print(f"[DEBUG] process_time_series result: {res}", flush=True)
                                 if res.get("narration"):
                                     narrations.append(f"### {frame.view} 视角分析\n\n{res['narration']}")
+                                    print(f"[DEBUG] Added narration for {frame.view}: {res['narration'][:50]}...", flush=True)
+                                else:
+                                    print(f"[DEBUG] No narration for {frame.view}", flush=True)
                             except Exception as e:
                                 print(f"[ERROR] Failed to process frame {frame.view}: {e}", flush=True)
                                 import traceback
@@ -380,7 +385,8 @@ async def websocket_endpoint(websocket: WebSocket):
                         metrics=metrics,
                         issues=issues if issues else None,
                         auxiliaryDiagnosis=auxiliary_diagnosis,  # Basic report
-                        assessmentType=assessment_type
+                        assessmentType=assessment_type,
+                        isDeepReport=False
                     )
                     
                     print(f"--- SENDING POSTURE_REPORT (Basic) ---", flush=True)
@@ -427,9 +433,18 @@ async def websocket_endpoint(websocket: WebSocket):
                         from utils.llm_reporter import posture_agent
                         posture_agent.clear()
                         
-                        for frame_data in frames_data:
-                            res = process_time_series(frame_data["view"], frame_data["timeSeriesLandmarks"])
-                            posture_agent.analyze_view(res["narration"], res["stats"])
+                        # Check if auxiliaryDiagnosis is provided (基础报告内容)
+                        auxiliary_diagnosis = message.get("auxiliaryDiagnosis", "")
+                        if auxiliary_diagnosis:
+                            print(f"[POSTURE_DEEP_ANALYSIS] Using provided auxiliaryDiagnosis: {len(auxiliary_diagnosis)} chars", flush=True)
+                            # Use the provided auxiliaryDiagnosis as the narration
+                            posture_agent.analyze_view(auxiliary_diagnosis, {})
+                        else:
+                            # Fallback to processing frames if no auxiliaryDiagnosis provided
+                            print("[POSTURE_DEEP_ANALYSIS] No auxiliaryDiagnosis provided, processing frames...", flush=True)
+                            for frame_data in frames_data:
+                                res = process_time_series(frame_data["view"], frame_data["timeSeriesLandmarks"])
+                                posture_agent.analyze_view(res["narration"], res["stats"])
                         
                         # Stream the report
                         async for chunk in posture_agent.generate_final_report_stream(assessment_type, websocket):

@@ -112,6 +112,9 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
           } else if (data.type === 'POSTURE_REPORT') {
             console.log('[usePostureWS] Received POSTURE_REPORT message');
             
+            // 检查是否是深度报告
+            const isDeepReport = data.isDeepReport || false;
+            
             // 处理深度报告 (markdown) - 只有非空时才设置
             const markdown = typeof data.markdown === 'string' ? data.markdown : '';
             const normalized = markdown.trim();
@@ -141,10 +144,10 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             }
             
             // Set auxiliary diagnosis from backend (基础报告)
-            if (data.auxiliaryDiagnosis) {
-              console.log('[usePostureWS] Received auxiliaryDiagnosis, length:', data.auxiliaryDiagnosis.length);
-              console.log('[usePostureWS] AuxiliaryDiagnosis content snippet:', data.auxiliaryDiagnosis.substring(0, 100) + '...');
-              setAuxiliaryDiagnosis(data.auxiliaryDiagnosis);
+            if (data.auxiliaryDiagnosis !== undefined) {
+                console.log('[usePostureWS] Received auxiliaryDiagnosis, length:', data.auxiliaryDiagnosis.length);
+                console.log('[usePostureWS] AuxiliaryDiagnosis content snippet:', data.auxiliaryDiagnosis.substring(0, 100) + '...');
+                setAuxiliaryDiagnosis(data.auxiliaryDiagnosis);
             }
             
             console.log('[usePostureWS] Saving posture report:', {
@@ -152,7 +155,8 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
               hasMarkdown: !!normalized,
               hasTimeSeries: timeSeries && timeSeries.length > 0,
               timeSeriesLength: timeSeries ? timeSeries.length : 0,
-              hasAuxiliaryDiagnosis: !!data.auxiliaryDiagnosis
+              hasAuxiliaryDiagnosis: !!data.auxiliaryDiagnosis,
+              isDeepReport
             });
             
             // Save both auxiliary diagnosis and markdown report with metrics and issues
@@ -171,7 +175,8 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             console.log('[usePostureWS] Current report state:', {
               markdownReport: markdownReport ? 'exists' : 'null',
               auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
-              timeSeriesData: timeSeriesData ? 'exists' : 'null'
+              timeSeriesData: timeSeriesData ? 'exists' : 'null',
+              isDeepReport
             });
           } else if (data.type === 'DEEP_REPORT_STREAM') {
             // Handle streaming chunks from LLM
@@ -297,7 +302,6 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     console.log('[usePostureWS] Stored raw frames data for deep analysis:', framesData.length, 'frames');
     
     // 清除之前的报告状态
-    setMarkdownReport(null);
     setResult(null);
     setAuxiliaryDiagnosis(null);
     
@@ -353,7 +357,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       frames: rawFramesData.map(f => ({ view: f.view, landmarksCount: f.timeSeriesLandmarks.length }))
     });
     
-    // 清除之前的深度报告，准备接收新的流式报告
+    // 清除之前的深度报告状态，准备接收新的流式报告
     setMarkdownReport(null);
     setIsStreamingReport(true);
     setStreamingReport('');
@@ -362,11 +366,12 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       type: 'POSTURE_DEEP_ANALYSIS',
       frames: rawFramesData,
       assessmentType: 'quick',
+      auxiliaryDiagnosis: auxiliaryDiagnosis, // 传递基础报告内容
       requestId: `deep-${Date.now()}`
     };
     console.log('[usePostureWS] Sending POSTURE_DEEP_ANALYSIS message');
     sendMessage(message);
-  }, [sendMessage, rawFramesData]);
+  }, [sendMessage, rawFramesData, auxiliaryDiagnosis]);
 
   return {
     result,
