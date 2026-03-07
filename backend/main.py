@@ -16,10 +16,10 @@ if os.path.exists(dotenv_path):
     from dotenv import load_dotenv
     load_dotenv(dotenv_path)
 
+from config import config
+
 # Add current directory to path to allow imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from config import config
 
 from models import (
     AnalysisRequest, AnalysisResponse, PostureMetrics, 
@@ -30,7 +30,7 @@ from models import (
 from utils.posture_analysis import analyze_posture
 from utils.joint_analysis import calculate_joint_angle
 from utils.camera_stream import CameraManager
-from utils.llm_reporter import generate_posture_report
+from utils.llm_reporter import generate_posture_report, posture_agent
 from utils.narrator import process_time_series
 import uuid
 
@@ -67,6 +67,15 @@ def build_time_series(frames):
             
     series.sort(key=lambda item: item.get("timestamp", 0))
     return series
+
+def serialize_landmark_series(time_series_landmarks):
+    return [
+        [
+            lm.model_dump() if hasattr(lm, "model_dump") else lm
+            for lm in frame
+        ]
+        for frame in time_series_landmarks
+    ]
 
 def compute_averages(series):
     sums: Dict[str, float] = {}
@@ -305,27 +314,14 @@ async def websocket_endpoint(websocket: WebSocket):
                         narrations = []
                         for frame in frames:
                             try:
-                                # Convert Landmark objects to dictionaries
-                                landmarks_sequence = []
-                                for frame_landmarks in frame.timeSeriesLandmarks:
-                                    landmark_dicts = [
-                                        {"x": lm.x, "y": lm.y, "z": lm.z, "visibility": lm.visibility}
-                                        for lm in frame_landmarks
-                                    ]
-                                    landmarks_sequence.append(landmark_dicts)
-                                
-                                print(f"[DEBUG] Processing frame {frame.view} with {len(landmarks_sequence)} time series landmarks", flush=True)
-                                res = process_time_series(frame.view, landmarks_sequence)
-                                print(f"[DEBUG] process_time_series result: {res}", flush=True)
+                                res = process_time_series(
+                                    frame.view,
+                                    serialize_landmark_series(frame.timeSeriesLandmarks)
+                                )
                                 if res.get("narration"):
                                     narrations.append(f"### {frame.view} 视角分析\n\n{res['narration']}")
-                                    print(f"[DEBUG] Added narration for {frame.view}: {res['narration'][:50]}...", flush=True)
-                                else:
-                                    print(f"[DEBUG] No narration for {frame.view}", flush=True)
                             except Exception as e:
                                 print(f"[ERROR] Failed to process frame {frame.view}: {e}", flush=True)
-                                import traceback
-                                traceback.print_exc()
                         
                         auxiliary_diagnosis = "\n\n---\n\n".join(narrations) if narrations else "基础分析完成，暂无异常发现。"
                         print(f"[DEBUG] Generated auxiliary diagnosis: {len(auxiliary_diagnosis)} chars", flush=True)
@@ -378,77 +374,64 @@ async def websocket_endpoint(websocket: WebSocket):
                         except Exception as e:
                             print(f"Error computing metrics: {e}", flush=True)
                     
+                    markdown_content = auxiliary_diagnosis or ""
+
                     report_response = PostureReportResponse(
-                        markdown="",  # Deep report is empty initially
+                        markdown=markdown_content,
                         reportId=str(uuid.uuid4()),
                         timeSeries=time_series,
                         metrics=metrics,
+                        auxiliaryDiagnosis=auxiliary_diagnosis,
                         issues=issues if issues else None,
-                        auxiliaryDiagnosis=auxiliary_diagnosis,  # Basic report
-                        assessmentType=assessment_type,
-                        isDeepReport=False
+                        assessmentType=assessment_type
                     )
                     
-                    print(f"--- SENDING POSTURE_REPORT (Basic) ---", flush=True)
-                    print(f"Auxiliary diagnosis length: {len(auxiliary_diagnosis)}", flush=True)
-                    print(f"Content snippet: {auxiliary_diagnosis[:100]}...", flush=True)
+                    print(f"--- SENDING POSTURE_REPORT ---", flush=True)
+                    print(f"Markdown length: {len(markdown_content)}", flush=True)
+                    print(f"Content snippet: {markdown_content[:100]}...", flush=True)
                     
                     await websocket.send_text(report_response.model_dump_json())
-                    print("POSTURE_REPORT (Basic) sent successfully", flush=True)
+                    print("POSTURE_REPORT sent successfully", flush=True)
                 except Exception as e:
                     print(f"Error processing POSTURE_STEPPED_ANALYSIS: {e}")
                     import traceback
                     traceback.print_exc()
             
             elif msg_type == "POSTURE_DEEP_ANALYSIS":
+                # Handle deep analysis request with streaming LLM output
                 try:
                     print(f"[POSTURE_DEEP_ANALYSIS] Received deep analysis request", flush=True)
-                    
-                    # Support both single frame and multi-frame requests
-                    frames_data = message.get("frames", [])
-                    assessment_type = message.get("assessmentType", "quick")
-                    
-                    if not frames_data:
-                        # Fallback to single frame format
-                        request = AnalysisRequest(**message)
-                        frames_data = [{
-                            "view": request.view,
-                            "timeSeriesLandmarks": request.timeSeriesLandmarks
-                        }]
-                        assessment_type = "quick"
+                    request = SteppedAnalysisRequest(
+                        type="POSTURE_STEPPED_ANALYSIS",
+                        frames=message.get("frames", []),
+                        assessmentType=message.get("assessmentType", "quick"),
+                        requestId=message.get("requestId")
+                    )
                     
                     # Send ACK immediately
                     ack_payload = {"type": "POSTURE_ACK", "status": "processing"}
-                    if message.get("requestId"):
-                        ack_payload["requestId"] = message["requestId"]
+                    if request.requestId:
+                        ack_payload["requestId"] = request.requestId
                     await websocket.send_text(json.dumps(ack_payload))
                     print(f"[POSTURE_DEEP_ANALYSIS] Sent POSTURE_ACK", flush=True)
                     
                     # Generate LLM deep report (STREAMING MODE)
                     markdown_content = ""
                     try:
-                        print(f"[POSTURE_DEEP_ANALYSIS] Generating LLM report for {len(frames_data)} frames...", flush=True)
-                        
-                        # Process all frames
-                        from utils.llm_reporter import posture_agent
+                        print(f"[POSTURE_DEEP_ANALYSIS] Generating LLM report (streaming)...", flush=True)
+                        print(f"[POSTURE_DEEP_ANALYSIS] Calling generate_final_report_stream...", flush=True)
+
                         posture_agent.clear()
-                        
-                        # Check if auxiliaryDiagnosis is provided (基础报告内容)
-                        auxiliary_diagnosis = message.get("auxiliaryDiagnosis", "")
-                        if auxiliary_diagnosis:
-                            print(f"[POSTURE_DEEP_ANALYSIS] Using provided auxiliaryDiagnosis: {len(auxiliary_diagnosis)} chars", flush=True)
-                            # Use the provided auxiliaryDiagnosis as the narration
-                            posture_agent.analyze_view(auxiliary_diagnosis, {})
-                        else:
-                            # Fallback to processing frames if no auxiliaryDiagnosis provided
-                            print("[POSTURE_DEEP_ANALYSIS] No auxiliaryDiagnosis provided, processing frames...", flush=True)
-                            for frame_data in frames_data:
-                                res = process_time_series(frame_data["view"], frame_data["timeSeriesLandmarks"])
-                                posture_agent.analyze_view(res["narration"], res["stats"])
-                        
+                        for frame in request.frames:
+                            res = process_time_series(
+                                frame.view,
+                                serialize_landmark_series(frame.timeSeriesLandmarks)
+                            )
+                            posture_agent.analyze_view(res["narration"], res["stats"])
+
                         # Stream the report
-                        async for chunk in posture_agent.generate_final_report_stream(assessment_type, websocket):
-                            markdown_content = chunk
+                        async for chunk in posture_agent.generate_final_report_stream(request.assessmentType, websocket):
+                            markdown_content = chunk  # Keep the last chunk (full content)
                         
                         print(f"[POSTURE_DEEP_ANALYSIS] Stream completed. Final content: {len(markdown_content)} chars", flush=True)
                         
@@ -466,7 +449,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         metrics={},
                         auxiliaryDiagnosis="",
                         issues=[],
-                        assessmentType="quick",
+                        assessmentType=request.assessmentType,
                         isDeepReport=True
                     )
                     await websocket.send_text(deep_report.model_dump_json())
@@ -480,7 +463,7 @@ async def websocket_endpoint(websocket: WebSocket):
                         markdown=f"生成深度报告失败：{str(e)}",
                         reportId=str(uuid.uuid4()),
                         auxiliaryDiagnosis="",
-                        assessmentType="quick",
+                        assessmentType=message.get("assessmentType", "quick"),
                         isDeepReport=True
                     )
                     await websocket.send_text(error_response.model_dump_json())

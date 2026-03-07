@@ -11,6 +11,8 @@ import { NewSessionModal } from './components/NewSessionModal';
 import { PatientSearchModal } from './components/PatientSearchModal';
 import { DataSettingsModal } from './components/DataSettingsModal';
 import { PatientToolbox } from './components/PatientToolbox';
+import { PatientWorkspace } from './components/PatientWorkspace';
+import { ProgressComparison } from './components/ProgressComparison';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 import { DashboardView } from './views/DashboardView';
 import { usePatientStore } from '@/store/usePatientStore';
@@ -21,7 +23,7 @@ import type { ViewMode } from './types';
 
 export const NexusHub: React.FC = () => {
   const [view, setView] = useState<ViewMode>('dashboard');
-  const [activePlugin, setActivePlugin] = useState<'vision3' | 'medvoice' | 'reports' | 'datacenter'>('vision3');
+  const [activePlugin, setActivePlugin] = useState<'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison'>('vision3');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
@@ -48,7 +50,7 @@ export const NexusHub: React.FC = () => {
   };
 
   const handleToolSelectFromToolbox = (toolId: string) => {
-    setActivePlugin(toolId as 'vision3' | 'medvoice');
+    setActivePlugin(toolId as 'vision3' | 'medvoice' | 'comparison');
     setView('workspace');
   };
 
@@ -62,7 +64,7 @@ export const NexusHub: React.FC = () => {
     setView('toolbox');
   };
 
-  const handleSelectTool = (tool: 'vision3' | 'medvoice' | 'reports' | 'datacenter') => {
+  const handleSelectTool = (tool: 'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison') => {
     setActivePlugin(tool);
   };
 
@@ -93,6 +95,14 @@ export const NexusHub: React.FC = () => {
         return <NexusReportCenter />;
       case 'datacenter':
         return <NexusReportCenter />;
+      case 'comparison':
+        return selectedPatient ? (
+          <ProgressComparison
+            patientId={selectedPatient.id}
+            patientName={selectedPatient.name}
+            onBack={handleBackFromWorkspace}
+          />
+        ) : null;
       default:
         return <Vision3Plugin />;
     }

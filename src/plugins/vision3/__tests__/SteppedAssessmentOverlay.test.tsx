@@ -21,6 +21,7 @@ describe('SteppedAssessmentOverlay', () => {
     recordingProgress: 0,
     isInPosition: false,
     steppedResults: {},
+    assessmentType: 'standard' as const,
     onStartCapture: vi.fn(),
     onNextView: vi.fn(),
     onRetake: vi.fn(),

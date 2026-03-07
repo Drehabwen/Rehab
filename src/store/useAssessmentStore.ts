@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { db } from '@/lib/db';
-import type { Assessment, PostureAssessmentData, RomAssessmentData, MedVoiceAssessmentData, AssessmentMode } from '@/types/assessment';
+import type {
+  Assessment,
+  PostureAssessmentData,
+  RomAssessmentData,
+  MedVoiceAssessmentData,
+  AssessmentMode
+} from '@/types/assessment';
 import { nanoid } from 'nanoid';
 
 interface AssessmentState {
@@ -13,7 +19,7 @@ interface AssessmentState {
   addAssessment: (data: {
     sessionId: string;
     patientId: string;
-    type: 'posture' | 'rom' | 'medvoice' | 'combined';
+    type: Assessment['type'];
     mode: AssessmentMode;
     data: {
       posture?: PostureAssessmentData;
@@ -40,52 +46,72 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
   
   addAssessment: async (input) => {
     set({ isLoading: true, error: null });
-    
-    const assessment: Assessment = {
-      id: nanoid(12),
-      sessionId: input.sessionId,
-      patientId: input.patientId,
-      type: input.type,
-      mode: input.mode,
-      createdAt: Date.now(),
-      data: input.data,
-      notes: input.notes,
-      status: 'completed'
-    };
-    
-    await db.assessments.add(assessment);
-    
-    set(state => ({ 
-      assessments: [assessment, ...state.assessments],
-      currentAssessment: assessment,
-      isLoading: false 
-    }));
-    
-    return assessment;
+
+    try {
+      const assessment: Assessment = {
+        id: nanoid(12),
+        sessionId: input.sessionId,
+        patientId: input.patientId,
+        type: input.type,
+        mode: input.mode,
+        createdAt: Date.now(),
+        data: input.data,
+        notes: input.notes,
+        status: 'completed'
+      };
+
+      await db.assessments.add(assessment);
+
+      set(state => ({ 
+        assessments: [assessment, ...state.assessments],
+        currentAssessment: assessment,
+        isLoading: false 
+      }));
+
+      return assessment;
+    } catch (error) {
+      const message = (error as Error).message;
+      set({ error: message, isLoading: false });
+      throw error;
+    }
   },
   
   updateAssessment: async (id, updates) => {
     set({ isLoading: true, error: null });
-    
-    await db.assessments.update(id, updates);
-    
-    set(state => ({
-      assessments: state.assessments.map(a => 
-        a.id === id ? { ...a, ...updates } : a
-      ),
-      isLoading: false
-    }));
+
+    try {
+      await db.assessments.update(id, updates);
+
+      set(state => ({
+        assessments: state.assessments.map(a => 
+          a.id === id ? { ...a, ...updates } : a
+        ),
+        currentAssessment: state.currentAssessment?.id === id
+          ? { ...state.currentAssessment, ...updates }
+          : state.currentAssessment,
+        isLoading: false
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message, isLoading: false });
+      throw error;
+    }
   },
   
   deleteAssessment: async (id) => {
     set({ isLoading: true, error: null });
-    
-    await db.assessments.delete(id);
-    
-    set(state => ({
-      assessments: state.assessments.filter(a => a.id !== id),
-      isLoading: false
-    }));
+
+    try {
+      await db.assessments.delete(id);
+
+      set(state => ({
+        assessments: state.assessments.filter(a => a.id !== id),
+        currentAssessment: state.currentAssessment?.id === id ? null : state.currentAssessment,
+        isLoading: false
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message, isLoading: false });
+      throw error;
+    }
   },
   
   loadAssessments: async () => {
@@ -112,7 +138,8 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
         .equals(patientId)
         .reverse()
         .sortBy('createdAt');
-      
+
+      set({ isLoading: false });
       return assessments;
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
@@ -129,7 +156,8 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
         .equals(sessionId)
         .reverse()
         .sortBy('createdAt');
-      
+
+      set({ isLoading: false });
       return assessments;
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });

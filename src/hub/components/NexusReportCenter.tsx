@@ -585,7 +585,7 @@ export const NexusReportCenter: React.FC = () => {
             </div>
             
             <div className="p-4 border-t border-slate-100 flex items-center justify-end gap-3">
-              {selectedAssessment.data.posture && (selectedAssessment.data.posture.markdownReport || selectedAssessment.data.posture.auxiliaryDiagnosis) && (
+              {(selectedAssessment.data.posture?.markdownReport || selectedAssessment.data.posture?.auxiliaryDiagnosis) && (
                 <button
                   onClick={() => {
                     const postureData = selectedAssessment.data.posture;

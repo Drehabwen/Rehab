@@ -4,7 +4,8 @@ import {
   Scale,
   Footprints,
   Layers,
-  CircleDot
+  CircleDot,
+  BarChart3
 } from 'lucide-react';
 
 export interface Tool {
@@ -25,6 +26,15 @@ export const tools: Tool[] = [
     icon: Activity,
     color: 'from-antey-primary to-cyan-400',
     category: 'assessment',
+    available: true
+  },
+  {
+    id: 'comparison',
+    name: '前后对比',
+    description: '对比不同时期的评估数据，展示治疗效果和改善趋势',
+    icon: BarChart3,
+    color: 'from-emerald-500 to-teal-500',
+    category: 'analysis',
     available: true
   },
   {

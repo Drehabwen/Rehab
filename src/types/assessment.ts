@@ -49,4 +49,5 @@ export interface Assessment {
   };
   notes?: string;
   status: 'pending' | 'completed' | 'reviewed';
+  isBaseline?: boolean;
 }

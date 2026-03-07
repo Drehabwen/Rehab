@@ -1,12 +1,12 @@
 import React from 'react';
-import { Camera, Mic, FileText, ChevronLeft, User } from 'lucide-react';
+import { Camera, Mic, FileText, ChevronLeft, User, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Patient } from '@/types/patient';
 
 interface PatientWorkspaceProps {
   patient: Patient;
   sessionCount: number;
-  onSelectTool: (tool: 'vision3' | 'medvoice' | 'reports') => void;
+  onSelectTool: (tool: 'vision3' | 'medvoice' | 'reports' | 'comparison') => void;
   onBack: () => void;
 }
 
@@ -30,6 +30,13 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
       icon: Mic, 
       color: 'from-purple-500 to-pink-500',
       description: 'AI 驱动的病历录入与语音指令交互助手'
+    },
+    { 
+      id: 'comparison' as const, 
+      name: '前后对比', 
+      icon: BarChart3, 
+      color: 'from-emerald-500 to-teal-500',
+      description: '对比不同时期的评估数据，展示治疗效果和改善趋势'
     },
     { 
       id: 'reports' as const, 
@@ -86,7 +93,7 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
           选择工作工具
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {tools.map(tool => (
             <button
               key={tool.id}

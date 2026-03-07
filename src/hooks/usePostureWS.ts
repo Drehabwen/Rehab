@@ -40,14 +40,12 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   const [analysisAckAt, setAnalysisAckAt] = useState<number | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   // 存储最后一次分析的原始帧数据，用于深度分析请求
-  const [rawFramesData, setRawFramesData] = useState<Array<{
-    view: 'front' | 'side' | 'back';
-    timeSeriesLandmarks: Landmark[][];
-  }>>([]);
+  const [rawFramesData, setRawFramesData] = useState<SteppedFrame[]>([]);
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout>();
   const pendingMessages = useRef<string[]>([]);
   const savePostureReport = useMeasurementStore(state => state.savePostureReport);
+  const savePostureReportRef = useRef(savePostureReport);
   const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
   const lastBatchTimeSeriesRef = useRef<TemporalAnalysis['timeSeries']>([]);
   const currentRequestIdRef = useRef<string | null>(null);
@@ -58,6 +56,10 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     width: number;
     height: number;
   } | null>(null);
+
+  useEffect(() => {
+    savePostureReportRef.current = savePostureReport;
+  }, [savePostureReport]);
 
   const flushPending = useCallback(() => {
     console.log('[usePostureWS] Flushing pending messages, count:', pendingMessages.current.length);
@@ -160,7 +162,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             });
             
             // Save both auxiliary diagnosis and markdown report with metrics and issues
-            savePostureReport(
+            savePostureReportRef.current(
               currentViewRef.current, 
               data.auxiliaryDiagnosis || normalized, 
               normalized || null, 
@@ -170,14 +172,6 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
               data.auxiliaryDiagnosis
             );
             console.log('[usePostureWS] Posture report saved successfully');
-            
-            // Log the current report state
-            console.log('[usePostureWS] Current report state:', {
-              markdownReport: markdownReport ? 'exists' : 'null',
-              auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
-              timeSeriesData: timeSeriesData ? 'exists' : 'null',
-              isDeepReport
-            });
           } else if (data.type === 'DEEP_REPORT_STREAM') {
             // Handle streaming chunks from LLM
             console.log('[usePostureWS] Received DEEP_REPORT_STREAM chunk');
@@ -296,7 +290,10 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     // 存储原始帧数据，用于后续的深度分析请求
     const framesData = frames.map(f => ({
       view: f.view,
-      timeSeriesLandmarks: f.timeSeriesLandmarks
+      timeSeriesLandmarks: f.timeSeriesLandmarks,
+      width: f.width,
+      height: f.height,
+      timestamp: f.timestamp
     }));
     setRawFramesData(framesData);
     console.log('[usePostureWS] Stored raw frames data for deep analysis:', framesData.length, 'frames');
@@ -361,13 +358,14 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     setMarkdownReport(null);
     setIsStreamingReport(true);
     setStreamingReport('');
+    currentRequestIdRef.current = `deep-${Date.now()}`;
     
     const message = {
       type: 'POSTURE_DEEP_ANALYSIS',
       frames: rawFramesData,
       assessmentType: 'quick',
       auxiliaryDiagnosis: auxiliaryDiagnosis, // 传递基础报告内容
-      requestId: `deep-${Date.now()}`
+      requestId: currentRequestIdRef.current
     };
     console.log('[usePostureWS] Sending POSTURE_DEEP_ANALYSIS message');
     sendMessage(message);

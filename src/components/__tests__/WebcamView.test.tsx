@@ -9,9 +9,6 @@ import { useCameraStream } from '@/hooks/useCameraStream';
 vi.mock('@/store/useMeasurementStore');
 vi.mock('@/hooks/usePostureWS');
 vi.mock('@/hooks/useCameraStream');
-vi.mock('react-webcam', () => ({
-  default: vi.fn(() => <div data-testid="mock-webcam" />)
-}));
 vi.mock('@mediapipe/pose', () => ({
   Pose: vi.fn().mockImplementation(() => ({
     setOptions: vi.fn(),
@@ -31,6 +28,7 @@ describe('WebcamView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     
     mockedUseMeasurementStore.mockReturnValue({
       activeMeasurements: [],
@@ -45,18 +43,22 @@ describe('WebcamView', () => {
       analyzeJoint: mockAnalyzeJoint,
       analyzeBatch: vi.fn(),
       analyzeStepped: vi.fn(),
+      requestDeepAnalysis: vi.fn(),
       jointResult: { results: [], timestamp: 0 },
       markdownReport: '',
+      streamingReport: '',
+      isStreamingReport: false,
       auxiliaryDiagnosis: '',
       timeSeriesData: [],
+      analysisAckAt: null,
       connect: vi.fn(),
       disconnect: vi.fn()
     });
 
     mockedUseCameraStream.mockReturnValue({
-      stream: new MediaStream(),
+      stream: {} as MediaStream,
       isLoading: false,
-      error: new Error(''),
+      error: null,
       startStream: vi.fn(async () => {}),
       stopStream: vi.fn(),
       trackInfo: { label: 'Mock Camera', muted: false, readyState: 'live' }
@@ -64,8 +66,8 @@ describe('WebcamView', () => {
   });
 
   it('renders correctly when camera is on', () => {
-    render(<WebcamView />);
-    expect(screen.getByTestId('mock-webcam')).toBeDefined();
+    const { container } = render(<WebcamView />);
+    expect(container.querySelector('video')).toBeTruthy();
   });
 
   it('shows message when no active measurements', () => {
