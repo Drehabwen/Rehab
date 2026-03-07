@@ -1,6 +1,7 @@
 import type { Landmark, PostureIssue, PostureMetrics } from './posture';
 import type { TemporalAnalysis } from '@/lib/posture-processor';
 import type { StructuredCase, PatientInfo } from '@/store/useCaseStore';
+import type { ROMData } from '@/plugins/rom/types';
 
 export type AssessmentMode = 'realtime' | 'stepped' | 'voice';
 
@@ -21,10 +22,9 @@ export interface PostureAssessmentData {
 }
 
 export interface RomAssessmentData {
-  joint: string;
-  movement: string;
-  rangeOfMotion: number;
-  landmarks?: Landmark[];
+  items: ROMData[];
+  summary?: string;
+  recommendations?: string[];
 }
 
 export interface MedVoiceAssessmentData {

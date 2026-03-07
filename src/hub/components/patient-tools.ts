@@ -20,11 +20,29 @@ export interface Tool {
 
 export const tools: Tool[] = [
   {
+    id: 'medvoice',
+    name: '语音接诊',
+    description: '语音转文字记录患者主诉，自动生成病历摘要',
+    icon: Mic,
+    color: 'from-blue-500 to-indigo-500',
+    category: 'record',
+    available: true
+  },
+  {
     id: 'vision3',
     name: '体态分析',
     description: '基于 MediaPipe 全身关键点追踪，实时捕捉身体细微偏差',
     icon: Activity,
     color: 'from-antey-primary to-cyan-400',
+    category: 'assessment',
+    available: true
+  },
+  {
+    id: 'rom',
+    name: '关节活动度',
+    description: '测量关节活动范围，评估运动功能受限程度',
+    icon: Layers,
+    color: 'from-violet-500 to-purple-500',
     category: 'assessment',
     available: true
   },
@@ -36,24 +54,6 @@ export const tools: Tool[] = [
     color: 'from-emerald-500 to-teal-500',
     category: 'analysis',
     available: true
-  },
-  {
-    id: 'medvoice',
-    name: '语音接诊',
-    description: '语音转文字记录患者主诉，自动生成病历摘要',
-    icon: Mic,
-    color: 'from-blue-500 to-indigo-500',
-    category: 'record',
-    available: true
-  },
-  {
-    id: 'rom',
-    name: '关节活动度',
-    description: '测量关节活动范围，评估运动功能受限程度',
-    icon: Layers,
-    color: 'from-violet-500 to-purple-500',
-    category: 'assessment',
-    available: false
   },
   {
     id: 'balance',

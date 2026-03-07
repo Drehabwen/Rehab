@@ -1,15 +1,16 @@
 import React from 'react';
-import { Camera, Mic, FileText, Database, BarChart3 } from 'lucide-react';
+import { Camera, Mic, FileText, Database, BarChart3, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WorkspaceToolbarProps {
-  activeTool: 'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison';
-  onSelectTool: (tool: 'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison') => void;
+  activeTool: 'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison' | 'rom';
+  onSelectTool: (tool: 'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison' | 'rom') => void;
 }
 
 const tools = [
-  { id: 'vision3' as const, name: '体态分析', icon: Camera, color: 'from-blue-500 to-cyan-500' },
   { id: 'medvoice' as const, name: '语音接诊', icon: Mic, color: 'from-purple-500 to-pink-500' },
+  { id: 'vision3' as const, name: '体态分析', icon: Camera, color: 'from-blue-500 to-cyan-500' },
+  { id: 'rom' as const, name: '关节活动度', icon: Activity, color: 'from-green-500 to-emerald-500' },
   { id: 'comparison' as const, name: '前后对比', icon: BarChart3, color: 'from-emerald-500 to-teal-500' },
   { id: 'datacenter' as const, name: '数据中心', icon: Database, color: 'from-emerald-500 to-teal-500' },
   { id: 'reports' as const, name: '报告中心', icon: FileText, color: 'from-amber-500 to-orange-500' },

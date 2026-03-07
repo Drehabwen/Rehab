@@ -239,6 +239,8 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
         postureReports: updatedReports
       };
     });
+    
+    console.log('[useMeasurementStore] Report saved to Zustand store (UI cache)');
   },
 
   deletePostureReport: (id) => set((state) => ({

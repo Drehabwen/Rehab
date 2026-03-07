@@ -182,6 +182,12 @@ export const NexusReportCenter: React.FC = () => {
           }
         });
       }
+    } else if (assessment.data.rom) {
+      const rom = assessment.data.rom;
+      csvContent = 'joint,direction,side,angle,maxAngle,minAngle,confidence\n';
+      rom.items.forEach(item => {
+        csvContent += `${item.joint},${item.direction},${item.side},${item.angle},${item.maxAngle},${item.minAngle},${item.confidence}\n`;
+      });
     }
     
     if (csvContent) {
@@ -496,6 +502,70 @@ export const NexusReportCenter: React.FC = () => {
                             </div>
                           );
                         })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ROM Assessment */}
+              {selectedAssessment.data.rom && (
+                <div className="space-y-6">
+                  {/* ROM Assessment Header */}
+                  <div className="flex items-center justify-between p-4 bg-green-50 rounded-2xl border border-green-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-green-400">
+                        <Activity size={24} />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">评估类型</div>
+                        <div className="font-bold text-slate-900">关节活动度评估</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ROM Data */}
+                  <div>
+                    <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 px-1">关节活动度数据</h4>
+                    <div className="space-y-3">
+                      {selectedAssessment.data.rom.items.map((item, idx) => (
+                        <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-green-100 transition-colors">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-bold text-slate-900">
+                              {item.joint} {item.direction} ({item.side})
+                            </div>
+                            <div className="text-xl font-black text-green-600">{item.angle.toFixed(1)}°</div>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-slate-500">
+                            <span>最大值: {item.maxAngle.toFixed(1)}°</span>
+                            <span>最小值: {item.minAngle.toFixed(1)}°</span>
+                            <span>置信度: {(item.confidence * 100).toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ROM Summary */}
+                  {selectedAssessment.data.rom.summary && (
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 px-1">评估总结</h4>
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p className="text-sm text-slate-600 leading-relaxed">{selectedAssessment.data.rom.summary}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ROM Recommendations */}
+                  {selectedAssessment.data.rom.recommendations && selectedAssessment.data.rom.recommendations.length > 0 && (
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3 px-1">康复建议</h4>
+                      <div className="space-y-2">
+                        {selectedAssessment.data.rom.recommendations.map((recommendation, idx) => (
+                          <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-green-100 transition-colors">
+                            <p className="text-sm text-slate-600 leading-relaxed">{recommendation}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

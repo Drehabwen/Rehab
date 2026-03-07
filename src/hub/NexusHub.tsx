@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 
 import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
 import { MedVoicePlugin } from '@/plugins/medvoice/MedVoicePlugin';
+import { ROMPlugin } from '@/plugins/rom/ROMPlugin';
 import { NexusReportCenter } from './components/NexusReportCenter';
 import { GlobalExport } from '@/components/GlobalExport';
 import { NewSessionModal } from './components/NewSessionModal';
@@ -23,7 +24,7 @@ import type { ViewMode } from './types';
 
 export const NexusHub: React.FC = () => {
   const [view, setView] = useState<ViewMode>('dashboard');
-  const [activePlugin, setActivePlugin] = useState<'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison'>('vision3');
+  const [activePlugin, setActivePlugin] = useState<'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison' | 'rom'>('vision3');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
@@ -50,7 +51,7 @@ export const NexusHub: React.FC = () => {
   };
 
   const handleToolSelectFromToolbox = (toolId: string) => {
-    setActivePlugin(toolId as 'vision3' | 'medvoice' | 'comparison');
+    setActivePlugin(toolId as 'vision3' | 'medvoice' | 'comparison' | 'rom');
     setView('workspace');
   };
 
@@ -64,7 +65,7 @@ export const NexusHub: React.FC = () => {
     setView('toolbox');
   };
 
-  const handleSelectTool = (tool: 'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison') => {
+  const handleSelectTool = (tool: 'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison' | 'rom') => {
     setActivePlugin(tool);
   };
 
@@ -91,6 +92,8 @@ export const NexusHub: React.FC = () => {
         return <Vision3Plugin />;
       case 'medvoice':
         return <MedVoicePlugin />;
+      case 'rom':
+        return <ROMPlugin />;
       case 'reports':
         return <NexusReportCenter />;
       case 'datacenter':
