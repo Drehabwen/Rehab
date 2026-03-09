@@ -218,10 +218,9 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             }
             
             // Set auxiliary diagnosis from backend (基础报告)
-            if (data.auxiliaryDiagnosis !== undefined) {
-                console.log('[usePostureWS] Received auxiliaryDiagnosis, length:', data.auxiliaryDiagnosis.length);
-                console.log('[usePostureWS] AuxiliaryDiagnosis content snippet:', data.auxiliaryDiagnosis.substring(0, 100) + '...');
-                setAuxiliaryDiagnosis(data.auxiliaryDiagnosis);
+            if (effectiveAuxiliaryDiagnosis !== null) {
+              console.log('[usePostureWS] Applying auxiliaryDiagnosis, length:', effectiveAuxiliaryDiagnosis.length);
+              setAuxiliaryDiagnosis(effectiveAuxiliaryDiagnosis);
             }
             
             console.log('[usePostureWS] Saving posture report:', {
@@ -229,19 +228,18 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
               hasMarkdown: !!normalized,
               hasTimeSeries: timeSeries && timeSeries.length > 0,
               timeSeriesLength: timeSeries ? timeSeries.length : 0,
-              hasAuxiliaryDiagnosis: !!data.auxiliaryDiagnosis,
+              hasAuxiliaryDiagnosis: !!effectiveAuxiliaryDiagnosis,
               isDeepReport
             });
             
-            // Save both auxiliary diagnosis and markdown report with metrics and issues
             savePostureReportRef.current(
               currentViewRef.current, 
-              data.auxiliaryDiagnosis || normalized, 
+              effectiveAuxiliaryDiagnosis || normalized, 
               normalized || null, 
               timeSeries,
-              data.metrics,
-              data.issues,
-              data.auxiliaryDiagnosis
+              effectiveMetrics,
+              effectiveIssues,
+              effectiveAuxiliaryDiagnosis || undefined
             );
             console.log('[usePostureWS] Posture report saved successfully');
           } else if (data.type === 'DEEP_REPORT_STREAM') {

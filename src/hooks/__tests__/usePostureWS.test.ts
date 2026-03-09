@@ -180,6 +180,56 @@ describe('usePostureWS', () => {
       expect(result.current.markdownReport).toBe('### Test Report');
     });
 
+    it('should preserve base recommendations when deep report returns without them', () => {
+      const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
+
+      const messageCallback = mockWebSocket.addEventListener.mock.calls.find(
+        (call: any[]) => call[0] === 'message'
+      )?.[1];
+
+      const baseResponse = {
+        type: 'POSTURE_REPORT',
+        markdown: '### Basic Report',
+        reportId: 'base-report-123',
+        metrics: { headForward: 3.6, shoulderAngle: 2.4 },
+        issues: [
+          {
+            id: 'head_forward',
+            type: 'forward_head',
+            severity: 'moderate',
+            title: 'Forward Head',
+            description: 'Forward head distance is elevated.',
+            recommendation: 'Keep the screen at eye level.'
+          }
+        ],
+        auxiliaryDiagnosis: 'Basic recommendation block',
+        timestamp: 1000
+      };
+
+      const deepResponse = {
+        type: 'POSTURE_REPORT',
+        markdown: '### Deep Report',
+        reportId: 'deep-report-456',
+        metrics: {},
+        issues: [],
+        auxiliaryDiagnosis: '',
+        isDeepReport: true,
+        timestamp: 2000
+      };
+
+      act(() => {
+        if (messageCallback) {
+          messageCallback({ data: JSON.stringify(baseResponse) });
+          messageCallback({ data: JSON.stringify(deepResponse) });
+        }
+      });
+
+      expect(result.current.markdownReport).toBe('### Deep Report');
+      expect(result.current.result?.metrics).toEqual(baseResponse.metrics);
+      expect(result.current.result?.issues).toEqual(baseResponse.issues);
+      expect(result.current.auxiliaryDiagnosis).toBe(baseResponse.auxiliaryDiagnosis);
+    });
+
     it('should handle unknown message types', () => {
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
