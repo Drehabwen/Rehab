@@ -52,6 +52,8 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   const streamingFlushTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const savePostureReport = useMeasurementStore(state => state.savePostureReport);
   const savePostureReportRef = useRef(savePostureReport);
+  const resultRef = useRef<AnalysisResult | null>(null);
+  const auxiliaryDiagnosisRef = useRef<string | null>(null);
   const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
   const lastBatchTimeSeriesRef = useRef<TemporalAnalysis['timeSeries']>([]);
   const currentRequestIdRef = useRef<string | null>(null);
@@ -66,6 +68,14 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   useEffect(() => {
     savePostureReportRef.current = savePostureReport;
   }, [savePostureReport]);
+
+  useEffect(() => {
+    resultRef.current = result;
+  }, [result]);
+
+  useEffect(() => {
+    auxiliaryDiagnosisRef.current = auxiliaryDiagnosis;
+  }, [auxiliaryDiagnosis]);
 
   const clearStreamingBuffer = useCallback(() => {
     streamingBufferRef.current = '';
@@ -176,11 +186,33 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             setTimeSeriesData(timeSeries);
             
             // Set basic metrics and issues if available
-            if (data.metrics) {
-              console.log('[usePostureWS] Received basic metrics:', data.metrics);
+            const hasMetrics = !!data.metrics && Object.keys(data.metrics).length > 0;
+            const hasIssues = Array.isArray(data.issues) && data.issues.length > 0;
+            const hasAuxiliaryDiagnosis =
+              typeof data.auxiliaryDiagnosis === 'string' && data.auxiliaryDiagnosis.trim().length > 0;
+
+            const effectiveMetrics = hasMetrics ? data.metrics : resultRef.current?.metrics;
+            const effectiveIssues = hasIssues
+              ? data.issues
+              : isDeepReport
+                ? (resultRef.current?.issues || [])
+                : [];
+            const effectiveAuxiliaryDiagnosis = hasAuxiliaryDiagnosis
+              ? data.auxiliaryDiagnosis
+              : isDeepReport
+                ? auxiliaryDiagnosisRef.current
+                : null;
+
+            if (effectiveMetrics) {
+              console.log('[usePostureWS] Applying posture metrics:', {
+                incomingMetricCount: hasMetrics ? Object.keys(data.metrics).length : 0,
+                effectiveMetricCount: Object.keys(effectiveMetrics).length,
+                effectiveIssueCount: effectiveIssues.length,
+                isDeepReport
+              });
               setResult({
-                metrics: data.metrics,
-                issues: data.issues || [],
+                metrics: effectiveMetrics,
+                issues: effectiveIssues,
                 timestamp: data.timestamp || Date.now()
               });
             }
