@@ -1,58 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { X, Search, User, History, ChevronRight, RefreshCw, Stethoscope } from 'lucide-react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, Clock, Search, Stethoscope, User, X } from 'lucide-react';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { getRelativeTime } from '@/lib/session-utils';
 import { cn } from '@/lib/utils';
 import type { Patient } from '@/types/patient';
-import type { Session } from '@/types/session';
+import {
+  getPatientAvatar,
+  getPatientColor,
+  getPatientDisplayName,
+} from '@/lib/patient-utils';
 
 interface PatientSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectPatient: (session: Session) => void;
+  onSelectPatient: (patient: Patient) => void;
 }
 
-export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSelectPatient 
-}) => {
+export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, onClose, onSelectPatient }) => {
   const [query, setQuery] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [patientSessions, setPatientSessions] = useState<Session[]>([]);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
-  
+
   const { searchPatients, loadPatients } = usePatientStore();
-  const { loadSessions, startSession } = useSessionStore();
+  const { loadSessions, startSession, getPatientSessions } = useSessionStore();
 
   useEffect(() => {
-    if (isOpen) {
-      loadPatients();
-      setQuery('');
-      setSelectedPatient(null);
-      setPatientSessions([]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (selectedPatient) {
-      loadSessions(selectedPatient.id).then(() => {
-        const allSessions = useSessionStore.getState().sessions;
-        setPatientSessions(allSessions.filter(s => s.patientId === selectedPatient.id));
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPatient]);
+    if (!isOpen) return;
+    setQuery('');
+    setSelectedPatient(null);
+    loadPatients();
+    loadSessions();
+  }, [isOpen, loadPatients, loadSessions]);
 
   const filteredPatients = searchPatients(query);
 
-  const handleContinueSession = async (session: Session) => {
+  const selectedSessions = useMemo(() => {
+    if (!selectedPatient) return [];
+    return getPatientSessions(selectedPatient.id).sort((a, b) => b.createdAt - a.createdAt);
+  }, [selectedPatient, getPatientSessions]);
+
+  const handleContinueSession = async () => {
+    if (!selectedPatient) return;
     setIsCreatingSession(true);
     try {
-      const nextSession = await startSession(session.patientId);
-      onSelectPatient(nextSession);
+      await startSession(selectedPatient.id);
+      onSelectPatient(selectedPatient);
       onClose();
     } catch (error) {
       console.error('Failed to create session:', error);
@@ -61,188 +54,133 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({
     }
   };
 
-  const handleViewHistory = (session: Session) => {
-    useSessionStore.getState().setCurrentSession(session);
-    onSelectPatient(session);
-    onClose();
-  };
-
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      
-      <div className="relative bg-white rounded-[3rem] shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[80vh] flex flex-col animate-in fade-in zoom-in duration-300">
-        <div className="flex items-center justify-between p-8 border-b border-slate-100">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-antey-primary/10 flex items-center justify-center">
-              <Search className="text-antey-primary" size={24} />
+      <div className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]" onClick={onClose} />
+
+      <div className="relative bg-white border border-slate-200 rounded-2xl shadow-[0_20px_40px_rgba(15,23,42,0.18)] w-full max-w-3xl max-h-[86vh] overflow-hidden flex flex-col">
+        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-antey-primary/10 text-antey-primary flex items-center justify-center">
+              <Search size={18} />
             </div>
             <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">查找患者</h2>
-              <p className="text-slate-400 font-medium text-sm">搜索姓名或编号</p>
+              <h2 className="text-lg font-semibold text-slate-900">查找患者</h2>
+              <p className="text-xs text-slate-500 mt-1">按姓名或编号搜索，并快速开启接诊</p>
             </div>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-3 hover:bg-slate-100 rounded-2xl transition-all group"
-          >
-            <X size={20} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+
+          <button onClick={onClose} className="btn-icon" aria-label="close">
+            <X size={14} />
           </button>
         </div>
 
-        <div className="p-8 border-b border-slate-100">
-          <div className="relative">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+        <div className="p-4 border-b border-slate-200">
+          <label className="relative block">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="输入患者姓名或编号..."
+              placeholder="输入患者姓名或编号"
+              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-300 bg-white text-sm"
               autoFocus
-              className="w-full px-6 py-5 pl-16 bg-slate-50 border border-slate-200 rounded-2xl text-lg font-medium text-slate-900 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-antey-primary/10 focus:border-antey-primary/30 transition-all"
             />
-          </div>
+          </label>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4">
           {!selectedPatient ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {filteredPatients.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                    <User size={32} className="text-slate-300" />
-                  </div>
-                  <p className="text-slate-400 font-medium">
-                    {query ? '未找到匹配的患者' : '暂无患者记录'}
-                  </p>
+                <div className="state-panel">
+                  <h3 className="text-lg">未找到匹配患者</h3>
+                  <p>请检查输入内容，或先新建患者。</p>
                 </div>
               ) : (
-                filteredPatients.map(patient => (
+                filteredPatients.map((patient) => (
                   <button
                     key={patient.id}
                     onClick={() => setSelectedPatient(patient)}
-                    className="w-full flex items-center gap-4 p-4 bg-slate-50 hover:bg-antey-primary/5 rounded-2xl transition-all group text-left"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-between gap-3 text-left"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-                      <User size={20} className="text-slate-500" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <span className="text-base font-black text-slate-900">
-                          {patient.name || '匿名患者'}
-                        </span>
-                        <span className="px-2 py-0.5 bg-slate-900 text-white rounded text-[10px] font-black">
-                          {patient.id}
-                        </span>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={cn('w-10 h-10 rounded-xl text-white flex items-center justify-center text-sm font-semibold', getPatientColor(patient))}>
+                        {getPatientAvatar(patient)}
                       </div>
-                      <p className="text-[11px] font-medium text-slate-400 mt-1">
-                        创建于 {getRelativeTime(patient.createdAt)}
-                      </p>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900 truncate">{getPatientDisplayName(patient)}</div>
+                        <div className="text-xs text-slate-500 truncate">{patient.id}</div>
+                      </div>
                     </div>
-                    <ChevronRight size={18} className="text-slate-300 group-hover:text-antey-primary transition-colors" />
+                    <span className="text-xs text-slate-400">{getRelativeTime(patient.createdAt)}</span>
                   </button>
                 ))
               )}
             </div>
           ) : (
-            <div className="space-y-6">
-              <button
-                onClick={() => setSelectedPatient(null)}
-                className="flex items-center gap-2 text-slate-400 hover:text-slate-600 transition-colors text-[11px] font-black uppercase tracking-wider"
-              >
-                <ChevronRight size={14} className="rotate-180" />
-                返回搜索
+            <div className="space-y-4">
+              <button onClick={() => setSelectedPatient(null)} className="btn-tertiary h-8 px-2 text-sm">
+                <ChevronLeft size={14} />
+                返回搜索结果
               </button>
 
-              <div className="flex items-center gap-4 p-6 bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] text-white">
-                <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
-                  <User size={28} className="text-white/80" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl font-black">
-                      {selectedPatient.name || '匿名患者'}
-                    </span>
-                    <span className="px-3 py-1 bg-white/20 rounded-lg text-[12px] font-black">
-                      {selectedPatient.id}
-                    </span>
+              <section className="bento-card p-4">
+                <div className="flex items-center gap-3">
+                  <div className={cn('w-11 h-11 rounded-xl text-white flex items-center justify-center font-semibold', getPatientColor(selectedPatient))}>
+                    {getPatientAvatar(selectedPatient)}
                   </div>
-                  <p className="text-white/50 text-sm font-medium">
-                    共接诊 {patientSessions.length} 次
-                  </p>
+                  <div>
+                    <div className="text-base font-semibold text-slate-900">{getPatientDisplayName(selectedPatient)}</div>
+                    <div className="text-sm text-slate-500">{selectedPatient.id}</div>
+                  </div>
                 </div>
-              </div>
+              </section>
 
-              {patientSessions.length > 0 && (
-                <div className="space-y-3">
-                  <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
-                    <History size={14} />
-                    历史接诊记录
-                  </h3>
-                  {patientSessions.map(session => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl"
-                    >
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-base font-black text-slate-900">{session.id}</span>
-                          <span className="text-[10px] font-medium text-slate-400">
-                            第 {session.sequence} 次接诊
-                          </span>
-                        </div>
-                        <p className="text-[11px] font-medium text-slate-400 mt-1">
-                          {getRelativeTime(session.createdAt)}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleViewHistory(session)}
-                          className="px-4 py-2 text-[10px] font-black uppercase tracking-wider text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
-                        >
-                          查看
-                        </button>
-                        <button
-                          onClick={() => handleContinueSession(session)}
-                          disabled={isCreatingSession}
-                          className={cn(
-                            "flex items-center gap-2 px-4 py-2 bg-antey-primary text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all",
-                            "hover:shadow-lg hover:shadow-antey-primary/20",
-                            isCreatingSession && "opacity-50 cursor-not-allowed"
-                          )}
-                        >
-                          <Stethoscope size={14} />
-                          继续接诊
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <button
-                onClick={() => {
-                  const newSession = { id: '', patientId: selectedPatient.id, sequence: 0 } as Session;
-                  handleContinueSession(patientSessions[0] || newSession);
-                }}
-                disabled={isCreatingSession}
-                className={cn(
-                  "w-full flex items-center justify-center gap-3 py-5 bg-gradient-to-r from-antey-primary to-teal-600 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all hover:shadow-lg hover:shadow-antey-primary/20",
-                  isCreatingSession && "opacity-50 cursor-not-allowed"
-                )}
-              >
-                {isCreatingSession ? (
-                  <RefreshCw size={18} className="animate-spin" />
+              <section className="bento-card p-4">
+                <div className="text-sm font-semibold text-slate-900 mb-2">历史接诊</div>
+                {selectedSessions.length === 0 ? (
+                  <p className="text-sm text-slate-500">暂无历史接诊记录。</p>
                 ) : (
-                  <Stethoscope size={18} />
+                  <div className="space-y-2">
+                    {selectedSessions.slice(0, 6).map((session) => (
+                      <div key={session.id} className="px-3 py-2 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-sm text-slate-900 font-medium truncate">{session.id}</div>
+                          <div className="text-xs text-slate-500 inline-flex items-center gap-1">
+                            <Clock size={12} />
+                            第 {session.sequence} 次接诊 · {getRelativeTime(session.createdAt)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            onSelectPatient(selectedPatient);
+                            onClose();
+                          }}
+                          className="btn-secondary h-8 px-3 text-xs"
+                        >
+                          进入
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                新增接诊记录
-              </button>
+              </section>
             </div>
           )}
         </div>
+
+        {selectedPatient ? (
+          <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-end gap-2">
+            <button onClick={onClose} className="btn-secondary">取消</button>
+            <button onClick={handleContinueSession} disabled={isCreatingSession} className={cn('btn-primary', isCreatingSession && 'opacity-50 cursor-not-allowed')}>
+              <Stethoscope size={14} />
+              {isCreatingSession ? '创建中...' : '新增接诊记录'}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -1,10 +1,25 @@
-import React from 'react';
-import { TrendingUp, Zap } from 'lucide-react';
+﻿import React from 'react';
+import { Activity, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { THRESHOLDS, SYSTEM_CONFIG } from '../config';
 import type { PostureMetrics } from '@/hooks/usePostureWS';
 import { DATA_QUALITY_TEXTS } from '../constants/uiText';
-import { COLORS, SIZES, ANIMATIONS } from '@/constants/uiStyles';
+
+type MetricState = {
+  label: string;
+  badgeClass: string;
+  barClass: string;
+};
+
+interface MetricRowProps {
+  label: string;
+  value: number;
+  unit: string;
+  reference: string;
+  meaning: string;
+  state: MetricState;
+  progress: number;
+}
 
 interface MetricsSidebarProps {
   isVisible: boolean;
@@ -12,115 +27,151 @@ interface MetricsSidebarProps {
   stability?: { sd: number };
 }
 
-export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({ 
-  isVisible, 
+const clampProgress = (value: number) => Math.max(0, Math.min(100, value));
+
+const getMetricState = (value: number, good: number, warn: number): MetricState => {
+  const absValue = Math.abs(value);
+  if (absValue <= good) {
+    return {
+      label: '正常',
+      badgeClass: 'status-success',
+      barClass: 'bg-emerald-500',
+    };
+  }
+
+  if (absValue <= warn) {
+    return {
+      label: '待关注',
+      badgeClass: 'status-warning',
+      barClass: 'bg-amber-500',
+    };
+  }
+
+  return {
+    label: '异常',
+    badgeClass: 'status-error',
+    barClass: 'bg-rose-500',
+  };
+};
+
+const MetricRow: React.FC<MetricRowProps> = ({
+  label,
+  value,
+  unit,
+  reference,
+  meaning,
+  state,
+  progress,
+}) => {
+  return (
+    <div className="rounded-20 border border-slate-200 bg-white p-4">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{label}</p>
+          <p className="text-xs text-slate-500 mt-1">参考值：{reference}</p>
+        </div>
+        <span className={cn('status-badge h-6', state.badgeClass)}>{state.label}</span>
+      </div>
+
+      <div className="mt-3 flex items-end gap-2">
+        <span className="text-2xl font-semibold tabular-nums text-slate-900">{value.toFixed(1)}</span>
+        <span className="text-xs font-medium text-slate-500 mb-1">{unit}</span>
+      </div>
+
+      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div className={cn('h-full transition-all duration-500', state.barClass)} style={{ width: `${progress}%` }} />
+      </div>
+
+      <p className="mt-3 text-xs text-slate-600 leading-relaxed">{meaning}</p>
+    </div>
+  );
+};
+
+export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
+  isVisible,
   metrics,
-  stability 
+  stability,
 }) => {
   if (!isVisible || !metrics) return null;
 
+  const swayState = getMetricState(
+    metrics.swayOffset || 0,
+    THRESHOLDS.swayOffset.excellent,
+    THRESHOLDS.swayOffset.good,
+  );
+  const shoulderState = getMetricState(
+    metrics.shoulderAngle || 0,
+    THRESHOLDS.shoulderAngle.balanced,
+    THRESHOLDS.shoulderAngle.acceptable,
+  );
+  const hipState = getMetricState(
+    metrics.hipAngle || 0,
+    THRESHOLDS.hipAngle.balanced,
+    THRESHOLDS.hipAngle.acceptable,
+  );
+
+  const isStabilityGood = Boolean(stability && stability.sd < THRESHOLDS.stability.clinical);
+
   return (
-    <div className="absolute right-6 top-[100px] bottom-6 w-80 z-40 flex flex-col gap-4 pointer-events-none">
-      <div className={`${COLORS.neutral.light.bgSoft}/40 backdrop-blur-3xl p-6 rounded-[2.5rem] border border-white/60 shadow-2xl pointer-events-auto animate-in slide-in-from-right-8 duration-1000 ease-out`}>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-antey-primary/10 flex items-center justify-center border border-antey-primary/20">
-            <TrendingUp className="text-antey-primary" size={20} />
+    <aside className="absolute right-6 top-[100px] bottom-6 z-30 hidden xl:flex w-[320px] pointer-events-none">
+      <div className="bento-card p-4 w-full flex flex-col gap-4 pointer-events-auto">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-700 border border-cyan-100 flex items-center justify-center">
+            <TrendingUp size={18} />
           </div>
           <div>
-            <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ${COLORS.neutral.light.text}`}>核心生物力学指标</h3>
-            <p className={`text-[9px] font-bold ${COLORS.neutral.light.textLight} uppercase tracking-widest`}>Core Biomechanics</p>
+            <h3 className="text-sm font-semibold text-slate-900">核心生物力学指标</h3>
+            <p className="text-xs text-slate-500">用于快速判断姿态风险等级</p>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div className={`p-4 ${COLORS.neutral.light.bgSoft}/40 rounded-2xl border border-white/60 group hover:border-antey-primary/30 transition-all duration-500`}>
-            <div className="flex justify-between items-center mb-2">
-              <span className={`text-[10px] font-black ${COLORS.neutral.light.textLight} uppercase tracking-widest`}>重心偏移</span>
-              <span className={cn(
-                "text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tighter",
-                Math.abs(metrics?.swayOffset || 0) < THRESHOLDS.swayOffset.excellent ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"
-              )}>
-                {Math.abs(metrics?.swayOffset || 0) < THRESHOLDS.swayOffset.excellent ? 'Excellent' : 'Offset'}
-              </span>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className={`text-3xl font-light ${COLORS.neutral.light.text} tracking-tighter`}>{(metrics?.swayOffset || 0).toFixed(1)}</span>
-              <span className={`text-[10px] font-bold ${COLORS.neutral.light.textLight} mb-1.5 uppercase tracking-widest`}>mm</span>
-            </div>
-            <div className={`mt-4 w-full h-1 ${COLORS.neutral.light.bgSoft}/50 rounded-full overflow-hidden`}>
-              <div 
-                className="h-full bg-antey-primary transition-all duration-1000" 
-                style={{ width: `${Math.min(100, Math.abs(metrics?.swayOffset || 0) * SYSTEM_CONFIG.chartScaling.swayOffset)}%` }}
-              />
-            </div>
-            <div className="mt-3">
-              <p className={`text-[9px] ${COLORS.neutral.light.textMuted} leading-relaxed`}>
-                <strong>含义：</strong>身体重心偏离中立位置的距离<br/>
-                <strong>正常范围：</strong>0-5mm（优秀）<br/>
-                <strong>临床意义：</strong>过大的重心偏移可能导致姿势不稳，增加跌倒风险
-              </p>
-            </div>
-          </div>
+        <div className="flex-1 space-y-3 overflow-y-auto custom-scrollbar pr-1">
+          <MetricRow
+            label="重心偏移"
+            value={metrics.swayOffset || 0}
+            unit="mm"
+            reference="0-15 mm"
+            meaning="重心偏离中线越大，站姿稳定性风险越高。"
+            state={swayState}
+            progress={clampProgress(Math.abs(metrics.swayOffset || 0) * SYSTEM_CONFIG.chartScaling.swayOffset)}
+          />
 
-          <div className={`p-4 ${COLORS.neutral.light.bgSoft}/40 rounded-2xl border border-white/60 group hover:border-antey-primary/30 transition-all duration-500`}>
-            <div className="flex justify-between items-center mb-2">
-              <span className={`text-[10px] font-black ${COLORS.neutral.light.textLight} uppercase tracking-widest`}>肩部平衡</span>
-              <span className={cn(
-                "text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tighter",
-                Math.abs(metrics?.shoulderAngle || 0) < THRESHOLDS.shoulderAngle.balanced ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"
-              )}>
-                {Math.abs(metrics?.shoulderAngle || 0) < THRESHOLDS.shoulderAngle.balanced ? 'Balanced' : 'Tilted'}
-              </span>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className={`text-3xl font-light ${COLORS.neutral.light.text} tracking-tighter`}>{(metrics?.shoulderAngle || 0).toFixed(1)}</span>
-              <span className={`text-[10px] font-bold ${COLORS.neutral.light.textLight} mb-1.5 uppercase tracking-widest`}>°</span>
-            </div>
-            <div className="mt-3">
-              <p className={`text-[9px] ${COLORS.neutral.light.textMuted} leading-relaxed`}>
-                <strong>含义：</strong>左右肩膀高度差异的角度<br/>
-                <strong>正常范围：</strong>0-2°（平衡）<br/>
-                <strong>临床意义：</strong>肩部不平衡可能导致颈椎和胸椎问题，影响姿势对称性
-              </p>
-            </div>
-          </div>
+          <MetricRow
+            label="肩部平衡"
+            value={metrics.shoulderAngle || 0}
+            unit="deg"
+            reference="0-3°"
+            meaning="反映左右肩高差，提示颈肩代偿风险。"
+            state={shoulderState}
+            progress={clampProgress(Math.abs(metrics.shoulderAngle || 0) * SYSTEM_CONFIG.chartScaling.shoulderAngle)}
+          />
 
-          <div className={`p-4 ${COLORS.neutral.light.bgSoft}/40 rounded-2xl border border-white/60 group hover:border-antey-primary/30 transition-all duration-500`}>
-            <div className="flex justify-between items-center mb-2">
-              <span className={`text-[10px] font-black ${COLORS.neutral.light.textLight} uppercase tracking-widest`}>骨盆对称性</span>
-              <span className={cn(
-                "text-[9px] px-2.5 py-1 rounded-full font-black uppercase tracking-tighter",
-                Math.abs(metrics?.hipAngle || 0) < 2 ? "bg-emerald-500/10 text-emerald-600" : "bg-rose-500/10 text-rose-600"
-              )}>
-                {Math.abs(metrics?.hipAngle || 0) < 2 ? 'Symmetric' : 'Asymmetric'}
-              </span>
-            </div>
-            <div className="flex items-end gap-2">
-              <span className={`text-3xl font-light ${COLORS.neutral.light.text} tracking-tighter`}>{(metrics?.hipAngle || 0).toFixed(1)}</span>
-              <span className={`text-[10px] font-bold ${COLORS.neutral.light.textLight} mb-1.5 uppercase tracking-widest`}>°</span>
-            </div>
-            <div className="mt-3">
-              <p className={`text-[9px] ${COLORS.neutral.light.textMuted} leading-relaxed`}>
-                <strong>含义：</strong>左右骨盆高度差异的角度<br/>
-                <strong>正常范围：</strong>0-2°（对称）<br/>
-                <strong>临床意义：</strong>骨盆不对称可能导致腰痛、膝盖疼痛等问题，影响整体姿势
-              </p>
-            </div>
-          </div>
+          <MetricRow
+            label="骨盆对称"
+            value={metrics.hipAngle || 0}
+            unit="deg"
+            reference="0-2°"
+            meaning="骨盆倾斜会影响下肢受力与躯干稳定。"
+            state={hipState}
+            progress={clampProgress(Math.abs(metrics.hipAngle || 0) * 12)}
+          />
         </div>
 
-        <div className={`mt-6 pt-6 border-t ${COLORS.neutral.light.borderSoft}`}>
-          <div className="flex items-center gap-3 text-antey-primary mb-3">
-            <Zap size={14} />
-            <span className="text-[9px] font-black uppercase tracking-[0.2em]">Clinical Stability</span>
+        <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Activity size={14} className="text-slate-600" />
+              <span className="text-sm font-semibold text-slate-900">临床稳定性</span>
+            </div>
+            <span className={cn('status-badge h-6', isStabilityGood ? 'status-success' : 'status-warning')}>
+              {isStabilityGood ? '稳定' : '建议复测'}
+            </span>
           </div>
-          <p className={`text-[11px] ${COLORS.neutral.light.textMuted} leading-relaxed font-medium`}>
-            {stability && stability.sd < THRESHOLDS.stability.clinical 
-              ? DATA_QUALITY_TEXTS.excellent 
-              : DATA_QUALITY_TEXTS.suggestion}
+          <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+            {isStabilityGood ? DATA_QUALITY_TEXTS.excellent : DATA_QUALITY_TEXTS.suggestion}
           </p>
         </div>
       </div>
-    </div>
+    </aside>
   );
 };

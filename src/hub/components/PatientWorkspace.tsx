@@ -2,6 +2,11 @@ import React from 'react';
 import { Camera, Mic, FileText, ChevronLeft, User, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Patient } from '@/types/patient';
+import { 
+  getPatientDisplayName,
+  getPatientAvatar,
+  getPatientColor
+} from '@/lib/patient-utils';
 
 interface PatientWorkspaceProps {
   patient: Patient;
@@ -60,16 +65,18 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
         
         <div className="flex-1 bento-card p-8 flex items-center justify-between">
           <div className="flex items-center gap-6">
-            <div className="w-16 h-16 rounded-[2rem] bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
-              <User size={28} className="text-slate-500" />
+            <div className={cn(
+              "w-16 h-16 rounded-[2rem] flex items-center justify-center",
+              getPatientColor(patient)
+            )}>
+              <span className="text-white text-3xl font-black">
+                {getPatientAvatar(patient)}
+              </span>
             </div>
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <span className="px-4 py-1.5 bg-slate-900 text-white rounded-xl text-[11px] font-black tracking-wider">
-                  {patient.id}
-                </span>
                 <h2 className="text-2xl font-black text-slate-900">
-                  {patient.name || '匿名患者'}
+                  {getPatientDisplayName(patient)}
                 </h2>
               </div>
               <p className="text-slate-400 text-sm font-medium">

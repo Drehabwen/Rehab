@@ -1,17 +1,17 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 
 export interface StructuredCase {
-  '主诉'?: string;
-  '现病史'?: string;
-  '既往史'?: string;
-  '体格检查'?: string;
-  '诊断'?: string;
-  '处理意见'?: string;
-  'S'?: string;
-  'O'?: string;
-  'A'?: string;
-  'P'?: string;
-  'ai_suggestions'?: string;
+  主诉?: string;
+  现病史?: string;
+  既往史?: string;
+  体格检查?: string;
+  诊断?: string;
+  处理意见?: string;
+  S?: string;
+  O?: string;
+  A?: string;
+  P?: string;
+  ai_suggestions?: string;
   [key: string]: string | undefined;
 }
 
@@ -38,11 +38,12 @@ export const useCaseStore = create<CaseState>((set) => ({
     gender: '男',
     age: '45',
     case_id: `MV${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}001`,
-    visit_date: new Date().toLocaleDateString(),
+    visit_date: new Date().toLocaleDateString('zh-CN'),
   },
   setStructuredCase: (data) => set({ structuredCase: data }),
-  setPatientInfo: (info) => set((state) => ({ 
-    patientInfo: { ...state.patientInfo, ...info } 
-  })),
+  setPatientInfo: (info) =>
+    set((state) => ({
+      patientInfo: { ...state.patientInfo, ...info },
+    })),
   resetCase: () => set({ structuredCase: null }),
 }));

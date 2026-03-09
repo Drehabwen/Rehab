@@ -1,0 +1,10 @@
+--- Starting Real LLM Connection Test ---
+SUCCESS: Found API Key: sk-bbf...365a
+START: Sending request to Deepseek...
+SUCCESS: Received LLM report of length 25
+INFO: Saved report to test_report_output.html
+  - Contains HTML structure: NO
+  - Contains Charts (rehab-chart): NO
+  - Contains Tailwind CSS: NO
+WARNING: Response received but does not look like HTML.
+PREVIEW: 生成报告失败: Connection error....

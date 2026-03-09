@@ -1,11 +1,11 @@
-import { 
-  Activity, 
-  Mic, 
+﻿import {
+  Activity,
+  Mic,
   Scale,
   Footprints,
   Layers,
   CircleDot,
-  BarChart3
+  BarChart3,
 } from 'lucide-react';
 
 export interface Tool {
@@ -22,64 +22,64 @@ export const tools: Tool[] = [
   {
     id: 'medvoice',
     name: '语音接诊',
-    description: '语音转文字记录患者主诉，自动生成病历摘要',
+    description: '实时语音转写并结构化生成病历要点。',
     icon: Mic,
-    color: 'from-blue-500 to-indigo-500',
+    color: 'from-violet-600 to-purple-500',
     category: 'record',
-    available: true
+    available: true,
   },
   {
     id: 'vision3',
     name: '体态分析',
-    description: '基于 MediaPipe 全身关键点追踪，实时捕捉身体细微偏差',
+    description: '基于视觉关键点进行体态评估和问题识别。',
     icon: Activity,
-    color: 'from-antey-primary to-cyan-400',
+    color: 'from-blue-600 to-cyan-500',
     category: 'assessment',
-    available: true
+    available: true,
   },
   {
     id: 'rom',
     name: '关节活动度',
-    description: '测量关节活动范围，评估运动功能受限程度',
+    description: '测量关节活动范围并输出左右侧差异。',
     icon: Layers,
-    color: 'from-violet-500 to-purple-500',
+    color: 'from-green-600 to-emerald-500',
     category: 'assessment',
-    available: true
+    available: true,
   },
   {
     id: 'comparison',
     name: '前后对比',
-    description: '对比不同时期的评估数据，展示治疗效果和改善趋势',
+    description: '对比不同时间的评估结果并显示改善趋势。',
     icon: BarChart3,
-    color: 'from-emerald-500 to-teal-500',
+    color: 'from-cyan-600 to-teal-500',
     category: 'analysis',
-    available: true
+    available: true,
   },
   {
     id: 'balance',
     name: '平衡评估',
-    description: '静态动态平衡能力测试，评估跌倒风险',
+    description: '静态与动态平衡评估，识别跌倒风险。',
     icon: CircleDot,
     color: 'from-amber-500 to-orange-500',
     category: 'assessment',
-    available: false
+    available: false,
   },
   {
     id: 'scale',
     name: '量表评估',
-    description: '标准化问卷评估 pain/功能/生活质量',
+    description: '标准化量表采集疼痛、功能与生活质量。',
     icon: Scale,
-    color: 'from-emerald-500 to-teal-500',
+    color: 'from-teal-600 to-emerald-500',
     category: 'record',
-    available: false
+    available: false,
   },
   {
     id: 'gait',
     name: '步态分析',
-    description: '行走模式分析，识别异常步态特征',
+    description: '分析步态参数，定位异常步态模式。',
     icon: Footprints,
     color: 'from-rose-500 to-pink-500',
     category: 'assessment',
-    available: false
-  }
+    available: false,
+  },
 ];

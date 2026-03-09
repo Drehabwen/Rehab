@@ -47,6 +47,7 @@ export function usePostureAnalysis({
   
   // Only use WebSocket report, no fallback
   const markdownReport = wsMarkdownReport;
+  const hasCompletedReport = Boolean(markdownReport || auxiliaryDiagnosis);
 
   // Handle Capture Completion
   const onCapture = useCallback((data: { 
@@ -103,21 +104,28 @@ export function usePostureAnalysis({
   } = useCaptureStateMachine(onCapture);
 
   useEffect(() => {
-    console.log('[usePostureAnalysis] markdownReport changed:', markdownReport ? 'exists' : 'null');
-    if (markdownReport) {
+    console.log('[usePostureAnalysis] report state changed:', {
+      markdownReport: markdownReport ? 'exists' : 'null',
+      auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null'
+    });
+    if (hasCompletedReport) {
       console.log('[usePostureAnalysis] Setting step to completed');
       setStep('completed');
     }
-  }, [markdownReport, setStep]);
+  }, [hasCompletedReport, markdownReport, auxiliaryDiagnosis, setStep]);
 
   useEffect(() => {
-    console.log('[usePostureAnalysis] Checking analysis completion:', { markdownReport: markdownReport ? 'exists' : 'null', captureStatus });
+    console.log('[usePostureAnalysis] Checking analysis completion:', {
+      markdownReport: markdownReport ? 'exists' : 'null',
+      auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
+      captureStatus
+    });
     // 所有模式：等待后端返回 markdownReport 后再完成
-    if (markdownReport && captureStatus === 'analyzing') {
+    if (hasCompletedReport && captureStatus === 'analyzing') {
       console.log('[usePostureAnalysis] Dispatching ANALYSIS_COMPLETE');
       captureDispatch({ type: 'ANALYSIS_COMPLETE' });
     }
-  }, [markdownReport, captureStatus, captureDispatch]);
+  }, [hasCompletedReport, markdownReport, auxiliaryDiagnosis, captureStatus, captureDispatch]);
 
   useEffect(() => {
     if (captureStatus === 'analyzing') {

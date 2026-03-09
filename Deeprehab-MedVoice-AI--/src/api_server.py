@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+﻿from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -14,7 +14,7 @@ from datetime import datetime
 import logging
 import uvicorn
 
-# 导入核心模块
+# 瀵煎叆鏍稿績妯″潡
 try:
     from core.voice import VoiceRecorder, VoiceRecognizer
     from core.nlp_processor import NLPProcessor
@@ -30,14 +30,22 @@ except ImportError:
 
 app = FastAPI(
     title="AIsci API",
-    description="智能医疗助理系统后端接口",
+    description="鏅鸿兘鍖荤枟鍔╃悊绯荤粺鍚庣鎺ュ彛",
     version="1.0.0"
 )
 
-# 配置 CORS
+# 閰嶇疆 CORS
+def load_cors_origins() -> List[str]:
+    raw = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    )
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return origins or ["http://localhost:5173"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=load_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,10 +54,9 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# 加载配置
+# 鍔犺浇閰嶇疆
 def load_config():
-    # 尝试多个可能的路径
-    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # 灏濊瘯澶氫釜鍙兘鐨勮矾寰?    current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
     
     possible_paths = [
@@ -63,15 +70,15 @@ def load_config():
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
-                    logger.info(f"正在加载配置文件: {config_path}")
+                    logger.info(f"姝ｅ湪鍔犺浇閰嶇疆鏂囦欢: {config_path}")
                     return json.load(f)
             except Exception as e:
-                logger.error(f"解析配置文件失败 {config_path}: {e}")
+                logger.error(f"瑙ｆ瀽閰嶇疆鏂囦欢澶辫触 {config_path}: {e}")
     
-    logger.warning("未找到配置文件 config.json，将使用默认配置")
+    logger.warning("鏈壘鍒伴厤缃枃浠?config.json锛屽皢浣跨敤榛樿閰嶇疆")
     return {
-        "hospital_name": "XX社区卫生服务中心",
-        "doctor_name": "王医生",
+        "hospital_name": "XX绀惧尯鍗敓鏈嶅姟涓績",
+        "doctor_name": "鐜嬪尰鐢?,
         "audio_sample_rate": 16000,
         "audio_channels": 1,
         "cases_dir": "./cases",
@@ -83,17 +90,14 @@ def load_config():
 
 config = load_config()
 
-# 初始化组件
-print(f"DEBUG: api_server initializing components with config keys: {list(config.keys()) if config else 'None'}")
+# 鍒濆鍖栫粍浠?print(f"DEBUG: api_server initializing components with config keys: {list(config.keys()) if config else 'None'}")
 recorder = VoiceRecorder(config)
 nlp_processor = NLPProcessor(config)
 case_structurer = CaseStructurer(nlp_processor)
 doc_generator = DocumentGenerator(config)
 case_manager = CaseManager(config)
 
-# 挂载 Web 前端静态文件
-# 假设 api_server.py 在 src/ 目录下，web 在 src/web/ 目录下
-current_dir = os.path.dirname(os.path.abspath(__file__))
+# 鎸傝浇 Web 鍓嶇闈欐€佹枃浠?# 鍋囪 api_server.py 鍦?src/ 鐩綍涓嬶紝web 鍦?src/web/ 鐩綍涓?current_dir = os.path.dirname(os.path.abspath(__file__))
 web_dir = os.path.join(current_dir, "web")
 
 if os.path.exists(web_dir):
@@ -106,7 +110,7 @@ async def read_root():
         return FileResponse(index_path)
     return {"message": "AIsci API Server is running"}
 
-# --- 数据模型定义 ---
+# --- 鏁版嵁妯″瀷瀹氫箟 ---
 
 class TranscribeRequest(BaseModel):
     audio_data: str  # base64
@@ -130,23 +134,21 @@ class ExportRequest(BaseModel):
 class SaveRequest(BaseModel):
     case_data: Dict[str, Any]
 
-# --- 路由定义 ---
+# --- 璺敱瀹氫箟 ---
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-# --- 本地录音接口 ---
+# --- 鏈湴褰曢煶鎺ュ彛 ---
 
 @app.post("/api/record/start")
 async def start_local_record():
     try:
-        # 这里可以使用 on_update 来通过 websocket 或其他方式推送实时文本
-        # 目前先简单实现
-        recorder.start_recording()
-        return {"status": "success", "message": "已开启本地麦克风录音"}
+        # 杩欓噷鍙互浣跨敤 on_update 鏉ラ€氳繃 websocket 鎴栧叾浠栨柟寮忔帹閫佸疄鏃舵枃鏈?        # 鐩墠鍏堢畝鍗曞疄鐜?        recorder.start_recording()
+        return {"status": "success", "message": "宸插紑鍚湰鍦伴害鍏嬮褰曢煶"}
     except Exception as e:
-        logger.error(f"开启录音失败: {e}")
+        logger.error(f"寮€鍚綍闊冲け璐? {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/record/stop")
@@ -161,24 +163,24 @@ async def stop_local_record():
             }
         }
     except Exception as e:
-        logger.error(f"停止录音失败: {e}")
+        logger.error(f"鍋滄褰曢煶澶辫触: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/transcribe")
 async def transcribe_audio(request: TranscribeRequest):
-    logger.info(f"收到转录请求，格式: {request.format}, 数据大小: {len(request.audio_data)}")
+    logger.info(f"鏀跺埌杞綍璇锋眰锛屾牸寮? {request.format}, 鏁版嵁澶у皬: {len(request.audio_data)}")
     try:
         audio_bytes = base64.b64decode(request.audio_data)
-        logger.info(f"Base64解码成功，字节数: {len(audio_bytes)}")
+        logger.info(f"Base64瑙ｇ爜鎴愬姛锛屽瓧鑺傛暟: {len(audio_bytes)}")
         
         with tempfile.NamedTemporaryFile(suffix=f'.{request.format}', delete=False) as temp_file:
             temp_file.write(audio_bytes)
             temp_file_path = temp_file.name
         
-        logger.info(f"临时文件已创建: {temp_file_path}")
+        logger.info(f"涓存椂鏂囦欢宸插垱寤? {temp_file_path}")
         try:
             transcript = recorder.transcribe_file(temp_file_path)
-            logger.info(f"转录完成，结果长度: {len(transcript) if transcript else 0}")
+            logger.info(f"杞綍瀹屾垚锛岀粨鏋滈暱搴? {len(transcript) if transcript else 0}")
             return {
                 'status': 'success',
                 'data': {
@@ -191,8 +193,8 @@ async def transcribe_audio(request: TranscribeRequest):
                 os.remove(temp_file_path)
     
     except Exception as e:
-        logger.error(f'转录失败: {str(e)}')
-        # 返回更详细的错误信息
+        logger.error(f'杞綍澶辫触: {str(e)}')
+        # 杩斿洖鏇磋缁嗙殑閿欒淇℃伅
         return {
             'status': 'error',
             'message': str(e),
@@ -202,7 +204,7 @@ async def transcribe_audio(request: TranscribeRequest):
 @app.post("/api/structure")
 async def structure_case(request: StructureRequest):
     try:
-        # 使用合并后的方法，支持 Vision3 数据和 SOAP 模式
+        # 浣跨敤鍚堝苟鍚庣殑鏂规硶锛屾敮鎸?Vision3 鏁版嵁鍜?SOAP 妯″紡
         analyzed_dialogue, structured_case = case_structurer.analyze_and_structure(
             request.transcript, 
             vision3_data=request.vision3_data,
@@ -218,13 +220,13 @@ async def structure_case(request: StructureRequest):
             }
         }
     except Exception as e:
-        logger.error(f'病例结构化失败: {str(e)}')
-        raise HTTPException(status_code=500, detail=f'病例结构化失败: {str(e)}')
+        logger.error(f'鐥呬緥缁撴瀯鍖栧け璐? {str(e)}')
+        raise HTTPException(status_code=500, detail=f'鐥呬緥缁撴瀯鍖栧け璐? {str(e)}')
 
 @app.post("/api/generate")
 async def generate_medical_record(request: GenerateRequest):
     try:
-        # 合并信息
+        # 鍚堝苟淇℃伅
         case_data = {**request.structured_case, **request.patient_info}
         config_info = {**config, **request.doctor_info}
         
@@ -238,23 +240,21 @@ async def generate_medical_record(request: GenerateRequest):
             }
         }
     except Exception as e:
-        logger.error(f'病历生成失败: {str(e)}')
-        raise HTTPException(status_code=500, detail=f'病历生成失败: {str(e)}')
+        logger.error(f'鐥呭巻鐢熸垚澶辫触: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'鐥呭巻鐢熸垚澶辫触: {str(e)}')
 
 @app.post("/api/export")
 async def export_document(request: ExportRequest):
     try:
         case_data = request.case_data
         
-        # 统一映射字段，确保导出模块能拿到正确的数据
-        if not case_data.get("patient_name") and case_data.get("name"):
+        # 缁熶竴鏄犲皠瀛楁锛岀‘淇濆鍑烘ā鍧楄兘鎷垮埌姝ｇ‘鐨勬暟鎹?        if not case_data.get("patient_name") and case_data.get("name"):
             case_data["patient_name"] = case_data["name"]
         
-        # 确保 case_id 存在（用于文件名生成）
-        if "case_id" not in case_data:
+        # 纭繚 case_id 瀛樺湪锛堢敤浜庢枃浠跺悕鐢熸垚锛?        if "case_id" not in case_data:
             case_data["case_id"] = "EXPORT_" + datetime.now().strftime("%H%M%S")
 
-        logger.info(f"正在导出 {request.export_format} 格式，患者: {case_data.get('patient_name')}")
+        logger.info(f"姝ｅ湪瀵煎嚭 {request.export_format} 鏍煎紡锛屾偅鑰? {case_data.get('patient_name')}")
 
         if request.export_format == "pdf":
             file_path = doc_generator.generate_pdf(case_data)
@@ -272,29 +272,26 @@ async def export_document(request: ExportRequest):
             }
         }
     except Exception as e:
-        logger.error(f'导出失败: {str(e)}')
-        raise HTTPException(status_code=500, detail=f'导出失败: {str(e)}')
+        logger.error(f'瀵煎嚭澶辫触: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'瀵煎嚭澶辫触: {str(e)}')
 
 @app.post("/api/save")
 async def save_case_data(request: SaveRequest):
     try:
-        # 为了适配 CaseManager，我们需要确保一些字段存在
-        case_data = request.case_data
+        # 涓轰簡閫傞厤 CaseManager锛屾垜浠渶瑕佺‘淇濅竴浜涘瓧娈靛瓨鍦?        case_data = request.case_data
         
-        # 映射字段名以适配 CaseManager 的验证逻辑
+        # 鏄犲皠瀛楁鍚嶄互閫傞厤 CaseManager 鐨勯獙璇侀€昏緫
         if "patient_name" not in case_data and "name" in case_data:
             case_data["patient_name"] = case_data["name"]
         
-        # 如果没有诊断字段，从结构化数据中提取
-        if "diagnosis" not in case_data and "诊断" in case_data:
-            case_data["diagnosis"] = case_data["诊断"]
+        # 濡傛灉娌℃湁璇婃柇瀛楁锛屼粠缁撴瀯鍖栨暟鎹腑鎻愬彇
+        if "diagnosis" not in case_data and "璇婃柇" in case_data:
+            case_data["diagnosis"] = case_data["璇婃柇"]
             
-        # 映射主诉字段以通过 CaseManager 的验证
-        if "chief_complaint" not in case_data and "主诉" in case_data:
-            case_data["chief_complaint"] = case_data["主诉"]
+        # 鏄犲皠涓昏瘔瀛楁浠ラ€氳繃 CaseManager 鐨勯獙璇?        if "chief_complaint" not in case_data and "涓昏瘔" in case_data:
+            case_data["chief_complaint"] = case_data["涓昏瘔"]
 
-        # 确保有就诊日期
-        if "visit_date" not in case_data:
+        # 纭繚鏈夊氨璇婃棩鏈?        if "visit_date" not in case_data:
             case_data["visit_date"] = datetime.now().strftime("%Y-%m-%d")
 
         success, result = case_manager.save_case(case_data)
@@ -310,15 +307,15 @@ async def save_case_data(request: SaveRequest):
             raise Exception(result)
             
     except Exception as e:
-        logger.error(f'保存失败: {str(e)}')
-        raise HTTPException(status_code=500, detail=f'保存失败: {str(e)}')
+        logger.error(f'淇濆瓨澶辫触: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'淇濆瓨澶辫触: {str(e)}')
 
 @app.websocket("/ws/stream_transcribe")
 async def websocket_stream_transcribe(websocket: WebSocket):
     await websocket.accept()
-    logger.info("收到前端流式转录 WebSocket 连接")
+    logger.info("鏀跺埌鍓嶇娴佸紡杞綍 WebSocket 杩炴帴")
     
-    # 准备 ASR
+    # 鍑嗗 ASR
     asr = VoiceRecognizer(config)
     loop = asyncio.get_running_loop()
     result_queue = asyncio.Queue()
@@ -332,10 +329,10 @@ async def websocket_stream_transcribe(websocket: WebSocket):
     def on_error(error):
         loop.call_soon_threadsafe(result_queue.put_nowait, {"type": "error", "message": str(error)})
 
-    # 启动 ASR (后台运行，禁用本地麦克风)
+    # 鍚姩 ASR (鍚庡彴杩愯锛岀鐢ㄦ湰鍦伴害鍏嬮)
     asr.start(on_update=on_update, on_complete=on_complete, on_error=on_error, use_pyaudio=False)
     
-    # 并发处理：发送结果和接收音频
+    # 骞跺彂澶勭悊锛氬彂閫佺粨鏋滃拰鎺ユ敹闊抽
     async def send_results():
         try:
             while True:
@@ -349,7 +346,7 @@ async def websocket_stream_transcribe(websocket: WebSocket):
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.error(f"发送流式结果失败: {e}")
+            logger.error(f"鍙戦€佹祦寮忕粨鏋滃け璐? {e}")
 
     send_task = asyncio.create_task(send_results())
     
@@ -358,46 +355,44 @@ async def websocket_stream_transcribe(websocket: WebSocket):
         last_log_time = asyncio.get_event_loop().time()
         
         while True:
-            # 接收前端发送的二进制音频切片或控制指令
+            # 鎺ユ敹鍓嶇鍙戦€佺殑浜岃繘鍒堕煶棰戝垏鐗囨垨鎺у埗鎸囦护
             message = await websocket.receive()
             
             if "bytes" in message:
                 audio_chunk = message["bytes"]
-                # 数据质量校验：检查是否全为 0 (静音或采集失败)
+                # 鏁版嵁璐ㄩ噺鏍￠獙锛氭鏌ユ槸鍚﹀叏涓?0 (闈欓煶鎴栭噰闆嗗け璐?
                 if len(audio_chunk) > 0:
-                    # 检查音量大小
-                    audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+                    # 妫€鏌ラ煶閲忓ぇ灏?                    audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
                     peak = np.abs(audio_data).max() if len(audio_data) > 0 else 0
                     
                     if peak > 0:
                         total_bytes += len(audio_chunk)
                         asr.push_audio(audio_chunk)
                         
-                        # 如果音量太小，记录警告
-                        if peak < 500: # 经验值：太小可能导致转写错误
+                        # 濡傛灉闊抽噺澶皬锛岃褰曡鍛?                        if peak < 500: # 缁忛獙鍊硷細澶皬鍙兘瀵艰嚧杞啓閿欒
                              if asyncio.get_event_loop().time() - last_log_time >= 5.0:
-                                 logger.warning(f"音频信号微弱 (Peak: {peak})，可能导致转写不准或出现英文")
+                                 logger.warning(f"闊抽淇″彿寰急 (Peak: {peak})锛屽彲鑳藉鑷磋浆鍐欎笉鍑嗘垨鍑虹幇鑻辨枃")
                     else:
                         if asyncio.get_event_loop().time() - last_log_time >= 5.0:
-                             logger.warning("接收到纯静音数据，请检查麦克风权限或设备")
+                             logger.warning("鎺ユ敹鍒扮函闈欓煶鏁版嵁锛岃妫€鏌ラ害鍏嬮鏉冮檺鎴栬澶?)
             elif "text" in message:
                 data = json.loads(message["text"])
                 if data.get("command") == "stop":
-                    logger.info("收到前端停止指令，正在结束 ASR 任务...")
+                    logger.info("鏀跺埌鍓嶇鍋滄鎸囦护锛屾鍦ㄧ粨鏉?ASR 浠诲姟...")
                     asr.stop()
                     break
     except WebSocketDisconnect:
-        logger.info("前端 WebSocket 已断开，清理资源...")
+        logger.info("鍓嶇 WebSocket 宸叉柇寮€锛屾竻鐞嗚祫婧?..")
         asr.stop()
     except Exception as e:
-        logger.error(f"流式转录链路异常: {e}", exc_info=True)
+        logger.error(f"娴佸紡杞綍閾捐矾寮傚父: {e}", exc_info=True)
         asr.stop()
         try:
-            await websocket.send_json({"status": "error", "message": f"链路故障: {str(e)}"})
+            await websocket.send_json({"status": "error", "message": f"閾捐矾鏁呴殰: {str(e)}"})
         except: pass
     finally:
         send_task.cancel()
-        logger.info("流式转录流程结束")
+        logger.info("娴佸紡杞綍娴佺▼缁撴潫")
 
 @app.get("/api/cases")
 async def get_cases():
@@ -411,8 +406,8 @@ async def get_cases():
             }
         }
     except Exception as e:
-        logger.error(f'获取病例列表失败: {str(e)}')
-        raise HTTPException(status_code=500, detail=f'获取病例列表失败: {str(e)}')
+        logger.error(f'鑾峰彇鐥呬緥鍒楄〃澶辫触: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'鑾峰彇鐥呬緥鍒楄〃澶辫触: {str(e)}')
 
 @app.get("/api/cases/{case_id}")
 async def get_case_detail(case_id: str):
@@ -427,15 +422,15 @@ async def get_case_detail(case_id: str):
                 }
             }
         else:
-            raise HTTPException(status_code=404, detail="未找到该病例")
+            raise HTTPException(status_code=404, detail="鏈壘鍒拌鐥呬緥")
     except Exception as e:
-        logger.error(f'获取病例详情失败: {str(e)}')
-        raise HTTPException(status_code=500, detail=f'获取病例详情失败: {str(e)}')
+        logger.error(f'鑾峰彇鐥呬緥璇︽儏澶辫触: {str(e)}')
+        raise HTTPException(status_code=500, detail=f'鑾峰彇鐥呬緥璇︽儏澶辫触: {str(e)}')
 
 @app.websocket("/ws/record")
 async def websocket_record(websocket: WebSocket):
     await websocket.accept()
-    logger.info("收到前端后端主导录音 WebSocket 连接")
+    logger.info("鏀跺埌鍓嶇鍚庣涓诲褰曢煶 WebSocket 杩炴帴")
     
     queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
@@ -466,7 +461,7 @@ async def websocket_record(websocket: WebSocket):
                 elif msg["type"] == "power":
                     await websocket.send_json({"status": "power", "power": msg["power"]})
         except Exception as e:
-            logger.error(f"WS 发送任务异常: {e}")
+            logger.error(f"WS 鍙戦€佷换鍔″紓甯? {e}")
 
     send_task = None
     
@@ -477,13 +472,13 @@ async def websocket_record(websocket: WebSocket):
             
             if command == "start":
                 if recorder.is_recording:
-                    await websocket.send_json({"status": "error", "message": "录音已在运行中"})
+                    await websocket.send_json({"status": "error", "message": "褰曢煶宸插湪杩愯涓?})
                     continue
                 
-                logger.info("启动后端本地麦克风录音...")
+                logger.info("鍚姩鍚庣鏈湴楹﹀厠椋庡綍闊?..")
                 
                 try:
-                    # 使用更新后的 start_recording 接口
+                    # 浣跨敤鏇存柊鍚庣殑 start_recording 鎺ュ彛
                     recorder.start_recording(
                         on_update=on_update,
                         on_complete=on_complete,
@@ -494,27 +489,27 @@ async def websocket_record(websocket: WebSocket):
                     send_task = asyncio.create_task(send_updates())
                     await websocket.send_json({"status": "started"})
                 except Exception as e:
-                    logger.error(f"启动录音失败: {e}", exc_info=True)
-                    await websocket.send_json({"status": "error", "message": f"启动录音失败: {str(e)}"})
+                    logger.error(f"鍚姩褰曢煶澶辫触: {e}", exc_info=True)
+                    await websocket.send_json({"status": "error", "message": f"鍚姩褰曢煶澶辫触: {str(e)}"})
                 
             elif command == "stop":
                 if recorder.is_recording:
-                    logger.info("停止后端本地麦克风录音")
+                    logger.info("鍋滄鍚庣鏈湴楹﹀厠椋庡綍闊?)
                     final_text = recorder.stop_recording()
-                    # stop_recording 会触发 on_complete，不需要手动发完成消息
+                    # stop_recording 浼氳Е鍙?on_complete锛屼笉闇€瑕佹墜鍔ㄥ彂瀹屾垚娑堟伅
                 else:
-                    await websocket.send_json({"status": "error", "message": "未在录音状态"})
+                    await websocket.send_json({"status": "error", "message": "鏈湪褰曢煶鐘舵€?})
                     
     except WebSocketDisconnect:
-        logger.info("前端 WebSocket 已断开")
+        logger.info("鍓嶇 WebSocket 宸叉柇寮€")
     except Exception as e:
-        logger.error(f"WebSocket 流程异常: {e}", exc_info=True)
+        logger.error(f"WebSocket 娴佺▼寮傚父: {e}", exc_info=True)
     finally:
         if recorder.is_recording:
             recorder.stop_recording()
         if send_task:
             send_task.cancel()
-        logger.info("后端录音 WebSocket 流程结束")
+        logger.info("鍚庣褰曢煶 WebSocket 娴佺▼缁撴潫")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)

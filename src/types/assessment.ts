@@ -51,3 +51,44 @@ export interface Assessment {
   status: 'pending' | 'completed' | 'reviewed';
   isBaseline?: boolean;
 }
+
+export interface TreatmentPlanVersion {
+  id: string;
+  version: number;
+  content: string;
+  assessmentId: string;
+  patientId: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  tags?: string[];
+  notes?: string;
+  isCurrent: boolean;
+  assessmentData?: AssessmentRecord;
+}
+
+export interface AssessmentRecord {
+  id: string;
+  timestamp: string;
+  patientId: string;
+  assessmentType: 'front' | 'side' | 'back';
+  imageData: string;
+  landmarks: Array<{x: number; y: number}> | number[];
+  angles: Record<string, number>;
+  metrics: Record<string, any>;
+  treatmentPlanId?: string;
+  feedback?: string;
+  improvement?: number;
+}
+
+export interface TimelineRecord {
+  id: string;
+  timestamp: string;
+  type: 'assessment' | 'treatment' | 'followup';
+  data: AssessmentRecord | TreatmentPlanVersion;
+}
+
+export interface TreatmentTimeline {
+  patientId: string;
+  records: TimelineRecord[];
+}

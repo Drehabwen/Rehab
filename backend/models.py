@@ -123,3 +123,26 @@ class PostureReportResponse(BaseModel):
     timestamp: int = Field(default_factory=lambda: int(datetime.now().timestamp() * 1000))
     assessmentType: str = "standard"
     isDeepReport: bool = False  # True for LLM deep report, False for basic report
+
+
+class TreatmentPlanRequest(BaseModel):
+    patientId: str
+    assessmentId: str
+    createdBy: str
+
+
+class TreatmentPlanResponse(BaseModel):
+    id: Optional[int] = None
+    patientId: str
+    assessmentId: str
+    version: int = 1
+    content: str
+    isCurrent: bool = True
+    createdAt: datetime
+    updatedAt: datetime
+    createdBy: str
+
+
+class TreatmentPlanStreamResponse(BaseModel):
+    chunk: str
+    done: bool = False

@@ -1,6 +1,6 @@
-export const ROM_TEXTS = {
+﻿export const ROM_TEXTS = {
   title: '关节活动度评估',
-  description: '评估患者各关节的活动范围',
+  description: '评估患者各关节的活动范围与左右侧差异。',
   joints: {
     cervical: '颈椎',
     shoulder: '肩关节',
@@ -24,8 +24,8 @@ export const ROM_TEXTS = {
     excessive: '活动过度',
   },
   messages: {
-    start: '请开始关节活动',
-    measuring: '正在测量...',
+    start: '准备就绪，点击开始测量',
+    measuring: '正在测量，请保持动作稳定',
     completed: '测量完成',
     save: '保存评估',
   },

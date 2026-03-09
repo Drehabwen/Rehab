@@ -1,102 +1,70 @@
 import React from 'react';
-import { Activity, TrendingUp, RotateCcw, History, Settings2 } from 'lucide-react';
+import { RotateCcw, Settings2, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { VIEW_LABEL_TEXTS, SYSTEM_TEXTS } from '../constants/uiText';
-import { COLORS, SIZES, TRANSITIONS, SHADOWS, BACKDROP } from '@/constants/uiStyles';
 
-export type ActiveTab = 'posture' | 'rom';
 export type ViewType = 'front' | 'side' | 'back';
 
 interface Vision3HeaderProps {
-  activeTab: ActiveTab;
-  setActiveTab: (tab: ActiveTab) => void;
   isEntryMode: boolean;
   setIsEntryMode: (mode: boolean) => void;
   view: ViewType;
   setView: (view: ViewType) => void;
 }
 
+const viewLabels: Record<ViewType, string> = {
+  front: '\u6b63\u9762',
+  side: '\u4fa7\u9762',
+  back: '\u80cc\u9762',
+};
+
 export const Vision3Header: React.FC<Vision3HeaderProps> = ({
-  activeTab,
-  setActiveTab,
   isEntryMode,
   setIsEntryMode,
   view,
-  setView
+  setView,
 }) => {
   return (
-    <div className={`flex items-center justify-between ${COLORS.neutral.light.bgSoft}/40 ${BACKDROP.md} p-3 ${SIZES.radius.pill} border border-white/60 ${SHADOWS.sm}`}>
-      <div className={`flex items-center ${SIZES.gap.lg}`}>
-        {isEntryMode ? (
-          <div className={`flex p-1.5 ${COLORS.neutral.light.bgSoft}/50 rounded-2xl`}>
-            <button 
-              onClick={() => { setActiveTab('posture'); setIsEntryMode(true); }}
-              className={cn(
-                `${SIZES.padding.xl} ${SIZES.radius.md} ${SIZES.font.lg} font-black uppercase tracking-[0.2em] ${TRANSITIONS.medium} flex items-center ${SIZES.gap.md}`,
-                activeTab === 'posture' 
-                  ? `${COLORS.neutral.white} ${COLORS.antey.primaryText} ${SHADOWS.lg} shadow-antey-primary/5 ring-1 ring-slate-200` 
-                  : COLORS.neutral.light.buttonInactive
-              )}
-            >
-              <Activity size={16} className={cn("transition-transform duration-500", activeTab === 'posture' && "scale-110")} />
-              体态评估
-            </button>
-            <button 
-              onClick={() => setActiveTab('rom')}
-              className={cn(
-                `${SIZES.padding.xl} ${SIZES.radius.md} ${SIZES.font.lg} font-black uppercase tracking-[0.2em] ${TRANSITIONS.medium} flex items-center ${SIZES.gap.md}`,
-                activeTab === 'rom' 
-                  ? `${COLORS.neutral.white} ${COLORS.antey.accentText} ${SHADOWS.lg} shadow-antey-accent/5 ring-1 ring-slate-200` 
-                  : COLORS.neutral.light.buttonInactive
-              )}
-            >
-              <TrendingUp size={16} className={cn("transition-transform duration-500", activeTab === 'rom' && "scale-110")} />
-              关节测量
-            </button>
+    <div className="bento-card p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center gap-2">
+        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+          <Camera size={18} />
+        </div>
+        <div>
+          <div className="text-base font-semibold text-slate-900">{'\u4f53\u6001\u5206\u6790'}</div>
+          <div className="text-xs text-slate-500">
+            {isEntryMode ? '\u8bf7\u9009\u62e9\u8bc4\u4f30\u6a21\u5f0f' : '\u6267\u884c\u8bc4\u4f30\u5e76\u67e5\u770b\u7ed3\u679c'}
           </div>
-        ) : (
-          <div className={`flex items-center ${SIZES.gap.md}`}>
-            <button 
-              onClick={() => setIsEntryMode(true)}
-              className={`group flex items-center gap-3 px-6 py-3 ${COLORS.neutral.light.bg} ${COLORS.neutral.light.text} rounded-2xl ${COLORS.neutral.light.border} shadow-sm ${COLORS.neutral.light.hover} transition-all duration-300`}
-            >
-              <RotateCcw size={16} className="text-antey-primary group-hover:rotate-[-45deg] transition-transform" />
-              <span className={`${SIZES.font.lg} font-black uppercase tracking-widest`}>返回中心概览</span>
-            </button>
-            
-            <div className={`w-px h-8 ${COLORS.neutral.light.border.replace('border', 'bg')}`} />
-            
-            <div className={`flex p-1.5 ${COLORS.neutral.light.bgSoft}/50 rounded-2xl`}>
-              {(['front', 'side', 'back'] as const).map((v) => (
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="h-8 px-3 rounded-xl border border-blue-100 bg-blue-50 text-sm font-semibold text-blue-700 flex items-center">
+          Posture AI
+        </div>
+
+        {!isEntryMode ? (
+          <>
+            <div className="flex items-center p-1 rounded-xl border border-slate-300 bg-white">
+              {(Object.keys(viewLabels) as ViewType[]).map((item) => (
                 <button
-                  key={v}
-                  onClick={() => setView(v)}
-                  className={cn(
-                    `${SIZES.padding.lg} ${SIZES.radius.md} ${SIZES.font.md} font-black uppercase tracking-[0.2em] ${TRANSITIONS.slow} flex items-center ${SIZES.gap.sm}`,
-                    view === v 
-                      ? `${COLORS.neutral.white} ${COLORS.antey.primaryText} ${SHADOWS.md} ring-1 ring-slate-200` 
-                      : COLORS.neutral.light.buttonInactive.replace('hover:bg-slate-50', '')
-                  )}
+                  key={item}
+                  onClick={() => setView(item)}
+                  className={cn('h-8 px-3 rounded-lg text-sm', view === item ? 'bg-slate-100 text-slate-900' : 'text-slate-600')}
                 >
-                  <div className={cn(`${SIZES.size.xs} ${SIZES.radius.full}`, view === v ? COLORS.antey.primary : 'bg-slate-300')} />
-                  {VIEW_LABEL_TEXTS[v]}
+                  {viewLabels[item]}
                 </button>
               ))}
             </div>
-          </div>
-        )}
-      </div>
-      
-      <div className={`flex items-center ${SIZES.gap.xxl} px-6`}>
-        <div className={`flex items-center ${SIZES.gap.md} ${SIZES.font.md} font-black ${COLORS.neutral.slateText} uppercase tracking-widest`}>
-          <div className={`${SIZES.size.xs} ${SIZES.radius.full} ${COLORS.success.emerald} animate-pulse`} />
-          {SYSTEM_TEXTS.ready}
-          <span className={`w-px h-4 ${COLORS.neutral.light.border.replace('border', 'bg')} mx-2`} />
-          <History size={14} className="text-slate-300" />
-          {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.')}
-        </div>
-        <button className={`p-2.5 ${COLORS.neutral.light.textLight} ${COLORS.neutral.light.hover} ${COLORS.neutral.light.text} hover:text-antey-primary hover:shadow-sm rounded-xl transition-all duration-300`}>
-          <Settings2 size={18} />
+
+            <button onClick={() => setIsEntryMode(true)} className="btn-secondary">
+              <RotateCcw size={14} />
+              {'\u8fd4\u56de\u6a21\u5f0f\u9009\u62e9'}
+            </button>
+          </>
+        ) : null}
+
+        <button className="btn-icon" aria-label="settings">
+          <Settings2 size={16} />
         </button>
       </div>
     </div>

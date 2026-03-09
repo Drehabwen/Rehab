@@ -51,6 +51,8 @@ export default function Posture() {
   const [showQualityWarning, setShowQualityWarning] = useState(false);
   
   const recordingStartTimeRef = useRef<number>(0);
+  const lastProgressUpdateAtRef = useRef<number>(0);
+  const lastProgressValueRef = useRef<number>(0);
   const [isInPosition, setIsInPosition] = useState(false);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -148,26 +150,30 @@ export default function Posture() {
   }, [captureStatus]);
 
   useEffect(() => {
-    if (wsResult && capturedImage && landmarks) {
+    if (!wsResult || !capturedImage || !landmarks) {
+      return;
+    }
       setResult({
         issues: wsResult.issues,
         metrics: wsResult.metrics,
         image: capturedImage
       });
 
-      setTimeout(() => drawResultCanvas(
-        capturedImage, 
-        landmarks, 
-        wsResult.issues, 
-        wsResult.annotations || []
-      ), 100);
+      const frameId = requestAnimationFrame(() => {
+        drawResultCanvas(
+          capturedImage,
+          landmarks,
+          wsResult.issues,
+          wsResult.annotations || []
+        );
+      });
 
       // 仅在非批量分析模式下重置状态
       if (captureStatus !== 'analyzing' && captureStatus !== 'completed') {
         setCaptureStatus('idle');
         setIsInPosition(false);
       }
-    }
+      return () => cancelAnimationFrame(frameId);
   }, [wsResult, capturedImage, landmarks, drawResultCanvas, captureStatus]);
 
   useEffect(() => {
@@ -287,8 +293,14 @@ export default function Posture() {
         const now = performance.now();
         const elapsed = now - recordingStartTimeRef.current;
         const progress = Math.min((elapsed / 2000) * 100, 100);
-        console.log(`[Posture] Recording progress: ${progress.toFixed(1)}%, frames: ${landmarksBufferRef.current.length}`);
-        setRecordingProgress(progress);
+        const shouldUpdateProgress = now - lastProgressUpdateAtRef.current >= 100 || progress >= 100;
+        if (shouldUpdateProgress) {
+          if (Math.abs(progress - lastProgressValueRef.current) >= 1 || progress >= 100) {
+            setRecordingProgress(progress);
+            lastProgressValueRef.current = progress;
+          }
+          lastProgressUpdateAtRef.current = now;
+        }
 
         if (elapsed >= 2000) {
             console.log(`[Posture] Recording finished. Captured ${landmarksBufferRef.current.length} frames.`);
@@ -326,6 +338,9 @@ export default function Posture() {
             clearInterval(countdownIntervalRef.current!);
             setCaptureStatus('recording');
             recordingStartTimeRef.current = performance.now();
+            lastProgressUpdateAtRef.current = 0;
+            lastProgressValueRef.current = 0;
+            setRecordingProgress(0);
             landmarksBufferRef.current = [];
             return 0;
           }

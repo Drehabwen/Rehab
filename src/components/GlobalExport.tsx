@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Download, FileText, FileCode, FileType, ChevronDown, Loader2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCaseStore } from '@/store/useCaseStore';
+import { CONFIG } from '@/config';
 
 interface ExportOption {
   id: 'pdf' | 'word' | 'html';
@@ -29,8 +30,7 @@ export const GlobalExport: React.FC = () => {
 
     setIsExporting(format);
     try {
-      const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-      const response = await fetch(`${window.location.protocol}//${host}/medvoice/api/export`, {
+      const response = await fetch(CONFIG.medvoice.exportUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

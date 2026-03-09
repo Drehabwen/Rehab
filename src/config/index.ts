@@ -1,64 +1,69 @@
-// 全局配置文件
+const DEFAULT_API_BASE_URL = 'http://localhost:8002';
+const DEFAULT_WS_URL = 'ws://localhost:8002/ws/analyze';
+
+const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
+
+const toWebSocketBaseUrl = (value: string) => {
+  const normalized = trimTrailingSlash(value);
+  if (normalized.startsWith('https://')) return `wss://${normalized.slice('https://'.length)}`;
+  if (normalized.startsWith('http://')) return `ws://${normalized.slice('http://'.length)}`;
+  return normalized;
+};
+
+const apiBaseUrl = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL);
+const websocketUrl = import.meta.env.VITE_WS_URL ?? DEFAULT_WS_URL;
+const medvoiceBaseUrl = trimTrailingSlash(import.meta.env.VITE_MEDVOICE_BASE_URL ?? `${apiBaseUrl}/medvoice`);
+const medvoiceWsBaseUrl = toWebSocketBaseUrl(medvoiceBaseUrl);
+
 export const CONFIG = {
-  // WebSocket 配置
   websocket: {
-    url: 'ws://localhost:8002/ws/analyze',
+    url: websocketUrl,
   },
-  
-  // 视频配置
   video: {
     defaultWidth: 640,
     defaultHeight: 480,
   },
-  
-  // 分析配置
   analysis: {
-    timeout: 120000, // 120秒
+    timeout: 120000,
     confidenceThreshold: 0.5,
   },
-  
-  // 姿态分析阈值
   postureThresholds: {
-    // 头前倾阈值
     headForward: {
       moderate: 0.25,
-      severe: 0.45
+      severe: 0.45,
     },
-    // 圆肩/含胸阈值
     shoulderRounded: {
-      mild: 0.15
+      mild: 0.15,
     },
-    // 头部侧倾阈值
     headTilt: {
       mild: 0.03,
-      moderate: 0.08
+      moderate: 0.08,
     },
-    // 高低肩阈值
     unevenShoulders: {
       mild: 0.03,
-      moderate: 0.08
+      moderate: 0.08,
     },
-    // 骨盆侧倾阈值
     unevenHips: {
       mild: 0.03,
-      moderate: 0.08
+      moderate: 0.08,
     },
-    // 身体中线偏移阈值
     midlineShift: {
-      moderate: 0.08
-    }
+      moderate: 0.08,
+    },
   },
-  
-  // API 配置
   api: {
-    baseUrl: 'http://localhost:8002',
+    baseUrl: apiBaseUrl,
   },
-  
-  // 存储配置
+  medvoice: {
+    baseUrl: medvoiceBaseUrl,
+    structureUrl: `${medvoiceBaseUrl}/api/structure`,
+    exportUrl: `${medvoiceBaseUrl}/api/export`,
+    wsRecordUrl: `${medvoiceWsBaseUrl}/ws/record`,
+  },
   storage: {
     sessionKey: 'rehab_session',
     patientKey: 'rehab_patient',
   },
-};
+} as const;
 
 export default CONFIG;

@@ -50,6 +50,33 @@ def calculate_midpoint(p1: Dict[str, float], p2: Dict[str, float]) -> Dict[str, 
         "y": (p1["y"] + p2["y"]) / 2
     }
 
+def calculate_vector(p1: Dict[str, float], p2: Dict[str, float]) -> Dict[str, float]:
+    """Calculate 2D vector from p1 to p2."""
+    return {
+        "x": p2["x"] - p1["x"],
+        "y": p2["y"] - p1["y"]
+    }
+
+def calculate_distance(p1: Dict[str, float], p2: Dict[str, float]) -> float:
+    """Calculate Euclidean distance between two 2D points."""
+    dx = p2["x"] - p1["x"]
+    dy = p2["y"] - p1["y"]
+    return float(np.sqrt(dx * dx + dy * dy))
+
+def normalize_vector(v: Dict[str, float]) -> Dict[str, float]:
+    """Normalize a 2D vector to unit length."""
+    mag = float(np.sqrt(v["x"] ** 2 + v["y"] ** 2))
+    if mag == 0:
+        return {"x": 0.0, "y": 0.0}
+    return {
+        "x": v["x"] / mag,
+        "y": v["y"] / mag
+    }
+
+def dot_product(v1: Dict[str, float], v2: Dict[str, float]) -> float:
+    """Calculate dot product of two 2D vectors."""
+    return float(v1["x"] * v2["x"] + v1["y"] * v2["y"])
+
 # --- 3D Vector Operations ---
 
 def calculate_vector_3d(a: Dict[str, float], b: Dict[str, float]) -> Dict[str, float]:

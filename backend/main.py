@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+﻿from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 import statistics
 import time
 import uvicorn
@@ -10,7 +11,7 @@ import os
 import sys
 import json
 
-# 加载环境变量
+# 鍔犺浇鐜鍙橀噺
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 if os.path.exists(dotenv_path):
     from dotenv import load_dotenv
@@ -25,13 +26,22 @@ from models import (
     AnalysisRequest, AnalysisResponse, PostureMetrics, 
     JointAnalysisRequest, JointAnalysisResponse,
     TemporalAnalysisRequest, PostureReportResponse,
-    SteppedAnalysisRequest, Landmark
+    SteppedAnalysisRequest, Landmark,
+    TreatmentPlanRequest, TreatmentPlanResponse, TreatmentPlanStreamResponse
 )
 from utils.posture_analysis import analyze_posture
 from utils.joint_analysis import calculate_joint_angle
 from utils.camera_stream import CameraManager
 from utils.llm_reporter import generate_posture_report, posture_agent
 from utils.narrator import process_time_series
+from utils.treatment_plan_service import (
+    generate_treatment_plan,
+    generate_treatment_plan_stream,
+    get_assessment_data,
+    ensure_treatment_plan_config,
+    TreatmentPlanConfigError,
+    AssessmentDataUnavailableError,
+)
 import uuid
 
 app = FastAPI(
@@ -42,6 +52,23 @@ app = FastAPI(
 
 # Initialize Camera Manager
 camera_manager = CameraManager()
+medvoice_integrated = False
+
+DEBUG_LOGS = os.getenv("DEBUG_LOGS", "false").lower() == "true"
+
+
+def debug_print(*args, **kwargs):
+    if DEBUG_LOGS:
+        print(*args, **kwargs)
+
+
+def load_cors_origins() -> List[str]:
+    raw = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    )
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    return origins or ["http://localhost:5173"]
 
 def build_time_series(frames):
     series = []
@@ -121,6 +148,88 @@ def compute_stability(series):
         "velocity": velocity
     }
 
+
+def build_basic_issues(metrics: Optional[Dict[str, float]]) -> List[Dict[str, Any]]:
+    issues: List[Dict[str, Any]] = []
+    if not metrics:
+        return issues
+
+    if metrics.get('shoulderAngle', 0) and abs(metrics['shoulderAngle']) > config.POSTURE_THRESHOLDS['uneven_shoulders']['mild']:
+        issues.append({
+            'id': 'shoulder_imbalance',
+            'type': 'alignment',
+            'severity': 'moderate' if abs(metrics['shoulderAngle']) > config.POSTURE_THRESHOLDS['uneven_shoulders']['moderate'] else 'mild',
+            'title': 'Shoulder Imbalance',
+            'description': f'Shoulder height difference is about {abs(metrics["shoulderAngle"]):.1f} degrees.',
+            'recommendation': 'Maintain neutral posture and avoid one-sided load for long periods.'
+        })
+
+    if metrics.get('headDeviation', 0) and abs(metrics['headDeviation']) > config.POSTURE_THRESHOLDS['midline_shift']['moderate']:
+        issues.append({
+            'id': 'head_deviation',
+            'type': 'alignment',
+            'severity': 'moderate',
+            'title': 'Head Deviation',
+            'description': f'Head shift relative to body midline is about {abs(metrics["headDeviation"]):.1f} cm.',
+            'recommendation': 'Keep your head centered and reduce prolonged side-lean posture.'
+        })
+
+    if metrics.get('headForward', 0) and metrics['headForward'] > config.POSTURE_THRESHOLDS['head_forward']['moderate']:
+        issues.append({
+            'id': 'head_forward',
+            'type': 'forward_head',
+            'severity': 'moderate' if metrics['headForward'] > config.POSTURE_THRESHOLDS['head_forward']['severe'] else 'mild',
+            'title': 'Forward Head',
+            'description': f'Forward head distance is about {metrics["headForward"]:.1f} cm.',
+            'recommendation': 'Adjust monitor height and maintain a neutral head position.'
+        })
+
+    return issues
+
+
+async def build_posture_base_payload(
+    frames: List[Any],
+    provided_auxiliary_diagnosis: Optional[str] = None
+):
+    auxiliary_diagnosis = provided_auxiliary_diagnosis or ""
+    if not frames:
+        return auxiliary_diagnosis or "> Warning: no captured frame data. Please retry capture.", [], None, []
+
+    if not auxiliary_diagnosis:
+        narrations = []
+        for frame in frames:
+            try:
+                res = await run_in_threadpool(
+                    process_time_series,
+                    frame.view,
+                    serialize_landmark_series(frame.timeSeriesLandmarks)
+                )
+                if res.get("narration"):
+                    narrations.append(f"### {frame.view} 瑙嗚鍒嗘瀽\n\n{res['narration']}")
+            except Exception as e:
+                debug_print(f"[ERROR] Failed to process frame {frame.view}: {e}", flush=True)
+
+        auxiliary_diagnosis = "\n\n---\n\n".join(narrations) if narrations else "Basic analysis completed with no obvious abnormal findings."
+
+    time_series: List[Dict[str, Any]] = []
+    try:
+        time_series = await run_in_threadpool(build_time_series, frames)
+        debug_print(f"[DEBUG] Built time series with {len(time_series)} entries", flush=True)
+    except Exception as e:
+        debug_print(f"Error building time series: {e}", flush=True)
+
+    metrics = None
+    if time_series:
+        try:
+            metrics = compute_averages(time_series)
+            debug_print(f"[DEBUG] Computed averages: {metrics}", flush=True)
+        except Exception as e:
+            debug_print(f"Error computing metrics: {e}", flush=True)
+
+    issues = build_basic_issues(metrics)
+    debug_print(f"[DEBUG] Generated {len(issues)} basic issues", flush=True)
+    return auxiliary_diagnosis, time_series, metrics, issues
+
 # --- Video Stream ---
 
 def gen_frames():
@@ -129,6 +238,7 @@ def gen_frames():
         while True:
             frame = camera_manager.get_video_frame()
             if frame is None:
+                time.sleep(0.01)
                 continue
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
@@ -155,7 +265,7 @@ async def stop_camera():
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=load_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -165,32 +275,32 @@ app.add_middleware(
 
 @app.websocket("/ws/analyze")
 async def websocket_endpoint(websocket: WebSocket):
-    print("WebSocket connection attempt...", flush=True)
+    debug_print("WebSocket connection attempt...", flush=True)
     await websocket.accept()
-    print("WebSocket connection established", flush=True)
+    debug_print("WebSocket connection established", flush=True)
     try:
         while True:
             # Add timeout to prevent blocking forever if client is silent
             # But client sends data, so let's just read
             data = await websocket.receive_text()
-            print(f"[DEBUG] Received WebSocket message: {data[:200]}...", flush=True)
-            print(f"Received raw data len: {len(data)}", flush=True)
+            debug_print(f"[DEBUG] Received WebSocket message: {data[:200]}...", flush=True)
+            debug_print(f"Received raw data len: {len(data)}", flush=True)
             
             try:
                 message = json.loads(data)
             except json.JSONDecodeError as e:
-                print(f"JSON Decode Error: {e}", flush=True)
+                debug_print(f"JSON Decode Error: {e}", flush=True)
                 continue
             
             msg_type = message.get("type")
-            print(f"Message type: {msg_type}", flush=True)
+            debug_print(f"Message type: {msg_type}", flush=True)
 
             if msg_type == "POSTURE_SYNC":
-                print("Processing POSTURE_SYNC...", flush=True)
+                debug_print("Processing POSTURE_SYNC...", flush=True)
                 try:
                     # Validate and parse using Pydantic
                     request = AnalysisRequest(**message)
-                    print(f"Pydantic validation success for POSTURE_SYNC", flush=True)
+                    debug_print(f"Pydantic validation success for POSTURE_SYNC", flush=True)
                     
                     # Process time-series data using narrator
                     # Convert Pydantic models to dicts for narrator
@@ -204,23 +314,38 @@ async def websocket_endpoint(websocket: WebSocket):
                     num_frames = len(request.timeSeriesLandmarks)
                     if num_frames > 0:
                         num_lms = len(request.timeSeriesLandmarks[0])
-                        for i in range(num_lms):
-                            avg_x = sum(f[i].x for f in request.timeSeriesLandmarks) / num_frames
-                            avg_y = sum(f[i].y for f in request.timeSeriesLandmarks) / num_frames
-                            avg_z = sum(f[i].z or 0 for f in request.timeSeriesLandmarks) / num_frames
-                            avg_landmarks.append(Landmark(x=avg_x, y=avg_y, z=avg_z))
+                        sum_x = [0.0] * num_lms
+                        sum_y = [0.0] * num_lms
+                        sum_z = [0.0] * num_lms
+
+                        for frame_landmarks in request.timeSeriesLandmarks:
+                            for i, landmark in enumerate(frame_landmarks):
+                                sum_x[i] += landmark.x
+                                sum_y[i] += landmark.y
+                                sum_z[i] += landmark.z or 0.0
+
+                        inv_num_frames = 1.0 / num_frames
+                        avg_landmarks = [
+                            Landmark(
+                                x=sum_x[i] * inv_num_frames,
+                                y=sum_y[i] * inv_num_frames,
+                                z=sum_z[i] * inv_num_frames,
+                            )
+                            for i in range(num_lms)
+                        ]
                     
-                    print(f"Calculated average landmarks for {num_frames} frames", flush=True)
+                    debug_print(f"Calculated average landmarks for {num_frames} frames", flush=True)
 
                     # Perform analysis on averaged landmarks
-                    result = analyze_posture(
+                    result = await run_in_threadpool(
+                        analyze_posture,
                         view=request.view,
                         landmarks=avg_landmarks,
                         width=request.width,
                         height=request.height
                     )
                     # result['metrics'] is a Pydantic model, use model_dump() to get dict
-                    print(f"Analysis complete. Metrics: {result['metrics']}", flush=True)
+                    debug_print(f"Analysis complete. Metrics: {result['metrics']}", flush=True)
                     
                     # Construct response
                     response = AnalysisResponse(
@@ -232,9 +357,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Send back the results
                     resp_json = response.model_dump_json()
                     await websocket.send_text(resp_json)
-                    print(f"Sent POSTURE_SYNC response len: {len(resp_json)}", flush=True)
+                    debug_print(f"Sent POSTURE_SYNC response len: {len(resp_json)}", flush=True)
                 except Exception as e:
-                    print(f"Error processing POSTURE_SYNC: {e}", flush=True)
+                    debug_print(f"Error processing POSTURE_SYNC: {e}", flush=True)
                     import traceback
                     traceback.print_exc()
                 
@@ -268,13 +393,13 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Send back the results
                     await websocket.send_text(response.model_dump_json())
                 except Exception as e:
-                    print(f"Error processing JOINT_ANALYSIS: {e}")
+                    debug_print(f"Error processing JOINT_ANALYSIS: {e}")
             
             elif message.get("type") == "POSTURE_BATCH_ANALYSIS":
                 try:
                     # Validate and parse using Pydantic
                     request = TemporalAnalysisRequest(**message)
-                    print(f"Received batch analysis for view: {request.view}")
+                    debug_print(f"Received batch analysis for view: {request.view}")
                     
                     # Generate Markdown report using LLM
                     markdown_content = await run_in_threadpool(generate_posture_report, request.model_dump())
@@ -288,91 +413,34 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Send back the Markdown report
                     await websocket.send_text(report_response.model_dump_json())
                 except Exception as e:
-                    print(f"Error processing POSTURE_BATCH_ANALYSIS: {e}")
+                    debug_print(f"Error processing POSTURE_BATCH_ANALYSIS: {e}")
 
             elif message.get("type") == "POSTURE_STEPPED_ANALYSIS":
                 try:
-                    print(f"[DEBUG] Received POSTURE_STEPPED_ANALYSIS message", flush=True)
+                    debug_print(f"[DEBUG] Received POSTURE_STEPPED_ANALYSIS message", flush=True)
                     request = SteppedAnalysisRequest(**message)
                     frames = request.frames
                     assessment_type = request.assessmentType or "standard"
-                    print(f"[DEBUG] Number of frames: {len(frames)}, Assessment type: {assessment_type}", flush=True)
+                    debug_print(f"[DEBUG] Number of frames: {len(frames)}, Assessment type: {assessment_type}", flush=True)
                     
                     # Generate auxiliary diagnosis (basic report) without LLM
                     auxiliary_diagnosis = ""
                     if request.mock:
-                        auxiliary_diagnosis = "### [MOCK] 基础评估报告\n\n- **稳定性**: 优秀\n- **体态**: 正常\n\n这是测试用的模拟报告。"
-                        print("Generated MOCK auxiliary diagnosis", flush=True)
+                        auxiliary_diagnosis = "### [MOCK] Basic assessment report\n\n- Stability: Good\n- Posture: Normal\n\nThis is a mock report for testing."
+                        debug_print("Generated MOCK auxiliary diagnosis", flush=True)
                     elif len(frames) == 0:
-                        auxiliary_diagnosis = "> **⚠️ 警告**：未采集到任何视角数据，请重新采集。"
-                        print("[DEBUG] No frames received", flush=True)
+                        auxiliary_diagnosis = "> Warning: no captured frame data. Please retry capture."
+                        debug_print("[DEBUG] No frames received", flush=True)
                     else:
-                        print(f"Received stepped analysis for {len(frames)} views")
-                        print(f"[DEBUG] Frame details: {[f'view={f.view}, landmarks={len(f.timeSeriesLandmarks)}' for f in frames]}", flush=True)
-                        
-                        # Generate basic report from narration (without LLM)
-                        narrations = []
-                        for frame in frames:
-                            try:
-                                res = process_time_series(
-                                    frame.view,
-                                    serialize_landmark_series(frame.timeSeriesLandmarks)
-                                )
-                                if res.get("narration"):
-                                    narrations.append(f"### {frame.view} 视角分析\n\n{res['narration']}")
-                            except Exception as e:
-                                print(f"[ERROR] Failed to process frame {frame.view}: {e}", flush=True)
-                        
-                        auxiliary_diagnosis = "\n\n---\n\n".join(narrations) if narrations else "基础分析完成，暂无异常发现。"
-                        print(f"[DEBUG] Generated auxiliary diagnosis: {len(auxiliary_diagnosis)} chars", flush=True)
-                    
-                    time_series = []
-                    if frames and len(frames) > 0:
-                        try:
-                            time_series = build_time_series(frames)
-                            print(f"[DEBUG] Built time series with {len(time_series)} entries", flush=True)
-                        except Exception as e:
-                            print(f"Error building time series: {e}", flush=True)
-                    
-                    # Calculate basic metrics from time series
-                    metrics = None
-                    issues = []
-                    if time_series and len(time_series) > 0:
-                        try:
-                            metrics = compute_averages(time_series)
-                            print(f"[DEBUG] Computed averages: {metrics}", flush=True)
-                            
-                            # Generate basic issues from metrics
-                            if metrics.get('shoulderAngle', 0) and abs(metrics['shoulderAngle']) > config.POSTURE_THRESHOLDS['uneven_shoulders']['mild']:
-                                issues.append({
-                                    'id': 'shoulder_imbalance',
-                                    'type': 'alignment',
-                                    'severity': 'moderate' if abs(metrics['shoulderAngle']) > config.POSTURE_THRESHOLDS['uneven_shoulders']['moderate'] else 'mild',
-                                    'title': '肩膀不平衡',
-                                    'description': f'左右肩膀高度差异约 {abs(metrics["shoulderAngle"]):.1f}°',
-                                    'recommendation': '注意保持正确坐姿，避免单侧承重'
-                                })
-                            if metrics.get('headDeviation', 0) and abs(metrics['headDeviation']) > config.POSTURE_THRESHOLDS['midline_shift']['moderate']:
-                                issues.append({
-                                    'id': 'head_deviation',
-                                    'type': 'alignment',
-                                    'severity': 'moderate',
-                                    'title': '头部偏移',
-                                    'description': f'头部相对于中线偏移约 {abs(metrics["headDeviation"]):.1f}cm',
-                                    'recommendation': '注意保持头部中立位，避免长时间侧倾'
-                                })
-                            if metrics.get('headForward', 0) and metrics['headForward'] > config.POSTURE_THRESHOLDS['head_forward']['moderate']:
-                                issues.append({
-                                    'id': 'head_forward',
-                                    'type': 'forward_head',
-                                    'severity': 'moderate' if metrics['headForward'] > config.POSTURE_THRESHOLDS['head_forward']['severe'] else 'mild',
-                                    'title': '头前伸',
-                                    'description': f'头部前倾约 {metrics["headForward"]:.1f}cm',
-                                    'recommendation': '注意调整屏幕高度，保持头部中立位'
-                                })
-                            print(f"[DEBUG] Generated {len(issues)} basic issues", flush=True)
-                        except Exception as e:
-                            print(f"Error computing metrics: {e}", flush=True)
+                        debug_print(f"Received stepped analysis for {len(frames)} views")
+                        debug_print(f"[DEBUG] Frame details: {[f'view={f.view}, landmarks={len(f.timeSeriesLandmarks)}' for f in frames]}", flush=True)
+
+                    (
+                        auxiliary_diagnosis,
+                        time_series,
+                        metrics,
+                        issues,
+                    ) = await build_posture_base_payload(frames, auxiliary_diagnosis)
                     
                     markdown_content = auxiliary_diagnosis or ""
 
@@ -386,21 +454,21 @@ async def websocket_endpoint(websocket: WebSocket):
                         assessmentType=assessment_type
                     )
                     
-                    print(f"--- SENDING POSTURE_REPORT ---", flush=True)
-                    print(f"Markdown length: {len(markdown_content)}", flush=True)
-                    print(f"Content snippet: {markdown_content[:100]}...", flush=True)
+                    debug_print(f"--- SENDING POSTURE_REPORT ---", flush=True)
+                    debug_print(f"Markdown length: {len(markdown_content)}", flush=True)
+                    debug_print(f"Content snippet: {markdown_content[:100]}...", flush=True)
                     
                     await websocket.send_text(report_response.model_dump_json())
-                    print("POSTURE_REPORT sent successfully", flush=True)
+                    debug_print("POSTURE_REPORT sent successfully", flush=True)
                 except Exception as e:
-                    print(f"Error processing POSTURE_STEPPED_ANALYSIS: {e}")
+                    debug_print(f"Error processing POSTURE_STEPPED_ANALYSIS: {e}")
                     import traceback
                     traceback.print_exc()
             
             elif msg_type == "POSTURE_DEEP_ANALYSIS":
                 # Handle deep analysis request with streaming LLM output
                 try:
-                    print(f"[POSTURE_DEEP_ANALYSIS] Received deep analysis request", flush=True)
+                    debug_print(f"[POSTURE_DEEP_ANALYSIS] Received deep analysis request", flush=True)
                     request = SteppedAnalysisRequest(
                         type="POSTURE_STEPPED_ANALYSIS",
                         frames=message.get("frames", []),
@@ -413,17 +481,25 @@ async def websocket_endpoint(websocket: WebSocket):
                     if request.requestId:
                         ack_payload["requestId"] = request.requestId
                     await websocket.send_text(json.dumps(ack_payload))
-                    print(f"[POSTURE_DEEP_ANALYSIS] Sent POSTURE_ACK", flush=True)
+                    debug_print(f"[POSTURE_DEEP_ANALYSIS] Sent POSTURE_ACK", flush=True)
                     
                     # Generate LLM deep report (STREAMING MODE)
                     markdown_content = ""
+                    auxiliary_diagnosis = message.get("auxiliaryDiagnosis") or ""
+                    (
+                        auxiliary_diagnosis,
+                        time_series,
+                        metrics,
+                        issues,
+                    ) = await build_posture_base_payload(request.frames, auxiliary_diagnosis)
                     try:
-                        print(f"[POSTURE_DEEP_ANALYSIS] Generating LLM report (streaming)...", flush=True)
-                        print(f"[POSTURE_DEEP_ANALYSIS] Calling generate_final_report_stream...", flush=True)
+                        debug_print(f"[POSTURE_DEEP_ANALYSIS] Generating LLM report (streaming)...", flush=True)
+                        debug_print(f"[POSTURE_DEEP_ANALYSIS] Calling generate_final_report_stream...", flush=True)
 
                         posture_agent.clear()
                         for frame in request.frames:
-                            res = process_time_series(
+                            res = await run_in_threadpool(
+                                process_time_series,
                                 frame.view,
                                 serialize_landmark_series(frame.timeSeriesLandmarks)
                             )
@@ -433,34 +509,34 @@ async def websocket_endpoint(websocket: WebSocket):
                         async for chunk in posture_agent.generate_final_report_stream(request.assessmentType, websocket):
                             markdown_content = chunk  # Keep the last chunk (full content)
                         
-                        print(f"[POSTURE_DEEP_ANALYSIS] Stream completed. Final content: {len(markdown_content)} chars", flush=True)
+                        debug_print(f"[POSTURE_DEEP_ANALYSIS] Stream completed. Final content: {len(markdown_content)} chars", flush=True)
                         
                     except Exception as llm_error:
-                        print(f"[POSTURE_DEEP_ANALYSIS] LLM stream failed: {llm_error}", flush=True)
+                        debug_print(f"[POSTURE_DEEP_ANALYSIS] LLM stream failed: {llm_error}", flush=True)
                         import traceback
                         traceback.print_exc()
-                        markdown_content = f"API 链接失败：{str(llm_error)}"
+                        markdown_content = f"API call failed: {str(llm_error)}"
                     
                     # Send final complete message
                     deep_report = PostureReportResponse(
                         markdown=markdown_content,
                         reportId=str(uuid.uuid4()),
-                        timeSeries=[],
-                        metrics={},
-                        auxiliaryDiagnosis="",
-                        issues=[],
+                        timeSeries=time_series,
+                        metrics=metrics or {},
+                        auxiliaryDiagnosis=auxiliary_diagnosis,
+                        issues=issues,
                         assessmentType=request.assessmentType,
                         isDeepReport=True
                     )
                     await websocket.send_text(deep_report.model_dump_json())
-                    print(f"[POSTURE_DEEP_ANALYSIS] Deep report completion sent", flush=True)
+                    debug_print(f"[POSTURE_DEEP_ANALYSIS] Deep report completion sent", flush=True)
                     
                 except Exception as e:
-                    print(f"[POSTURE_DEEP_ANALYSIS] Error: {e}", flush=True)
+                    debug_print(f"[POSTURE_DEEP_ANALYSIS] Error: {e}", flush=True)
                     import traceback
                     traceback.print_exc()
                     error_response = PostureReportResponse(
-                        markdown=f"生成深度报告失败：{str(e)}",
+                        markdown=f"Failed to generate deep report: {str(e)}",
                         reportId=str(uuid.uuid4()),
                         auxiliaryDiagnosis="",
                         assessmentType=message.get("assessmentType", "quick"),
@@ -469,16 +545,67 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_text(error_response.model_dump_json())
                 
     except WebSocketDisconnect:
-        print("WebSocket disconnected")
+        debug_print("WebSocket disconnected")
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        debug_print(f"WebSocket error: {e}")
         await websocket.close()
 
 # --- HTTP Routes ---
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "services": {
+            "llm_key_configured": bool(os.getenv("DEEPSEEK_API_KEY")),
+            "medvoice_integrated": medvoice_integrated,
+        },
+    }
+
+
+@app.post("/api/treatment-plan/generate")
+async def generate_plan(request: TreatmentPlanRequest) -> TreatmentPlanResponse:
+    """Generate a treatment plan."""
+    try:
+        ensure_treatment_plan_config()
+        assessment_data = await get_assessment_data(request.assessmentId)
+        content = await generate_treatment_plan(assessment_data)
+        return TreatmentPlanResponse(
+            patientId=request.patientId,
+            assessmentId=request.assessmentId,
+            content=content,
+            createdBy=request.createdBy,
+            createdAt=datetime.now(),
+            updatedAt=datetime.now()
+        )
+    except TreatmentPlanConfigError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except AssessmentDataUnavailableError as e:
+        raise HTTPException(status_code=501, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate treatment plan: {str(e)}")
+
+
+@app.post("/api/treatment-plan/generate/stream")
+async def generate_plan_stream(request: TreatmentPlanRequest):
+    """Generate a treatment plan with streaming output."""
+    assessment_data = None
+    try:
+        ensure_treatment_plan_config()
+        assessment_data = await get_assessment_data(request.assessmentId)
+    except TreatmentPlanConfigError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except AssessmentDataUnavailableError as e:
+        raise HTTPException(status_code=501, detail=str(e))
+
+    async def stream_response():
+        try:
+            async for chunk in generate_treatment_plan_stream(assessment_data):
+                yield chunk
+        except Exception as e:
+            yield f"Failed to generate treatment plan: {str(e)}"
+
+    return StreamingResponse(stream_response(), media_type="text/plain")
 
 # Integration with MedVoice AI
 try:
@@ -487,11 +614,13 @@ try:
         sys.path.append(medvoice_path)
         from api_server import app as medvoice_app
         app.mount("/medvoice", medvoice_app)
-        print("MedVoice AI modules integrated at /medvoice")
+        medvoice_integrated = True
+        debug_print("MedVoice AI modules integrated at /medvoice")
 except Exception as e:
-    print(f"MedVoice AI integration failed: {e}")
+    debug_print(f"MedVoice AI integration failed: {e}")
 
 if __name__ == "__main__":
     import uvicorn
     # Use port from config to avoid conflicts with zombie processes on 8000
     uvicorn.run(app, host="0.0.0.0", port=8002)
+

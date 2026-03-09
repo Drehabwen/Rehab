@@ -1,8 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'tertiary' | 'outline' | 'danger' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   icon?: React.ReactNode;
   iconPosition?: 'left' | 'right';
@@ -21,23 +22,24 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    primary: 'bg-gradient-to-r from-antey-primary to-teal-600 text-white hover:shadow-lg hover:shadow-antey-primary/20',
-    secondary: 'bg-white border border-slate-200 text-slate-700 hover:border-antey-primary/30 hover:bg-slate-50',
+    primary: 'bg-antey-primary text-white hover:bg-teal-700',
+    secondary: 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400',
+    tertiary: 'bg-transparent text-slate-700 hover:bg-slate-100',
+    ghost: 'bg-transparent text-slate-700 hover:bg-slate-100',
     outline: 'bg-transparent border border-slate-300 text-slate-700 hover:border-antey-primary hover:text-antey-primary',
-    ghost: 'bg-transparent text-slate-600 hover:bg-slate-100',
-    danger: 'bg-red-500 text-white hover:bg-red-600',
+    danger: 'bg-red-600 text-white hover:bg-red-700',
   };
 
   const sizeStyles = {
-    sm: 'px-3 py-1.5 text-[10px] gap-1.5 rounded-lg',
-    md: 'px-4 py-2 text-xs gap-2 rounded-xl',
-    lg: 'px-6 py-3 text-sm gap-2.5 rounded-2xl',
+    sm: 'h-8 px-3 rounded-lg text-xs gap-1.5',
+    md: 'h-10 px-4 rounded-xl text-sm gap-2',
+    lg: 'h-11 px-5 rounded-xl text-sm gap-2.5',
   };
 
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center font-black uppercase tracking-wider transition-all duration-200',
+        'inline-flex items-center justify-center font-semibold transition-all duration-200',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         variantStyles[variant],
         sizeStyles[size],
@@ -47,7 +49,10 @@ export const Button: React.FC<ButtonProps> = ({
       {...props}
     >
       {loading ? (
-        <span className="animate-spin mr-2">⟳</span>
+        <>
+          <Loader2 size={16} className="animate-spin" />
+          <span>处理中...</span>
+        </>
       ) : (
         <>
           {icon && iconPosition === 'left' && <span className="flex-shrink-0">{icon}</span>}
@@ -60,7 +65,7 @@ export const Button: React.FC<ButtonProps> = ({
 };
 
 interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'primary' | 'ghost';
+  variant?: 'default' | 'primary' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
 }
 
@@ -72,15 +77,16 @@ export const IconButton: React.FC<IconButtonProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    default: 'bg-slate-100 hover:bg-slate-200 text-slate-600',
-    primary: 'bg-antey-primary/10 hover:bg-antey-primary/20 text-antey-primary',
-    ghost: 'bg-transparent hover:bg-slate-100 text-slate-500',
+    default: 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400',
+    primary: 'bg-antey-primary/10 text-antey-primary hover:bg-antey-primary/20',
+    ghost: 'bg-transparent text-slate-500 hover:bg-slate-100',
+    danger: 'bg-red-50 text-red-700 hover:bg-red-100',
   };
 
   const sizeStyles = {
-    sm: 'p-1.5 rounded-lg',
-    md: 'p-2.5 rounded-xl',
-    lg: 'p-3 rounded-2xl',
+    sm: 'h-8 w-8 rounded-lg',
+    md: 'h-10 w-10 rounded-xl',
+    lg: 'h-11 w-11 rounded-xl',
   };
 
   return (

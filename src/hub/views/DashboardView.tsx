@@ -1,9 +1,15 @@
-import React from 'react';
-import { Plus, Users, ClipboardList, Clock } from 'lucide-react';
-import { cn } from '@/lib/utils';
+﻿import React, { useMemo, useState } from 'react';
+import { Plus, Users, ClipboardList, Clock, Search, Calendar, ArrowRight } from 'lucide-react';
 import { StatsCard } from '../components/StatsCard';
 import type { Patient } from '@/types/patient';
 import type { PatientStatus } from '../types';
+import {
+  getPatientDisplayName,
+  getPatientAvatar,
+  getPatientColor,
+  getPatientSubtitle,
+} from '@/lib/patient-utils';
+import { PageTitleSection, StatePanel, UnifiedStatusBadge } from '@/components/layout';
 
 interface DashboardStats {
   pending: number;
@@ -24,20 +30,14 @@ interface DashboardViewProps {
   onNewPatient: () => void;
   onSearchPatient: () => void;
   getPatientLabel: (patient: PatientWithStatus) => string;
+  getPatientSessions: (patientId: string) => unknown[];
 }
 
-const statusLabels: Record<PatientStatus, string> = {
-  pending: '待接诊',
-  assessing: '评估中',
-  report: '待报告',
-  completed: '已完成'
-};
-
-const statusColors: Record<PatientStatus, string> = {
-  pending: 'bg-slate-100 text-slate-600',
-  assessing: 'bg-blue-50 text-blue-600',
-  report: 'bg-amber-50 text-amber-600',
-  completed: 'bg-emerald-50 text-emerald-600'
+const statusMap: Record<PatientStatus, { text: string; tone: 'success' | 'processing' | 'warning' }> = {
+  pending: { text: '待接诊', tone: 'warning' },
+  assessing: { text: '评估中', tone: 'processing' },
+  report: { text: '待报告', tone: 'processing' },
+  completed: { text: '已完成', tone: 'success' },
 };
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -47,137 +47,121 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectPatient,
   onNewPatient,
   onSearchPatient,
-  getPatientLabel
+  getPatientSessions,
 }) => {
+  const [keyword, setKeyword] = useState('');
+
+  const filteredPatients = useMemo(() => {
+    const q = keyword.trim().toLowerCase();
+    if (!q) return patientsWithStatus;
+    return patientsWithStatus.filter((patient) => {
+      const name = (patient.name || '').toLowerCase();
+      return patient.id.toLowerCase().includes(q) || name.includes(q);
+    });
+  }, [keyword, patientsWithStatus]);
+
   return (
-    <div className="h-full p-4 md:p-6 lg:p-8 overflow-y-auto touch-scroll-y custom-scrollbar">
-      <div className="max-w-7xl mx-auto space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-        {/* Header Section */}
-        <section className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6">
-          <div className="space-y-1 md:space-y-2">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none">
-              患者管理
-            </h1>
-            <p className="text-slate-400 font-medium text-sm md:text-lg flex items-center gap-2">
-              <span className="w-6 md:w-8 h-[1px] bg-slate-200" />
-              今日共有 {patients.length} 位患者记录
-            </p>
-          </div>
-          <div className="flex items-center gap-2 md:gap-3 bg-white/50 backdrop-blur-md p-1.5 md:p-2 rounded-2xl border border-white/50 shadow-sm">
-            <div className="px-3 md:px-4 py-1.5 md:py-2 bg-white/80 rounded-xl text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
-              {new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })}
-            </div>
-          </div>
+    <div className="rehab-page custom-scrollbar">
+      <div className="rehab-page-inner">
+        <PageTitleSection
+          title="患者管理"
+          description={`今日 ${new Date().toLocaleDateString('zh-CN')} · 共 ${patients.length} 位患者记录`}
+          right={<span className="status-badge status-disabled">门诊工作台</span>}
+        />
+
+        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatsCard count={stats.pending} label="待接诊" icon={Plus} variant="primary" onClick={onNewPatient} />
+          <StatsCard count={stats.assessing} label="评估中" icon={ClipboardList} variant="blue" />
+          <StatsCard count={stats.report} label="待报告" icon={Clock} variant="amber" />
+          <StatsCard count={stats.completed} label="已完成" icon={Users} variant="emerald" />
         </section>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 touch-scroll-x mobile-scroll pb-2 -mx-2 px-2 md:mx-0 md:px-0 md:pb-0 md:overflow-visible">
-          <StatsCard
-            count={stats.pending}
-            label="待接诊"
-            icon={Plus}
-            variant="primary"
-            onClick={onNewPatient}
-          />
-          <StatsCard
-            count={stats.assessing}
-            label="评估中"
-            icon={ClipboardList}
-            variant="blue"
-          />
-          <StatsCard
-            count={stats.report}
-            label="待报告"
-            icon={Clock}
-            variant="amber"
-          />
-          <StatsCard
-            count={stats.completed}
-            label="已完成"
-            icon={Users}
-            variant="emerald"
-          />
-        </div>
+        <section className="bento-card p-4 flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
+          <label className="relative w-full lg:w-[420px]">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="按姓名或 ID 快速筛选"
+              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-300 bg-white text-sm text-slate-700 outline-none focus:border-antey-primary"
+            />
+          </label>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2 md:gap-4">
-          <button
-            onClick={onNewPatient}
-            className="flex items-center gap-2 md:gap-3 px-4 md:px-6 py-2.5 md:py-3 bg-gradient-to-r from-antey-primary to-teal-600 text-white rounded-2xl shadow-lg shadow-antey-primary/20 hover:shadow-xl hover:shadow-antey-primary/30 transition-all hover:scale-[1.02]"
-          >
-            <Plus size={16} className="md:size-[18px]" />
-            <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider">新建患者</span>
-          </button>
-
-          <button
-            onClick={onSearchPatient}
-            className="flex items-center gap-2 md:gap-3 px-4 md:px-6 py-2.5 md:py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl shadow-sm hover:shadow-lg hover:border-antey-primary/20 transition-all"
-          >
-            <Users size={16} className="text-slate-400 md:size-[18px]" />
-            <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider">查找患者</span>
-          </button>
-        </div>
-
-        {/* Patient List */}
-        {patientsWithStatus.length > 0 ? (
-          <div>
-            <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6">
-              患者列表
-            </h3>
-            <div className="space-y-3 max-h-[50vh] md:max-h-none overflow-y-auto touch-scroll-y custom-scrollbar pr-1">
-              {patientsWithStatus.map(patient => (
-                <div
-                  key={patient.id}
-                  onClick={() => onSelectPatient(patient)}
-                  className="w-full bento-card p-3 md:p-4 lg:p-5 flex flex-row items-center justify-between gap-2 md:gap-3 hover:border-antey-primary/30 transition-all group cursor-pointer"
-                >
-                  <div className="flex items-center gap-3 md:gap-5 min-w-0 flex-1">
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-2xl bg-slate-100 flex items-center justify-center group-hover:bg-antey-primary/10 transition-colors shrink-0">
-                      <Users size={16} className="text-slate-400 group-hover:text-antey-primary transition-colors md:size-[18px]" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 md:gap-3 mb-1 flex-wrap">
-                        <span className="px-2 py-0.5 md:px-2.5 md:py-1 bg-slate-900 text-white rounded-lg text-[9px] md:text-[10px] font-black tracking-wider shrink-0">
-                          {patient.id}
-                        </span>
-                        <span className="text-xs md:text-sm font-black text-slate-900 truncate">
-                          {patient.name || '匿名患者'}
-                        </span>
-                      </div>
-                      <div className="text-[9px] md:text-[10px] font-medium text-slate-400 truncate">
-                        {getPatientLabel(patient)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 md:gap-3 shrink-0">
-                    <span className={cn(
-                      "px-2 md:px-3 py-1 md:py-1.5 rounded-xl text-[8px] md:text-[9px] font-black uppercase tracking-wider whitespace-nowrap",
-                      statusColors[patient.status]
-                    )}>
-                      {statusLabels[patient.status]}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="bento-card p-16 text-center">
-            <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-6">
-              <Users size={32} className="text-slate-300" />
-            </div>
-            <h3 className="text-xl font-black text-slate-900 mb-2">暂无患者记录</h3>
-            <p className="text-slate-400 mb-8">点击"新建患者"开始您的第一个接诊</p>
-            <button
-              onClick={onNewPatient}
-              className="inline-flex items-center gap-2 px-8 py-4 bg-antey-primary text-white rounded-2xl font-black text-sm uppercase tracking-wider hover:bg-teal-600 transition-all"
-            >
-              <Plus size={18} />
+          <div className="flex items-center gap-2">
+            <button onClick={onSearchPatient} className="btn-secondary">
+              <Users size={16} />
+              高级查找
+            </button>
+            <button onClick={onNewPatient} className="btn-primary">
+              <Plus size={16} />
               新建患者
             </button>
           </div>
-        )}
+        </section>
+
+        <section className="bento-card p-0 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 text-xs text-slate-500 grid grid-cols-[1.8fr_1fr_0.8fr_0.9fr_auto] gap-3">
+            <span>患者信息</span>
+            <span>最近更新</span>
+            <span>接诊次数</span>
+            <span>状态</span>
+            <span>操作</span>
+          </div>
+
+          {filteredPatients.length === 0 ? (
+            <div className="p-6">
+              <StatePanel
+                title="暂无可显示的患者"
+                description="可先新建患者，或调整搜索条件。"
+                actions={
+                  <>
+                    <button onClick={onNewPatient} className="btn-primary">新建患者</button>
+                    <button onClick={() => setKeyword('')} className="btn-secondary">清空筛选</button>
+                  </>
+                }
+              />
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-200">
+              {filteredPatients.map((patient) => {
+                const sessionCount = getPatientSessions(patient.id).length;
+                const status = statusMap[patient.status];
+                return (
+                  <button
+                    key={patient.id}
+                    onClick={() => onSelectPatient(patient)}
+                    className="w-full px-4 py-3 hover:bg-slate-50 transition-colors text-left grid grid-cols-[1.8fr_1fr_0.8fr_0.9fr_auto] gap-3 items-center"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-semibold ${getPatientColor(patient)}`}>
+                        {getPatientAvatar(patient)}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900 truncate">{getPatientDisplayName(patient)}</div>
+                        <div className="text-xs text-slate-500 truncate">{getPatientSubtitle(patient, sessionCount)}</div>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-slate-600 inline-flex items-center gap-1">
+                      <Calendar size={12} className="text-slate-400" />
+                      {new Date(patient.updatedAt).toLocaleDateString('zh-CN')}
+                    </div>
+
+                    <div className="text-sm text-slate-700 tabular-nums">{sessionCount}</div>
+
+                    <UnifiedStatusBadge status={status.tone} text={status.text} />
+
+                    <span className="inline-flex items-center justify-end text-xs text-antey-primary font-medium">
+                      进入
+                      <ArrowRight size={12} className="ml-1" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

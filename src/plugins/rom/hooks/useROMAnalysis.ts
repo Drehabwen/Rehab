@@ -21,6 +21,15 @@ export function useROMAnalysis() {
   const [selectedDirection, setSelectedDirection] = useState<MovementDirection>('flexion');
   const [selectedSide, setSelectedSide] = useState<'left' | 'right'>('left');
   
+  const configureAssessment = useCallback(
+    (joint: JointType, direction: MovementDirection, side: 'left' | 'right') => {
+      setSelectedJoint(joint);
+      setSelectedDirection(direction);
+      setSelectedSide(side);
+    },
+    [],
+  );
+  
   const startROMAssessment = useCallback(() => {
     // 清除现有测量
     resetMeasurement();
@@ -58,6 +67,7 @@ export function useROMAnalysis() {
     setSelectedJoint,
     setSelectedDirection,
     setSelectedSide,
+    configureAssessment,
     startROMAssessment,
     stopROMAssessment,
     handleResults,

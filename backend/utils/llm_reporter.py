@@ -16,6 +16,13 @@ from openai import OpenAI
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+DEBUG_LLM_LOGS = os.getenv("DEBUG_LOGS", "false").lower() == "true"
+
+if not DEBUG_LLM_LOGS:
+    def _silent_print(*args, **kwargs):
+        return None
+
+    print = _silent_print  # type: ignore[assignment]
 
 # Initialize Deepseek client (OpenAI compatible)
 client = None

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -17,13 +17,13 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   const variantStyles = {
     default: 'bg-white border border-slate-200',
-    elevated: 'bg-white border-none shadow-lg shadow-slate-200/50',
-    outlined: 'bg-transparent border border-slate-200',
+    elevated: 'bg-white border border-slate-200 shadow-[0_8px_24px_rgba(15,23,42,0.06)]',
+    outlined: 'bg-transparent border border-slate-300',
   };
 
   const paddingStyles = {
     none: '',
-    sm: 'p-3',
+    sm: 'p-4',
     md: 'p-5',
     lg: 'p-6',
   };
@@ -31,10 +31,10 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       className={cn(
-        'rounded-xl transition-all duration-200',
+        'rounded-[20px] transition-all duration-200',
         variantStyles[variant],
         paddingStyles[padding],
-        hover && 'hover:border-antey-primary/30 hover:shadow-lg cursor-pointer',
+        hover && 'hover:border-slate-300 hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)] cursor-pointer',
         className
       )}
       {...props}
@@ -50,7 +50,7 @@ export const CardHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   ...props
 }) => {
   return (
-    <div className={cn('pb-4 border-b border-slate-100 mb-4', className)} {...props}>
+    <div className={cn('pb-4 border-b border-slate-200 mb-4', className)} {...props}>
       {children}
     </div>
   );
@@ -63,7 +63,7 @@ export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement> & { as
   ...props
 }) => {
   return (
-    <Component className={cn('text-lg font-black text-slate-900', className)} {...props}>
+    <Component className={cn('text-xl font-semibold text-slate-900', className)} {...props}>
       {children}
     </Component>
   );
@@ -95,7 +95,7 @@ export const CardFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   ...props
 }) => {
   return (
-    <div className={cn('pt-4 border-t border-slate-100 mt-4', className)} {...props}>
+    <div className={cn('pt-4 border-t border-slate-200 mt-4', className)} {...props}>
       {children}
     </div>
   );

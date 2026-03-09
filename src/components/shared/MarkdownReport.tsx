@@ -1,26 +1,64 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { FileText, Loader2, AlertCircle } from 'lucide-react';
-import { COLORS, SIZES, ANIMATIONS, TRANSITIONS } from '@/constants/uiStyles';
+import { COLORS, SIZES } from '@/constants/uiStyles';
 
 interface MarkdownReportProps {
   content: string | null;
   loading?: boolean;
   className?: string;
   animate?: boolean;
+  showChrome?: boolean;
+  title?: string;
+  subtitle?: string;
+  footerNote?: string;
+  tone?: 'blue' | 'cyan' | 'violet';
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
-export const MarkdownReport: React.FC<MarkdownReportProps> = ({ 
-  content, 
-  loading = false, 
-  className = "",
-  animate = true 
+const toneClassMap = {
+  blue: {
+    iconBg: 'bg-blue-500/10',
+    iconText: 'text-blue-600',
+    strong: 'text-blue-700',
+    quote: 'border-blue-500 bg-blue-50 text-slate-700',
+    dot: 'bg-emerald-500',
+  },
+  cyan: {
+    iconBg: 'bg-cyan-500/10',
+    iconText: 'text-cyan-600',
+    strong: 'text-cyan-700',
+    quote: 'border-cyan-500 bg-cyan-50 text-slate-700',
+    dot: 'bg-cyan-500',
+  },
+  violet: {
+    iconBg: 'bg-violet-500/10',
+    iconText: 'text-violet-600',
+    strong: 'text-violet-700',
+    quote: 'border-violet-500 bg-violet-50 text-slate-700',
+    dot: 'bg-violet-500',
+  },
+} as const;
+
+export const MarkdownReport: React.FC<MarkdownReportProps> = ({
+  content,
+  loading = false,
+  className = '',
+  animate = true,
+  showChrome = true,
+  title = 'AI 康复评估报告',
+  subtitle = '基于当前采集数据生成',
+  footerNote = '报告由 Rehab-AI 生成，仅供临床参考。',
+  tone = 'blue',
+  emptyTitle = '暂无报告内容',
+  emptyDescription = '完成评估后，报告会显示在这里。',
 }) => {
   const [displayedContent, setDisplayedContent] = useState('');
   const normalizedContent = typeof content === 'string' ? content.trim() : '';
-  
-  // Typewriter effect for a more "AI-generating" feel
+  const toneClasses = toneClassMap[tone];
+
   useEffect(() => {
     if (!normalizedContent) {
       setDisplayedContent('');
@@ -32,12 +70,11 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
       return;
     }
 
-    // Simple character-by-character animation
     let currentIdx = 0;
     const interval = setInterval(() => {
       if (currentIdx < normalizedContent.length) {
         setDisplayedContent(normalizedContent.substring(0, currentIdx + 1));
-        currentIdx += 10; // Speed up by adding 10 chars at a time
+        currentIdx += 10;
       } else {
         clearInterval(interval);
       }
@@ -48,79 +85,87 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
 
   if (loading) {
     return (
-      <div className={`flex flex-col items-center justify-center p-12 min-h-[300px] ${COLORS.neutral.light.bg} ${SIZES.radius.xl} ${COLORS.neutral.light.border} ${className}`}>
-        <Loader2 className="w-10 h-10 text-blue-600 animate-spin mb-4" />
-        <p className={`${COLORS.neutral.light.textMuted} font-medium`}>AI 专家正在深度分析视角数据...</p>
-        <p className={`${COLORS.neutral.light.textMuted} text-sm mt-2`}>预计需要 5-10 秒</p>
+      <div className={`flex flex-col items-center justify-center p-10 min-h-[240px] rounded-2xl border border-slate-200 bg-slate-50 ${className}`}>
+        <Loader2 className={`mb-4 h-9 w-9 animate-spin ${toneClasses.iconText}`} />
+        <p className="text-sm font-semibold text-slate-900">{'\u6b63\u5728\u751f\u6210\u62a5\u544a'}</p>
+        <p className="mt-2 text-center text-sm text-slate-500">{'\u7cfb\u7edf\u6b63\u5728\u6574\u7406\u5f53\u524d\u4f53\u6001\u6570\u636e\uff0c\u8bf7\u7a0d\u5019\u3002'}</p>
       </div>
     );
   }
 
   if (!normalizedContent) {
     return (
-      <div className={`flex flex-col items-center justify-center p-12 min-h-[300px] ${COLORS.neutral.light.bg} ${SIZES.radius.xl} ${COLORS.neutral.light.border} border-dashed ${className}`}>
-        <FileText className="w-12 h-12 ${COLORS.neutral.light.textLight} mb-4" />
-        <p className={`${COLORS.neutral.light.textMuted} font-medium`}>完成评估后，报告将在此生成</p>
+      <div className={`flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-10 text-center ${className}`}>
+        <FileText className="mb-4 h-10 w-10 text-slate-300" />
+        <p className="text-sm font-semibold text-slate-900">{emptyTitle}</p>
+        <p className="mt-2 max-w-md text-sm text-slate-500">{emptyDescription}</p>
+      </div>
+    );
+  }
+
+  const contentBody = (
+    <div className="flex-1 overflow-y-auto p-5 lg:p-6 custom-scrollbar">
+      <div className={`max-w-none leading-relaxed ${COLORS.neutral.light.text}`}>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            h1: ({ ...props }) => <h1 className="mb-4 mt-6 border-b border-slate-200 pb-2 text-2xl font-bold first:mt-0" {...props} />,
+            h2: ({ ...props }) => <h2 className="mb-3 mt-6 text-xl font-bold first:mt-0" {...props} />,
+            h3: ({ ...props }) => <h3 className={`mb-2 mt-5 text-lg font-bold first:mt-0 ${toneClasses.strong}`} {...props} />,
+            p: ({ ...props }) => <p className="mb-4 leading-7 text-slate-700" {...props} />,
+            ul: ({ ...props }) => <ul className="mb-4 list-disc space-y-1 pl-5 text-slate-700" {...props} />,
+            ol: ({ ...props }) => <ol className="mb-4 list-decimal space-y-1 pl-5 text-slate-700" {...props} />,
+            li: ({ ...props }) => <li className="leading-7" {...props} />,
+            blockquote: ({ ...props }) => <blockquote className={`my-4 rounded-r-xl border-l-4 px-4 py-3 italic ${toneClasses.quote}`} {...props} />,
+            table: ({ ...props }) => (
+              <div className="my-6 overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full border-collapse text-sm" {...props} />
+              </div>
+            ),
+            th: ({ ...props }) => <th className="border border-slate-200 bg-slate-100 px-4 py-2 text-left font-semibold text-slate-800" {...props} />,
+            td: ({ ...props }) => <td className="border border-slate-200 px-4 py-2 text-slate-700" {...props} />,
+            strong: ({ ...props }) => <strong className={`font-semibold ${toneClasses.strong}`} {...props} />,
+            code: ({ ...props }) => <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm text-slate-800" {...props} />,
+            hr: ({ ...props }) => <hr className="my-8 border-slate-200" {...props} />,
+          }}
+        >
+          {displayedContent}
+        </ReactMarkdown>
+      </div>
+    </div>
+  );
+
+  if (!showChrome) {
+    return (
+      <div className={`flex h-full min-h-[220px] flex-col rounded-2xl border border-slate-200 bg-white ${className}`}>
+        {contentBody}
       </div>
     );
   }
 
   return (
-    <div className={`flex flex-col h-full ${COLORS.neutral.light.bg} ${SIZES.radius.xl} ${COLORS.neutral.light.border} overflow-hidden ${className}`}>
-      {/* Header */}
-      <div className={`flex items-center justify-between px-6 py-4 border-b ${COLORS.neutral.light.borderSoft} ${COLORS.neutral.light.bgSoft} backdrop-blur-md`}>
+    <div className={`flex h-full flex-col overflow-hidden rounded-3xl border ${COLORS.neutral.light.border} ${COLORS.neutral.light.bg} ${className}`}>
+      <div className={`flex items-center justify-between border-b ${COLORS.neutral.light.borderSoft} ${COLORS.neutral.light.bgSoft} px-6 py-4`}>
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/10 rounded-lg">
-            <FileText className="w-5 h-5 text-blue-600" />
+          <div className={`rounded-lg p-2 ${toneClasses.iconBg}`}>
+            <FileText className={`h-5 w-5 ${toneClasses.iconText}`} />
           </div>
           <div>
-            <h3 className={`${COLORS.neutral.light.text} font-semibold`}>AI 康复评估报告</h3>
-            <p className="text-xs text-slate-500">基于多视角生物力学分析</p>
+            <h3 className={`font-semibold ${COLORS.neutral.light.text}`}>{title}</h3>
+            <p className="text-xs text-slate-500">{subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="flex h-2 w-2 rounded-full bg-green-500" />
-          <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Analysis Ready</span>
+          <span className={`h-2 w-2 rounded-full ${toneClasses.dot}`} />
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${COLORS.neutral.light.textMuted}`}>Report Ready</span>
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-slate-300">
-        <div className={`max-w-none ${COLORS.neutral.light.text} leading-relaxed`}>
-          <ReactMarkdown 
-            remarkPlugins={[remarkGfm]}
-            components={{
-              h1: ({...props}) => <h1 className="text-2xl font-bold mt-8 mb-4 border-b border-slate-200 pb-2" {...props} />,
-              h2: ({...props}) => <h2 className="text-xl font-bold mt-6 mb-3" {...props} />,
-              h3: ({...props}) => <h3 className="text-lg font-bold mt-5 mb-2 text-blue-700" {...props} />,
-              p: ({...props}) => <p className="mb-4 leading-relaxed" {...props} />,
-              ul: ({...props}) => <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />,
-              ol: ({...props}) => <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />,
-              li: ({...props}) => <li {...props} />,
-              blockquote: ({...props}) => (
-                <blockquote className="border-l-4 border-blue-500 bg-blue-50 py-3 px-4 rounded-r-lg italic my-4 text-slate-700" {...props} />
-              ),
-              table: ({...props}) => (
-                <div className="overflow-x-auto my-6">
-                  <table className="w-full border-collapse text-sm" {...props} />
-                </div>
-              ),
-              th: ({...props}) => <th className="bg-slate-100 px-4 py-2 text-left border border-slate-200 font-bold" {...props} />,
-              td: ({...props}) => <td className="px-4 py-2 border border-slate-200" {...props} />,
-              strong: ({...props}) => <strong className="text-blue-700 font-semibold" {...props} />,
-              code: ({...props}) => <code className="text-blue-800 bg-slate-100 px-1.5 py-0.5 rounded font-mono text-sm" {...props} />,
-              hr: ({...props}) => <hr className="my-8 border-slate-200" {...props} />,
-            }}
-          >
-            {displayedContent}
-          </ReactMarkdown>
-        </div>
-      </div>
+      {contentBody}
 
-      {/* Footer */}
-      <div className={`px-6 py-3 ${COLORS.neutral.light.bgSoft} border-t ${COLORS.neutral.light.borderSoft} flex items-center gap-2 text-[11px] text-slate-500 italic`}>
-        <AlertCircle className="w-3 h-3" />
-        报告由 Rehab-AI 生成，结果仅供参考，不作为最终医疗诊断。
+      <div className={`flex items-center gap-2 border-t ${COLORS.neutral.light.borderSoft} ${COLORS.neutral.light.bgSoft} px-6 py-3 text-[11px] italic text-slate-500`}>
+        <AlertCircle className="h-3 w-3" />
+        {footerNote}
       </div>
     </div>
   );

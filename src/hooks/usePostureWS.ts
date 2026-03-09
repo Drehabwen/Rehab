@@ -25,6 +25,9 @@ export interface SteppedFrame {
   timestamp: number;
 }
 
+const MAX_PENDING_MESSAGES = 20;
+const STREAM_FLUSH_INTERVAL_MS = 80;
+
 export function usePostureWS(url: string = CONFIG.websocket.url) {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
@@ -40,10 +43,13 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   const [analysisAckAt, setAnalysisAckAt] = useState<number | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   // 存储最后一次分析的原始帧数据，用于深度分析请求
-  const [rawFramesData, setRawFramesData] = useState<SteppedFrame[]>([]);
+  const rawFramesDataRef = useRef<SteppedFrame[]>([]);
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<NodeJS.Timeout>();
   const pendingMessages = useRef<string[]>([]);
+  const shouldReconnectRef = useRef<boolean>(true);
+  const streamingBufferRef = useRef<string>('');
+  const streamingFlushTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const savePostureReport = useMeasurementStore(state => state.savePostureReport);
   const savePostureReportRef = useRef(savePostureReport);
   const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
@@ -60,6 +66,35 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   useEffect(() => {
     savePostureReportRef.current = savePostureReport;
   }, [savePostureReport]);
+
+  const clearStreamingBuffer = useCallback(() => {
+    streamingBufferRef.current = '';
+    if (streamingFlushTimeoutRef.current) {
+      clearTimeout(streamingFlushTimeoutRef.current);
+      streamingFlushTimeoutRef.current = null;
+    }
+  }, []);
+
+  const flushStreamingBuffer = useCallback(() => {
+    if (!streamingBufferRef.current) {
+      return;
+    }
+
+    const chunk = streamingBufferRef.current;
+    streamingBufferRef.current = '';
+    setStreamingReport(prev => prev + chunk);
+  }, []);
+
+  const scheduleStreamingFlush = useCallback(() => {
+    if (streamingFlushTimeoutRef.current) {
+      return;
+    }
+
+    streamingFlushTimeoutRef.current = setTimeout(() => {
+      streamingFlushTimeoutRef.current = null;
+      flushStreamingBuffer();
+    }, STREAM_FLUSH_INTERVAL_MS);
+  }, [flushStreamingBuffer]);
 
   const flushPending = useCallback(() => {
     console.log('[usePostureWS] Flushing pending messages, count:', pendingMessages.current.length);
@@ -79,11 +114,15 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       return;
     }
     console.log('[usePostureWS] WebSocket not ready, adding to pending queue:', payload.type);
+    if (pendingMessages.current.length >= MAX_PENDING_MESSAGES) {
+      pendingMessages.current.shift();
+    }
     pendingMessages.current.push(message);
   }, []);
 
   const connect = useCallback(() => {
     try {
+      shouldReconnectRef.current = true;
       setStatus('connecting');
       console.log('[usePostureWS] Connecting to WebSocket:', url);
       const socket = new WebSocket(url);
@@ -130,6 +169,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             }
             
             // 清除流式状态
+            clearStreamingBuffer();
             setIsStreamingReport(false);
             setStreamingReport('');
             const timeSeries = Array.isArray(data.timeSeries) ? data.timeSeries : lastBatchTimeSeriesRef.current;
@@ -177,8 +217,9 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             console.log('[usePostureWS] Received DEEP_REPORT_STREAM chunk');
             const content = typeof data.content === 'string' ? data.content : '';
             if (content) {
-              setStreamingReport(prev => prev + content);
               setIsStreamingReport(true);
+              streamingBufferRef.current += content;
+              scheduleStreamingFlush();
             }
           }
         } catch (e) {
@@ -190,8 +231,10 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       const handleClose = () => {
         console.log('Posture WebSocket Disconnected');
         setStatus('disconnected');
-        // Auto reconnect
-        reconnectTimeout.current = setTimeout(connect, 3000);
+        if (shouldReconnectRef.current) {
+          // Auto reconnect
+          reconnectTimeout.current = setTimeout(connect, 3000);
+        }
       };
 
       const handleError = (error: Event) => {
@@ -214,21 +257,28 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       console.error('Connection error:', e);
       setStatus('error');
     }
-  }, [url, flushPending]); // Removed savePostureReport from dependencies as it's a stable store method
+  }, [url, flushPending, clearStreamingBuffer, scheduleStreamingFlush]); // Removed savePostureReport from dependencies as it's a stable store method
 
   useEffect(() => {
     console.log('[usePostureWS] Initializing WebSocket connection');
     connect();
     return () => {
       console.log('[usePostureWS] Cleaning up WebSocket connection');
+      shouldReconnectRef.current = false;
+      clearStreamingBuffer();
       if (ws.current) ws.current.close();
       if (reconnectTimeout.current) clearTimeout(reconnectTimeout.current);
     };
-  }, [connect]);
+  }, [connect, clearStreamingBuffer]);
 
   const analyze = useCallback((view: 'front' | 'side' | 'back', timeSeriesLandmarks: Landmark[][], width: number, height: number) => {
     console.log('[usePostureWS] analyze called:', { view, landmarksCount: timeSeriesLandmarks.length, width, height });
+    clearStreamingBuffer();
     setMarkdownReport(null);
+    setAuxiliaryDiagnosis(null);
+    setTimeSeriesData(null);
+    setIsStreamingReport(false);
+    setStreamingReport('');
     setResult(null);
     currentViewRef.current = view;
     // 保存分析数据用于后续深度分析请求
@@ -242,7 +292,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     };
     console.log('[usePostureWS] Sending POSTURE_SYNC message');
     sendMessage(message);
-  }, [sendMessage]);
+  }, [sendMessage, clearStreamingBuffer]);
 
   const analyzeJoint = useCallback((
     measurements: { id: string; jointType: string; direction: string; side?: string }[],
@@ -264,6 +314,10 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   const analyzeBatch = useCallback((analysis: TemporalAnalysis & { timeSeriesLandmarks?: Landmark[][] }) => {
     console.log('[usePostureWS] analyzeBatch called:', { view: analysis.view, landmarksCount: analysis.timeSeriesLandmarks?.length || 0 });
     setMarkdownReport(null);
+    setAuxiliaryDiagnosis(null);
+    setTimeSeriesData(null);
+    setIsStreamingReport(false);
+    setStreamingReport('');
     setResult(null);
     currentViewRef.current = analysis.view;
     lastBatchTimeSeriesRef.current = analysis.timeSeries;
@@ -295,12 +349,16 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       height: f.height,
       timestamp: f.timestamp
     }));
-    setRawFramesData(framesData);
+    rawFramesDataRef.current = framesData;
     console.log('[usePostureWS] Stored raw frames data for deep analysis:', framesData.length, 'frames');
     
     // 清除之前的报告状态
     setResult(null);
+    setMarkdownReport(null);
     setAuxiliaryDiagnosis(null);
+    setTimeSeriesData(null);
+    setIsStreamingReport(false);
+    setStreamingReport('');
     
     if (frames.length === 0) {
       console.error('[usePostureWS] ERROR: No frames to analyze!');
@@ -344,6 +402,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
 
   // 新增：请求深度报告
   const requestDeepAnalysis = useCallback(() => {
+    const rawFramesData = rawFramesDataRef.current;
     if (!rawFramesData || rawFramesData.length === 0) {
       console.error('[usePostureWS] requestDeepAnalysis: No frames data available');
       return;
@@ -355,6 +414,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     });
     
     // 清除之前的深度报告状态，准备接收新的流式报告
+    clearStreamingBuffer();
     setMarkdownReport(null);
     setIsStreamingReport(true);
     setStreamingReport('');
@@ -369,7 +429,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     };
     console.log('[usePostureWS] Sending POSTURE_DEEP_ANALYSIS message');
     sendMessage(message);
-  }, [sendMessage, rawFramesData, auxiliaryDiagnosis]);
+  }, [sendMessage, auxiliaryDiagnosis, clearStreamingBuffer]);
 
   return {
     result,
@@ -388,6 +448,11 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     analysisAckAt,
     connect,
     disconnect: () => {
+      shouldReconnectRef.current = false;
+      clearStreamingBuffer();
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+      }
       ws.current?.close();
       setStatus('disconnected');
     }

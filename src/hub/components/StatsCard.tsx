@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -15,61 +15,29 @@ export const StatsCard: React.FC<StatsCardProps> = ({
   label,
   icon: Icon,
   variant = 'primary',
-  onClick
+  onClick,
 }) => {
   const variants = {
-    primary: {
-      bg: 'bg-antey-primary/10',
-      hoverBg: 'group-hover:bg-antey-primary',
-      text: 'text-antey-primary',
-      hoverText: 'group-hover:text-white',
-      gradient: 'from-antey-primary/5 to-transparent'
-    },
-    blue: {
-      bg: 'bg-blue-50',
-      hoverBg: '',
-      text: 'text-blue-500',
-      hoverText: '',
-      gradient: ''
-    },
-    amber: {
-      bg: 'bg-amber-50',
-      hoverBg: '',
-      text: 'text-amber-500',
-      hoverText: '',
-      gradient: ''
-    },
-    emerald: {
-      bg: 'bg-emerald-50',
-      hoverBg: '',
-      text: 'text-emerald-500',
-      hoverText: '',
-      gradient: ''
-    }
+    primary: 'bg-teal-50 text-teal-700',
+    blue: 'bg-blue-50 text-blue-700',
+    amber: 'bg-amber-50 text-amber-700',
+    emerald: 'bg-emerald-50 text-emerald-700',
   };
-
-  const v = variants[variant];
 
   return (
     <div
       onClick={onClick}
       className={cn(
-        "bento-card p-4 md:p-6 flex items-center justify-between min-w-[140px] md:min-w-0",
-        onClick && "cursor-pointer hover:border-antey-primary/30 transition-all",
-        v.gradient && `bg-gradient-to-br ${v.gradient}`
+        'bento-card p-4 flex items-center justify-between min-h-[84px]',
+        onClick ? 'cursor-pointer hover:border-slate-300' : ''
       )}
     >
       <div>
-        <div className="text-2xl md:text-3xl font-black text-slate-900">{count}</div>
-        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{label}</div>
+        <div className="text-[30px] font-semibold text-slate-900 leading-none tabular-nums">{count}</div>
+        <div className="text-xs text-slate-500 mt-1.5">{label}</div>
       </div>
-      <div className={cn(
-        "w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center transition-all",
-        v.bg,
-        onClick && "group-hover:scale-110",
-        v.hoverBg
-      )}>
-        <Icon size={18} className={cn(v.text, v.hoverText, "md:size-[20px]")} />
+      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', variants[variant])}>
+        <Icon size={16} />
       </div>
     </div>
   );

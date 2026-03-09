@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+﻿import { useState, useRef, useCallback, useEffect } from 'react';
+import { CONFIG } from '@/config';
 
 interface UseVoiceRecorderProps {
   onTranscriptUpdate: (text: string) => void;
@@ -18,28 +19,26 @@ export const useVoiceRecorder = ({
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 同步 ref
+  // 鍚屾 ref
   useEffect(() => {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
 
-  // 初始化 WebSocket 连接（后端主导模式）
+  // 鍒濆鍖?WebSocket 杩炴帴锛堝悗绔富瀵兼ā寮忥級
   const connectWS = useCallback(() => {
-    // 如果已有连接且状态正常，直接返回
+    // 濡傛灉宸叉湁杩炴帴涓旂姸鎬佹甯革紝鐩存帴杩斿洖
     if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return wsRef.current;
     }
 
-    // 如果已有连接但已关闭，先清理
+    // 濡傛灉宸叉湁杩炴帴浣嗗凡鍏抽棴锛屽厛娓呯悊
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname === 'localhost' ? 'localhost:8000' : window.location.host;
-    // 使用后端主导的录音接口
-    const ws = new WebSocket(`${protocol}//${host}/medvoice/ws/record`);
+    // Use backend-driven recording endpoint
+    const ws = new WebSocket(CONFIG.medvoice.wsRecordUrl);
     
     ws.onopen = () => {
       console.log('Backend-driven WebSocket connected');
@@ -65,7 +64,7 @@ export const useVoiceRecorder = ({
           onWaveformUpdate(data.power || 0);
         } else if (data.status === 'error') {
           console.error('ASR Error:', data.message);
-          alert(`录音错误: ${data.message}`);
+          alert(`褰曢煶閿欒: ${data.message}`);
           setIsRecording(false);
         }
       } catch (err) {
@@ -91,9 +90,9 @@ export const useVoiceRecorder = ({
   const startRecording = async () => {
     const ws = connectWS();
     let retryCount = 0;
-    const maxRetries = 50; // 5秒超时
+    const maxRetries = 50; // 5绉掕秴鏃?
     
-    // 等待连接建立后发送指令
+    // 绛夊緟杩炴帴寤虹珛鍚庡彂閫佹寚浠?
     const sendStart = () => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ command: 'start' }));
@@ -117,7 +116,7 @@ export const useVoiceRecorder = ({
     setIsRecording(false);
   }, []);
 
-  // 组件卸载时清理资源
+  // 缁勪欢鍗歌浇鏃舵竻鐞嗚祫婧?
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);

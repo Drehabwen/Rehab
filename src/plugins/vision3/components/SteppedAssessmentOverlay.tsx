@@ -129,7 +129,13 @@ export const SteppedAssessmentOverlay: React.FC<SteppedAssessmentOverlayProps> =
         {/* 3. 实时检测提示 或 拍摄预览 */}
         {captureStatus === 'recording' ? (
           <div className="w-80 space-y-4 animate-in fade-in zoom-in-95 duration-500">
-            <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden border border-white/10">
+            <div
+              className="h-2 w-full bg-white/10 rounded-full overflow-hidden border border-white/10"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(recordingProgress)}
+            >
               <div 
                 className={`h-full ${COLORS.success.emerald} transition-all duration-100 ease-linear ${COLORS.success.emeraldShadow}`}
                 style={{ width: `${recordingProgress}%` }}
