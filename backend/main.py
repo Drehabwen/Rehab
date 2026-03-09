@@ -27,7 +27,9 @@ from models import (
     JointAnalysisRequest, JointAnalysisResponse,
     TemporalAnalysisRequest, PostureReportResponse,
     SteppedAnalysisRequest, Landmark,
-    TreatmentPlanRequest, TreatmentPlanResponse, TreatmentPlanStreamResponse
+    TreatmentPlanRequest, TreatmentPlanResponse, TreatmentPlanStreamResponse,
+    SessionTreatmentPlanRequest,
+    SessionReportRequest, SessionReportResponse,
 )
 from utils.posture_analysis import analyze_posture
 from utils.joint_analysis import calculate_joint_angle
@@ -36,12 +38,15 @@ from utils.llm_reporter import generate_posture_report, posture_agent
 from utils.narrator import process_time_series
 from utils.treatment_plan_service import (
     generate_treatment_plan,
+    generate_treatment_plan_from_session_report,
     generate_treatment_plan_stream,
+    generate_treatment_plan_stream_from_session_report,
     get_assessment_data,
     ensure_treatment_plan_config,
     TreatmentPlanConfigError,
     AssessmentDataUnavailableError,
 )
+from utils.session_reporter import generate_session_report
 import uuid
 
 app = FastAPI(
@@ -448,9 +453,9 @@ async def websocket_endpoint(websocket: WebSocket):
                         markdown=markdown_content,
                         reportId=str(uuid.uuid4()),
                         timeSeries=time_series,
-                        metrics=metrics,
+                        metrics=metrics or {},
                         auxiliaryDiagnosis=auxiliary_diagnosis,
-                        issues=issues if issues else None,
+                        issues=issues or [],
                         assessmentType=assessment_type
                     )
                     
@@ -606,6 +611,54 @@ async def generate_plan_stream(request: TreatmentPlanRequest):
             yield f"Failed to generate treatment plan: {str(e)}"
 
     return StreamingResponse(stream_response(), media_type="text/plain")
+
+
+@app.post("/api/treatment-plan/generate-from-session-report")
+async def generate_plan_from_session_report(request: SessionTreatmentPlanRequest) -> TreatmentPlanResponse:
+    """Generate a treatment plan from a session-level comprehensive report."""
+    try:
+        ensure_treatment_plan_config()
+        content = await generate_treatment_plan_from_session_report(request.model_dump())
+        return TreatmentPlanResponse(
+            patientId=request.patientId,
+            sessionId=request.sessionId,
+            sessionReportId=request.sessionReportId,
+            content=content,
+            createdBy=request.createdBy,
+            createdAt=datetime.now(),
+            updatedAt=datetime.now(),
+        )
+    except TreatmentPlanConfigError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate treatment plan from session report: {str(e)}")
+
+
+@app.post("/api/treatment-plan/generate-from-session-report/stream")
+async def generate_plan_stream_from_session_report(request: SessionTreatmentPlanRequest):
+    """Generate a treatment plan from a session-level comprehensive report with streaming output."""
+    try:
+        ensure_treatment_plan_config()
+    except TreatmentPlanConfigError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    async def stream_response():
+        try:
+            async for chunk in generate_treatment_plan_stream_from_session_report(request.model_dump()):
+                yield chunk
+        except Exception as e:
+            yield f"Failed to generate treatment plan from session report: {str(e)}"
+
+    return StreamingResponse(stream_response(), media_type="text/plain")
+
+
+@app.post("/api/session-report/generate")
+async def generate_session_level_report(request: SessionReportRequest) -> SessionReportResponse:
+    """Generate a session-level comprehensive report from posture / ROM / voice inputs."""
+    try:
+        return await run_in_threadpool(generate_session_report, request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate session report: {str(e)}")
 
 # Integration with MedVoice AI
 try:

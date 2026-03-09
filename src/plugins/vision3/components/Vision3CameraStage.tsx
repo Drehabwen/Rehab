@@ -124,7 +124,10 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
         showSkeleton={isCameraOn}
         annotations={annotations}
         headAxes={showHeadAxes ? headAxes : null}
-        className="w-full h-full object-cover transition-opacity duration-1000"
+        className={cn(
+          'w-full h-full object-cover',
+          compact ? 'transition-none' : 'transition-opacity duration-700'
+        )}
       />
 
       {/* Phase 4: 评估交互层 */}
@@ -166,7 +169,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       </button>
       
       {/* AI Scanning Effect */}
-      {isCameraOn && (
+      {isCameraOn && !compact && captureStatus !== 'completed' && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-antey-primary to-transparent opacity-80 animate-scan shadow-[0_0_20px_rgba(13,148,136,0.8)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(13,148,136,0.1)_0%,transparent_70%)] animate-pulse-subtle" />
@@ -183,7 +186,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       <div className={cn(`absolute flex items-center ${SIZES.gap.lg}`, compact ? 'top-4 left-4' : 'top-10 left-10')}>
         <div className={cn(
           `${SIZES.radius.lg} bg-black/60 border ${COLORS.neutral.whiteBorder} flex items-center ${SIZES.gap.lg} ${SHADOWS.lg}`,
-          compact ? 'px-4 py-2.5' : SIZES.padding.lg
+          compact ? 'px-3 py-2' : SIZES.padding.lg
         )}>
           <div className="relative">
             <div className={cn(`${SIZES.size.sm} ${SIZES.radius.full}`, isCameraOn ? `${COLORS.success.emeraldLight} shadow-[0_0_12px_rgba(52,211,153,0.8)]` : "bg-rose-500")} />
@@ -194,7 +197,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
               Engine Status
             </span>
             <span className={`${compact ? 'text-[10px]' : SIZES.font.lg} font-black text-white uppercase tracking-[0.2em] leading-none`}>
-              {activeTab === 'posture' ? 'Posture AI Core' : 'Joint ROM Engine'} v3.2
+              {activeTab === 'posture' ? (compact ? 'Posture Core' : 'Posture AI Core') : 'Joint ROM Engine'} v3.2
             </span>
           </div>
           {simulateMockCapture && (

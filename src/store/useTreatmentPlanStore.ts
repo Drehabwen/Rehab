@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import { TreatmentPlanApi } from '../api';
-import type { TreatmentPlanVersion, AssessmentRecord } from '../types/assessment';
+import { TreatmentPlanApi } from '../api/treatmentPlanApi';
+import type { SessionTreatmentPlanRequest } from '../api/treatmentPlanApi';
+import type { AssessmentRecord, TreatmentPlanVersion } from '../types/assessment';
 import { TreatmentPlanStorage } from '../utils/treatmentPlanStorage';
 import { AssessmentRecordStorage } from '../utils/assessmentRecordStorage';
 import { APP_CONFIG } from '../config/appConfig';
 
 interface TreatmentPlanState {
-  // 状态
   currentContent: string;
   isGenerating: boolean;
   error: string | null;
@@ -15,38 +15,48 @@ interface TreatmentPlanState {
   comparingVersions: [string | null, string | null];
   assessmentRecords: AssessmentRecord[];
   linkedAssessmentId: string | null;
-  
-  // 操作
+  linkedSessionId: string | null;
+  linkedSessionReportId: string | null;
   generatePlan: (assessmentId: string, patientId: string) => Promise<void>;
+  generatePlanFromSessionReport: (payload: SessionTreatmentPlanRequest) => Promise<void>;
   clearContent: () => void;
   setError: (error: string | null) => void;
-  
-  // 版本管理
   saveVersion: (content: string, assessmentId: string, patientId: string) => void;
+  saveSessionReportVersion: (content: string, payload: SessionTreatmentPlanRequest) => void;
   switchVersion: (versionId: string) => void;
   deleteVersion: (versionId: string) => void;
   updateVersionTags: (versionId: string, tags: string[]) => void;
   updateVersionNotes: (versionId: string, notes: string) => void;
-  
-  // 版本对比
-  startCompare: (versionId1: string, versionId2: string) => void;
+  startCompare: (versionId1: string | null, versionId2: string | null) => void;
   endCompare: () => void;
-  
-  // 评估关联
   linkAssessment: (planId: string, assessmentId: string) => void;
   loadAssessmentRecords: (patientId: string) => void;
   setLinkedAssessment: (assessmentId: string | null) => void;
+  setLinkedSessionReport: (sessionId: string | null, sessionReportId: string | null) => void;
   setCurrentVersion: (versionId: string) => void;
+}
+
+function buildVersionBase(versionCount: number, content: string, patientId: string): TreatmentPlanVersion {
+  const now = new Date().toISOString();
+  return {
+    id: `version_${Date.now()}_${versionCount + 1}`,
+    version: versionCount + 1,
+    content,
+    patientId,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: 'system',
+    isCurrent: true,
+  };
 }
 
 export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
   const savedVersions = TreatmentPlanStorage.loadVersions();
-  const currentVersion = savedVersions.find(v => v.isCurrent);
+  const currentVersion = savedVersions.find((version) => version.isCurrent);
   const patientId = APP_CONFIG.CURRENT_PATIENT_ID;
   const savedAssessmentRecords = AssessmentRecordStorage.loadRecords(patientId);
-  
+
   return {
-    // 初始状态
     currentContent: currentVersion?.content || '',
     isGenerating: false,
     error: null,
@@ -55,230 +65,262 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
     comparingVersions: [null, null],
     assessmentRecords: savedAssessmentRecords,
     linkedAssessmentId: currentVersion?.assessmentId || null,
-  
-  // 生成治疗计划
-  generatePlan: async (assessmentId, patientId) => {
-    set({ isGenerating: true, error: null, currentContent: '' });
-    
-    try {
-      let fullContent = '';
-      
-      await TreatmentPlanApi.generateStream(
-        assessmentId,
-        patientId,
-        (chunk) => {
-          // 直接追加内容，不重新渲染整个组件
+    linkedSessionId: currentVersion?.sessionId || null,
+    linkedSessionReportId: currentVersion?.sessionReportId || null,
+
+    generatePlan: async (assessmentId, patientId) => {
+      set({
+        isGenerating: true,
+        error: null,
+        currentContent: '',
+        linkedAssessmentId: assessmentId,
+        linkedSessionId: null,
+        linkedSessionReportId: null,
+      });
+
+      try {
+        let fullContent = '';
+        await TreatmentPlanApi.generateStream(assessmentId, patientId, (chunk) => {
           fullContent += chunk;
-          set((state) => ({ 
-            currentContent: state.currentContent + chunk 
+          set((state) => ({
+            currentContent: state.currentContent + chunk,
           }));
-        }
-      );
-      
-      // 生成完成后自动保存版本
+        });
+
+        set((state) => {
+          const nextVersion: TreatmentPlanVersion = {
+            ...buildVersionBase(state.versions.length, fullContent, patientId),
+            assessmentId,
+            sourceType: 'assessment',
+          };
+          const versions = state.versions.map((version) => ({ ...version, isCurrent: false })).concat(nextVersion);
+          return {
+            versions,
+            currentVersionId: nextVersion.id,
+            linkedAssessmentId: assessmentId,
+            linkedSessionId: null,
+            linkedSessionReportId: null,
+          };
+        });
+
+        TreatmentPlanStorage.saveVersions(get().versions);
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : '鐢熸垚娌荤枟璁″垝澶辫触',
+        });
+      } finally {
+        set({ isGenerating: false });
+      }
+    },
+
+    generatePlanFromSessionReport: async (payload) => {
+      set({
+        isGenerating: true,
+        error: null,
+        currentContent: '',
+        linkedAssessmentId: null,
+        linkedSessionId: payload.sessionId,
+        linkedSessionReportId: payload.sessionReportId,
+      });
+
+      try {
+        let fullContent = '';
+        await TreatmentPlanApi.generateStreamFromSessionReport(payload, (chunk) => {
+          fullContent += chunk;
+          set((state) => ({
+            currentContent: state.currentContent + chunk,
+          }));
+        });
+
+        set((state) => {
+          const nextVersion: TreatmentPlanVersion = {
+            ...buildVersionBase(state.versions.length, fullContent, payload.patientId),
+            sessionId: payload.sessionId,
+            sessionReportId: payload.sessionReportId,
+            sourceType: 'session-report',
+          };
+          const versions = state.versions.map((version) => ({ ...version, isCurrent: false })).concat(nextVersion);
+          return {
+            versions,
+            currentVersionId: nextVersion.id,
+            linkedAssessmentId: null,
+            linkedSessionId: payload.sessionId,
+            linkedSessionReportId: payload.sessionReportId,
+          };
+        });
+
+        TreatmentPlanStorage.saveVersions(get().versions);
+      } catch (error) {
+        set({
+          error: error instanceof Error ? error.message : '鐢熸垚娌荤枟璁″垝澶辫触',
+        });
+      } finally {
+        set({ isGenerating: false });
+      }
+    },
+
+    clearContent: () => set({ currentContent: '', error: null }),
+
+    setError: (error) => set({ error }),
+
+    saveVersion: (content, assessmentId, patientId) =>
       set((state) => {
-        const newVersion: TreatmentPlanVersion = {
-          id: `version_${Date.now()}_${state.versions.length + 1}`,
-          version: state.versions.length + 1,
-          content: fullContent,
+        const nextVersion: TreatmentPlanVersion = {
+          ...buildVersionBase(state.versions.length, content, patientId),
           assessmentId,
-          patientId,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          createdBy: 'system',
-          isCurrent: true
+          sourceType: 'assessment',
         };
-        
-        // 将其他版本标记为非当前
-        const updatedVersions = state.versions.map(v => ({
-          ...v,
-          isCurrent: false
+        const versions = state.versions.map((version) => ({ ...version, isCurrent: false })).concat(nextVersion);
+        TreatmentPlanStorage.saveVersions(versions);
+        return {
+          versions,
+          currentVersionId: nextVersion.id,
+          currentContent: content,
+          linkedAssessmentId: assessmentId,
+          linkedSessionId: null,
+          linkedSessionReportId: null,
+        };
+      }),
+
+    saveSessionReportVersion: (content, payload) =>
+      set((state) => {
+        const nextVersion: TreatmentPlanVersion = {
+          ...buildVersionBase(state.versions.length, content, payload.patientId),
+          sessionId: payload.sessionId,
+          sessionReportId: payload.sessionReportId,
+          sourceType: 'session-report',
+        };
+        const versions = state.versions.map((version) => ({ ...version, isCurrent: false })).concat(nextVersion);
+        TreatmentPlanStorage.saveVersions(versions);
+        return {
+          versions,
+          currentVersionId: nextVersion.id,
+          currentContent: content,
+          linkedAssessmentId: null,
+          linkedSessionId: payload.sessionId,
+          linkedSessionReportId: payload.sessionReportId,
+        };
+      }),
+
+    switchVersion: (versionId) =>
+      set((state) => {
+        const version = state.versions.find((item) => item.id === versionId);
+        if (!version) return state;
+
+        const versions = state.versions.map((item) => ({
+          ...item,
+          isCurrent: item.id === versionId,
         }));
-        
+
+        TreatmentPlanStorage.saveVersions(versions);
+
         return {
-          versions: [...updatedVersions, newVersion],
-          currentVersionId: newVersion.id
+          versions,
+          currentVersionId: versionId,
+          currentContent: version.content,
+          linkedAssessmentId: version.assessmentId || null,
+          linkedSessionId: version.sessionId || null,
+          linkedSessionReportId: version.sessionReportId || null,
         };
-      });
-      
-      // 保存到本地存储
-      TreatmentPlanStorage.saveVersions(get().versions);
-      
-    } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : '生成治疗计划失败' 
-      });
-    } finally {
-      set({ isGenerating: false });
-    }
-  },
-  
-  // 清除内容
-  clearContent: () => set({ currentContent: '', error: null }),
-  
-  // 设置错误
-  setError: (error) => set({ error }),
-  
-  // 版本管理
-  saveVersion: (content, assessmentId, patientId) => set((state) => {
-    const newVersion: TreatmentPlanVersion = {
-      id: `version_${Date.now()}_${state.versions.length + 1}`,
-      version: state.versions.length + 1,
-      content,
-      assessmentId,
-      patientId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: 'system',
-      isCurrent: true
-    };
-    
-    const updatedVersions = state.versions.map(v => ({
-      ...v,
-      isCurrent: false
-    }));
-    
-    const newVersions = [...updatedVersions, newVersion];
-    
-    // 保存到本地存储
-    TreatmentPlanStorage.saveVersions(newVersions);
-    
-    return {
-      versions: newVersions,
-      currentVersionId: newVersion.id,
-      currentContent: content
-    };
-  }),
-  
-  switchVersion: (versionId) => set((state) => {
-    const version = state.versions.find(v => v.id === versionId);
-    if (!version) return state;
-    
-    const newVersions = state.versions.map(v => ({
-      ...v,
-      isCurrent: v.id === versionId
-    }));
-    
-    // 保存到本地存储
-    TreatmentPlanStorage.saveVersions(newVersions);
-    
-    return {
-      currentVersionId: versionId,
-      currentContent: version.content,
-      versions: newVersions
-    };
-  }),
-  
-  deleteVersion: (versionId) => set((state) => {
-    const filteredVersions = state.versions.filter(v => v.id !== versionId);
-    
-    let newCurrentVersionId = state.currentVersionId;
-    let newCurrentContent = state.currentContent;
-    
-    if (versionId === state.currentVersionId) {
-      if (filteredVersions.length > 0) {
-        const latestVersion = filteredVersions[filteredVersions.length - 1];
-        newCurrentVersionId = latestVersion.id;
-        newCurrentContent = latestVersion.content;
-      } else {
-        newCurrentVersionId = null;
-        newCurrentContent = '';
-      }
-    }
-    
-    const finalVersions = filteredVersions.map(v => ({
-      ...v,
-      isCurrent: v.id === newCurrentVersionId
-    }));
-    
-    // 保存到本地存储
-    TreatmentPlanStorage.saveVersions(finalVersions);
-    
-    return {
-      versions: finalVersions,
-      currentVersionId: newCurrentVersionId,
-      currentContent: newCurrentContent
-    };
-  }),
-  
-  updateVersionTags: (versionId, tags) => set((state) => {
-    const newVersions = state.versions.map(v => 
-      v.id === versionId ? { ...v, tags, updatedAt: new Date().toISOString() } : v
-    );
-    
-    // 保存到本地存储
-    TreatmentPlanStorage.saveVersions(newVersions);
-    
-    return { versions: newVersions };
-  }),
-  
-  updateVersionNotes: (versionId, notes) => set((state) => {
-    const newVersions = state.versions.map(v => 
-      v.id === versionId ? { ...v, notes, updatedAt: new Date().toISOString() } : v
-    );
-    
-    // 保存到本地存储
-    TreatmentPlanStorage.saveVersions(newVersions);
-    
-    return { versions: newVersions };
-  }),
-  
-  // 版本对比
-  startCompare: (versionId1, versionId2) => set({
-    comparingVersions: [versionId1, versionId2]
-  }),
-  
-  endCompare: () => set({
-    comparingVersions: [null, null]
-  }),
-  
-  // 评估关联
-  linkAssessment: (planId, assessmentId) => set((state) => {
-    const newVersions = state.versions.map(v => {
-      if (v.id === planId) {
-        const assessmentRecord = state.assessmentRecords.find(r => r.id === assessmentId);
+      }),
+
+    deleteVersion: (versionId) =>
+      set((state) => {
+        const versions = state.versions.filter((version) => version.id !== versionId);
+        const nextCurrent = versionId === state.currentVersionId ? versions[versions.length - 1] : versions.find((version) => version.id === state.currentVersionId) || null;
+        const finalVersions = versions.map((version) => ({
+          ...version,
+          isCurrent: version.id === nextCurrent?.id,
+        }));
+
+        TreatmentPlanStorage.saveVersions(finalVersions);
+
         return {
-          ...v,
-          assessmentId,
-          assessmentData: assessmentRecord,
-          updatedAt: new Date().toISOString()
+          versions: finalVersions,
+          currentVersionId: nextCurrent?.id || null,
+          currentContent: nextCurrent?.content || '',
+          linkedAssessmentId: nextCurrent?.assessmentId || null,
+          linkedSessionId: nextCurrent?.sessionId || null,
+          linkedSessionReportId: nextCurrent?.sessionReportId || null,
         };
-      }
-      return v;
-    });
-    
-    const newAssessmentRecords = state.assessmentRecords.map(r => {
-      if (r.id === assessmentId) {
-        return { ...r, treatmentPlanId: planId };
-      }
-      return r;
-    });
-    
-    TreatmentPlanStorage.saveVersions(newVersions);
-    
-    const updatedRecord = newAssessmentRecords.find(r => r.id === assessmentId);
-    if (updatedRecord) {
-      AssessmentRecordStorage.saveRecord(updatedRecord);
-    }
-    
-    return {
-      versions: newVersions,
-      assessmentRecords: newAssessmentRecords,
-      linkedAssessmentId: assessmentId
-    };
-  }),
-  
-  loadAssessmentRecords: (patientId) => {
-    const records = AssessmentRecordStorage.loadRecords(patientId);
-    set({ assessmentRecords: records });
-  },
-  
-  setLinkedAssessment: (assessmentId) => set({
-    linkedAssessmentId: assessmentId
-  }),
-  
-  setCurrentVersion: (versionId) => set({
-    currentVersionId: versionId
-  }),
+      }),
+
+    updateVersionTags: (versionId, tags) =>
+      set((state) => {
+        const versions = state.versions.map((version) =>
+          version.id === versionId ? { ...version, tags, updatedAt: new Date().toISOString() } : version,
+        );
+        TreatmentPlanStorage.saveVersions(versions);
+        return { versions };
+      }),
+
+    updateVersionNotes: (versionId, notes) =>
+      set((state) => {
+        const versions = state.versions.map((version) =>
+          version.id === versionId ? { ...version, notes, updatedAt: new Date().toISOString() } : version,
+        );
+        TreatmentPlanStorage.saveVersions(versions);
+        return { versions };
+      }),
+
+    startCompare: (versionId1, versionId2) => set({ comparingVersions: [versionId1, versionId2] }),
+
+    endCompare: () => set({ comparingVersions: [null, null] }),
+
+    linkAssessment: (planId, assessmentId) =>
+      set((state) => {
+        const versions = state.versions.map((version) => {
+          if (version.id !== planId) {
+            return version;
+          }
+
+          const assessmentRecord = state.assessmentRecords.find((record) => record.id === assessmentId);
+          return {
+            ...version,
+            assessmentId,
+            assessmentData: assessmentRecord,
+            updatedAt: new Date().toISOString(),
+          };
+        });
+
+        const assessmentRecords = state.assessmentRecords.map((record) =>
+          record.id === assessmentId ? { ...record, treatmentPlanId: planId } : record,
+        );
+
+        TreatmentPlanStorage.saveVersions(versions);
+
+        const updatedRecord = assessmentRecords.find((record) => record.id === assessmentId);
+        if (updatedRecord) {
+          AssessmentRecordStorage.saveRecord(updatedRecord);
+        }
+
+        return {
+          versions,
+          assessmentRecords,
+          linkedAssessmentId: assessmentId,
+          linkedSessionId: null,
+          linkedSessionReportId: null,
+        };
+      }),
+
+    loadAssessmentRecords: (patientId) => {
+      set({ assessmentRecords: AssessmentRecordStorage.loadRecords(patientId) });
+    },
+
+    setLinkedAssessment: (assessmentId) =>
+      set({
+        linkedAssessmentId: assessmentId,
+        linkedSessionId: null,
+        linkedSessionReportId: null,
+      }),
+
+    setLinkedSessionReport: (sessionId, sessionReportId) =>
+      set({
+        linkedAssessmentId: null,
+        linkedSessionId: sessionId,
+        linkedSessionReportId: sessionReportId,
+      }),
+
+    setCurrentVersion: (versionId) => set({ currentVersionId: versionId }),
   };
 });

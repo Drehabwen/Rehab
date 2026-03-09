@@ -4,11 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePostureWS } from '../usePostureWS';
 import { PoseLandmark } from '../../plugins/vision3/vision3-utils';
+import { useMeasurementStore } from '@/store/useMeasurementStore';
 
 describe('usePostureWS', () => {
   let mockWebSocket: any;
 
   beforeEach(() => {
+    useMeasurementStore.setState({ postureReports: [] });
+
     mockWebSocket = {
       readyState: 1,
       send: vi.fn(),
@@ -160,7 +163,7 @@ describe('usePostureWS', () => {
       expect(result.current.jointResult).toEqual(mockResponse);
     });
 
-    it('should handle POSTURE_REPORT response', () => {
+    it('should treat a basic report as auxiliary content when markdown duplicates it', () => {
       const { result } = renderHook(() => usePostureWS('ws://localhost:8001/ws/analyze'));
 
       const messageCallback = mockWebSocket.addEventListener.mock.calls.find(
@@ -170,6 +173,7 @@ describe('usePostureWS', () => {
       const mockResponse = {
         type: 'POSTURE_REPORT',
         markdown: '### Test Report',
+        auxiliaryDiagnosis: '### Test Report',
         reportId: 'test-report-123'
       };
 
@@ -177,7 +181,9 @@ describe('usePostureWS', () => {
         if (messageCallback) messageCallback({ data: JSON.stringify(mockResponse) });
       });
 
-      expect(result.current.markdownReport).toBe('### Test Report');
+      expect(result.current.markdownReport).toBeNull();
+      expect(result.current.auxiliaryDiagnosis).toBe('### Test Report');
+      expect(useMeasurementStore.getState().postureReports[0]?.markdown).toBeNull();
     });
 
     it('should preserve base recommendations when deep report returns without them', () => {
@@ -228,6 +234,12 @@ describe('usePostureWS', () => {
       expect(result.current.result?.metrics).toEqual(baseResponse.metrics);
       expect(result.current.result?.issues).toEqual(baseResponse.issues);
       expect(result.current.auxiliaryDiagnosis).toBe(baseResponse.auxiliaryDiagnosis);
+
+      const latestReport = useMeasurementStore.getState().postureReports[0];
+      expect(latestReport.markdown).toBe('### Deep Report');
+      expect(latestReport.metrics).toEqual(baseResponse.metrics);
+      expect(latestReport.issues).toEqual(baseResponse.issues);
+      expect(latestReport.auxiliaryDiagnosis).toBe(baseResponse.auxiliaryDiagnosis);
     });
 
     it('should handle unknown message types', () => {

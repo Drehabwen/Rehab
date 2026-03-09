@@ -15,8 +15,19 @@ import {
 import { cn } from '@/lib/utils';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { usePatientStore } from '@/store/usePatientStore';
+import { useSessionReportStore } from '@/store/useSessionReportStore';
+import { useTreatmentPlanStore } from '@/store/useTreatmentPlanStore';
 import type { Assessment } from '@/types/assessment';
+import type { SessionReportInputStatus, SessionReportOutput } from '@/types/report-center';
 import { PageTitleSection, StatePanel, UnifiedStatusBadge } from '@/components/layout';
+import {
+  buildAssessmentOutputSummary,
+  buildSessionReportGenerationRequest,
+  buildSessionReportInputs,
+  getAssessmentPreview,
+  hasAssessmentReportPayload,
+} from '../report-center-utils';
+import { buildSessionDraftReport, buildSessionInsightCards } from '../report-center-insights';
 
 interface NexusReportCenterProps {
   mode?: 'datacenter' | 'reports';
@@ -50,52 +61,35 @@ const statusTextMap: Record<Assessment['status'], string> = {
   pending: '待处理',
 };
 
-function hasReportPayload(assessment: Assessment): boolean {
-  if (assessment.data.posture?.markdownReport || assessment.data.posture?.auxiliaryDiagnosis) return true;
-  if (assessment.data.medvoice?.structuredCase || assessment.data.medvoice?.transcript) return true;
-  if (assessment.data.rom?.summary || (assessment.data.rom?.items?.length || 0) > 0) return true;
-  return false;
-}
-
 function getReportStatus(assessment: Assessment): { tone: 'success' | 'processing' | 'warning'; text: string } {
-  if (assessment.type === 'posture') {
-    if (assessment.data.posture?.markdownReport) return { tone: 'success', text: '深度报告' };
-    if (assessment.data.posture?.auxiliaryDiagnosis) return { tone: 'processing', text: '基础报告' };
+  const summary = buildAssessmentOutputSummary(assessment);
+  if (!summary) {
     return { tone: 'warning', text: '待生成' };
   }
 
-  if (assessment.type === 'rom') {
-    if (assessment.data.rom?.summary) return { tone: 'success', text: 'ROM报告' };
-    if ((assessment.data.rom?.items?.length || 0) > 0) return { tone: 'processing', text: '原始数据' };
+  if (summary.type === 'posture') {
+    if (assessment.data.posture?.markdownReport) return { tone: 'success', text: '体态报告扩展' };
+    if (assessment.data.posture?.auxiliaryDiagnosis) return { tone: 'processing', text: '体态基础报告' };
     return { tone: 'warning', text: '待生成' };
   }
 
-  if (assessment.type === 'medvoice') {
-    if (assessment.data.medvoice?.structuredCase) return { tone: 'success', text: '病历已结构化' };
-    if (assessment.data.medvoice?.transcript) return { tone: 'processing', text: '仅转写' };
-    return { tone: 'warning', text: '待生成' };
+  if (summary.type === 'rom') {
+    return summary.status === 'ready'
+      ? { tone: 'success', text: 'ROM摘要' }
+      : summary.status === 'partial'
+        ? { tone: 'processing', text: 'ROM原始数据' }
+        : { tone: 'warning', text: '待生成' };
+  }
+
+  if (summary.type === 'medvoice') {
+    return summary.status === 'ready'
+      ? { tone: 'success', text: '病历已结构化' }
+      : summary.status === 'partial'
+        ? { tone: 'processing', text: '仅转写' }
+        : { tone: 'warning', text: '待生成' };
   }
 
   return { tone: 'processing', text: '可查看' };
-}
-
-function getReportPreview(assessment: Assessment): string | null {
-  if (assessment.data.posture?.markdownReport) return assessment.data.posture.markdownReport;
-  if (assessment.data.posture?.auxiliaryDiagnosis) return assessment.data.posture.auxiliaryDiagnosis;
-  if (assessment.data.rom?.summary) return assessment.data.rom.summary;
-
-  if (assessment.data.medvoice?.structuredCase) {
-    const lines = Object.entries(assessment.data.medvoice.structuredCase)
-      .filter(([, value]) => Boolean(value && String(value).trim().length > 0))
-      .map(([key, value]) => `## ${key}\n${String(value)}`);
-    return lines.join('\n\n');
-  }
-
-  if (assessment.data.medvoice?.transcript) {
-    return assessment.data.medvoice.transcript;
-  }
-
-  return null;
 }
 
 function getReportExportLabel(assessment: Assessment): string {
@@ -105,12 +99,35 @@ function getReportExportLabel(assessment: Assessment): string {
   return 'JSON / CSV';
 }
 
+const readinessBadgeMap: Record<SessionReportInputStatus, { tone: 'success' | 'processing' | 'warning'; text: string }> = {
+  ready: { tone: 'success', text: '已就绪' },
+  partial: { tone: 'processing', text: '部分到位' },
+  missing: { tone: 'warning', text: '缺失' },
+};
+
 export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'datacenter' }) => {
   const { assessments, loadAssessments, deleteAssessment } = useAssessmentStore();
   const { patients, loadPatients } = usePatientStore();
+  const {
+    reports: sessionReports,
+    isGenerating: isGeneratingSessionReport,
+    error: sessionReportError,
+    loadReports: loadSessionReports,
+    generateReport,
+    getLatestReportBySessionId,
+  } = useSessionReportStore();
+  const {
+    currentContent: currentTreatmentPlanContent,
+    isGenerating: isGeneratingTreatmentPlan,
+    error: treatmentPlanError,
+    generatePlanFromSessionReport,
+    linkedSessionId,
+    linkedSessionReportId,
+  } = useTreatmentPlanStore();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
@@ -119,7 +136,8 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
   useEffect(() => {
     loadPatients();
     loadAssessments();
-  }, [loadPatients, loadAssessments]);
+    loadSessionReports();
+  }, [loadPatients, loadAssessments, loadSessionReports]);
 
   const patientMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -142,7 +160,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
       : assessments;
 
     if (mode === 'reports') {
-      list = list.filter(hasReportPayload);
+      list = list.filter(hasAssessmentReportPayload);
     }
 
     if (statusFilter !== 'all') {
@@ -156,18 +174,25 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
     return list;
   }, [assessments, selectedPatientId, mode, statusFilter, typeFilter]);
 
-  const filteredAssessments = useMemo(() => {
-    if (!searchLower) return scopedAssessments;
+  const sessionInputs = useMemo(() => buildSessionReportInputs(scopedAssessments, patientMap), [scopedAssessments, patientMap]);
 
-    return scopedAssessments.filter((assessment) => {
+  const filteredAssessments = useMemo(() => {
+    const sessionScoped = selectedSessionId
+      ? scopedAssessments.filter((assessment) => assessment.sessionId === selectedSessionId)
+      : scopedAssessments;
+
+    if (!searchLower) return sessionScoped;
+
+    return sessionScoped.filter((assessment) => {
       const patientName = (patientMap.get(assessment.patientId) || '').toLowerCase();
       return (
         assessment.id.toLowerCase().includes(searchLower) ||
+        assessment.sessionId.toLowerCase().includes(searchLower) ||
         assessment.patientId.toLowerCase().includes(searchLower) ||
         patientName.includes(searchLower)
       );
     });
-  }, [scopedAssessments, searchLower, patientMap]);
+  }, [scopedAssessments, selectedSessionId, searchLower, patientMap]);
 
   const stats = useMemo(() => {
     const weeklyCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -190,6 +215,32 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
       },
     ];
   }, [scopedAssessments, patients.length, mode]);
+
+  useEffect(() => {
+    setSelectedSessionId(null);
+  }, [selectedPatientId]);
+
+  const activeSessionInput = useMemo(() => {
+    if (sessionInputs.length === 0) {
+      return null;
+    }
+
+    return selectedSessionId
+      ? sessionInputs.find((sessionInput) => sessionInput.sessionId === selectedSessionId) ?? sessionInputs[0]
+      : sessionInputs[0];
+  }, [sessionInputs, selectedSessionId]);
+  const sessionInsightCards = useMemo(
+    () => (activeSessionInput ? buildSessionInsightCards(activeSessionInput) : []),
+    [activeSessionInput],
+  );
+  const sessionDraftReport = useMemo(
+    () => (activeSessionInput ? buildSessionDraftReport(activeSessionInput) : null),
+    [activeSessionInput],
+  );
+  const generatedSessionReport = useMemo(
+    () => (activeSessionInput ? getLatestReportBySessionId(activeSessionInput.sessionId) : undefined),
+    [activeSessionInput, getLatestReportBySessionId, sessionReports],
+  );
 
   const exportToJson = (assessment: Assessment) => {
     const dataStr = JSON.stringify(assessment, null, 2);
@@ -238,13 +289,13 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
   };
 
   const openReportText = (assessment: Assessment) => {
-    const content = getReportPreview(assessment);
+    const content = getAssessmentPreview(assessment);
     if (!content) return;
     setSelectedReportMarkdown(content);
   };
 
   const exportReportText = (assessment: Assessment) => {
-    const content = getReportPreview(assessment);
+    const content = getAssessmentPreview(assessment);
     if (!content) return;
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -255,6 +306,68 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const exportSessionReportJson = (report: SessionReportOutput) => {
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `session-report-${report.sessionId}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportSessionReportText = (report: SessionReportOutput) => {
+    const blob = new Blob([report.markdown], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `session-report-${report.sessionId}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGenerateSessionReport = async () => {
+    if (!activeSessionInput) {
+      return;
+    }
+
+    const report = await generateReport(buildSessionReportGenerationRequest(activeSessionInput));
+    setSelectedReportMarkdown(report.markdown);
+  };
+
+  const handleGenerateTreatmentPlan = async () => {
+    if (!generatedSessionReport || !activeSessionInput) {
+      return;
+    }
+
+    await generatePlanFromSessionReport({
+      patientId: generatedSessionReport.patientId,
+      sessionId: generatedSessionReport.sessionId,
+      sessionReportId: generatedSessionReport.id,
+      sessionReportMarkdown: generatedSessionReport.markdown,
+      insights: generatedSessionReport.insights,
+      recommendations: generatedSessionReport.recommendations,
+    });
+  };
+
+  const sessionScopedReports = useMemo(() => {
+    return sessionReports.filter((report) => {
+      if (selectedPatientId && report.patientId !== selectedPatientId) {
+        return false;
+      }
+      if (selectedSessionId && report.sessionId !== selectedSessionId) {
+        return false;
+      }
+      return true;
+    });
+  }, [selectedPatientId, selectedSessionId, sessionReports]);
+
+  const hasVisibleTreatmentPlan =
+    Boolean(currentTreatmentPlanContent) &&
+    Boolean(activeSessionInput) &&
+    linkedSessionId === activeSessionInput?.sessionId &&
+    linkedSessionReportId === generatedSessionReport?.id;
 
   return (
     <div className="rehab-page custom-scrollbar">
@@ -284,6 +397,328 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
             </div>
           ))}
         </section>
+
+        {mode === 'reports' ? (
+          <section className="bento-card p-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">接诊输入概览</div>
+                <div className="text-xs text-slate-500 mt-1">按接诊汇总体态、ROM、语音病历输入，明确综合报告可用上下文。</div>
+              </div>
+              <span className="text-xs text-slate-500">{selectedSessionId ? `已筛选接诊 ${selectedSessionId}` : `共 ${sessionInputs.length} 个接诊`}</span>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedSessionId(null)}
+                className={cn(
+                  'rounded-2xl border px-4 py-3 text-left transition-colors',
+                  !selectedSessionId ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                )}
+              >
+                <div className="text-sm font-semibold">全部接诊</div>
+                <div className="text-xs text-slate-500 mt-1">查看当前筛选范围内所有报告输入</div>
+              </button>
+
+              {sessionInputs.map((sessionInput) => (
+                <button
+                  key={sessionInput.sessionId}
+                  type="button"
+                  onClick={() => setSelectedSessionId(sessionInput.sessionId)}
+                  className={cn(
+                    'min-w-[260px] rounded-2xl border px-4 py-3 text-left transition-colors',
+                    selectedSessionId === sessionInput.sessionId
+                      ? 'border-antey-primary bg-antey-primary/10'
+                      : 'border-slate-200 bg-white hover:bg-slate-50',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-900 truncate">{sessionInput.patientName || sessionInput.patientId}</div>
+                      <div className="text-xs text-slate-500 truncate">{sessionInput.sessionId}</div>
+                    </div>
+                    <UnifiedStatusBadge
+                      status={sessionInput.readiness.readyCount >= 2 ? 'success' : sessionInput.readiness.readyCount >= 1 ? 'processing' : 'warning'}
+                      text={`已就绪 ${sessionInput.readiness.readyCount}/3`}
+                    />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {(['posture', 'rom', 'medvoice'] as const).map((type) => {
+                      const output = sessionInput.outputs[type];
+                      const readiness = output ? readinessBadgeMap[output.status] : readinessBadgeMap.missing;
+                      const label = type === 'posture' ? '体态' : type === 'rom' ? 'ROM' : '语音';
+
+                      return (
+                        <div key={type} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                          <div className="text-xs text-slate-500">{label}</div>
+                          <div className="mt-1">
+                            <UnifiedStatusBadge status={readiness.tone} text={readiness.text} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {mode === 'reports' && activeSessionInput ? (
+          <section className="bento-card p-5">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900">综合报告编排区</div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {`${activeSessionInput.patientName || activeSessionInput.patientId} · ${activeSessionInput.sessionId}`}
+                </div>
+                <div className="text-sm text-slate-600 mt-3">
+                  综合 LLM 报告将只在这里基于当前接诊输入统一生成。当前阶段先完成 posture、ROM、语音病历的输入归集与可视化。
+                </div>
+                {sessionReportError ? (
+                  <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {sessionReportError}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <UnifiedStatusBadge
+                  status={activeSessionInput.readiness.readyCount >= 2 ? 'success' : activeSessionInput.readiness.readyCount >= 1 ? 'processing' : 'warning'}
+                  text={`综合输入 ${activeSessionInput.readiness.readyCount}/3`}
+                />
+                <span className="status-badge status-disabled">
+                  {activeSessionInput.readiness.missingTypes.length > 0
+                    ? `待补 ${activeSessionInput.readiness.missingTypes.join(' / ')}`
+                    : '输入已齐备'}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                {(['posture', 'rom', 'medvoice'] as const).map((type) => {
+                  const output = activeSessionInput.outputs[type];
+                  const readiness = output ? readinessBadgeMap[output.status] : readinessBadgeMap.missing;
+                  const label = type === 'posture' ? '体态评估输入' : type === 'rom' ? 'ROM 输入' : '语音病历输入';
+
+                  return (
+                    <article key={type} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">{label}</div>
+                          <div className="text-xs text-slate-500 mt-1">
+                            {output ? `最近更新 ${new Date(output.createdAt).toLocaleString('zh-CN')}` : '当前接诊尚未提供该输入'}
+                          </div>
+                        </div>
+                        <UnifiedStatusBadge status={readiness.tone} text={readiness.text} />
+                      </div>
+
+                      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600 min-h-[120px]">
+                        {output?.preview ? (
+                          <div className="line-clamp-5 whitespace-pre-wrap">{output.preview}</div>
+                        ) : (
+                          <div className="text-slate-400">暂无可用于综合报告的输入摘要。</div>
+                        )}
+                      </div>
+
+                      {output?.preview ? (
+                        <button
+                          type="button"
+                          className="btn-secondary mt-3 h-9 px-3"
+                          onClick={() => setSelectedReportMarkdown(output.preview)}
+                        >
+                          <FileText size={14} />
+                          查看输入详情
+                        </button>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+
+              <article className="rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">综合报告入口</div>
+                    <div className="text-xs text-slate-500 mt-1">综合报告只在这里发起并落库，下面同时显示当前编排预览和最近一次已生成结果。</div>
+                  </div>
+                  <UnifiedStatusBadge
+                    status={generatedSessionReport ? 'success' : activeSessionInput.readiness.readyCount >= 2 ? 'processing' : 'warning'}
+                    text={generatedSessionReport ? '已生成' : activeSessionInput.readiness.readyCount >= 2 ? '可编排' : '待补输入'}
+                  />
+                </div>
+
+                <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600 min-h-[176px] whitespace-pre-wrap">
+                  {generatedSessionReport?.markdown || sessionDraftReport}
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn-primary h-9 px-3"
+                    onClick={() => void handleGenerateSessionReport()}
+                    disabled={!activeSessionInput || activeSessionInput.readiness.readyCount < 2 || isGeneratingSessionReport}
+                  >
+                    <FileText size={14} />
+                    {isGeneratingSessionReport ? '生成中...' : '生成综合报告'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary h-9 px-3"
+                    onClick={() => setSelectedReportMarkdown(generatedSessionReport?.markdown || sessionDraftReport || null)}
+                    disabled={!generatedSessionReport?.markdown && !sessionDraftReport}
+                  >
+                    <ExternalLink size={14} />
+                    {generatedSessionReport ? '查看已生成报告' : '查看综合预览'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary h-9 px-3"
+                    onClick={() => generatedSessionReport ? exportSessionReportText(generatedSessionReport) : undefined}
+                    disabled={!generatedSessionReport}
+                  >
+                    <FileText size={14} />
+                    导出综合报告
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary h-9 px-3"
+                    onClick={() => generatedSessionReport ? exportSessionReportJson(generatedSessionReport) : undefined}
+                    disabled={!generatedSessionReport}
+                  >
+                    <FileJson size={14} />
+                    导出综合 JSON
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary h-9 px-3"
+                    onClick={() => void handleGenerateTreatmentPlan()}
+                    disabled={!generatedSessionReport || isGeneratingTreatmentPlan}
+                  >
+                    <FileSpreadsheet size={14} />
+                    {isGeneratingTreatmentPlan ? '生成治疗计划中...' : '生成治疗计划'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary h-9 px-3"
+                    onClick={() => setSelectedReportMarkdown(currentTreatmentPlanContent || null)}
+                    disabled={!hasVisibleTreatmentPlan}
+                  >
+                    <ExternalLink size={14} />
+                    查看治疗计划
+                  </button>
+                </div>
+              </article>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
+              {sessionInsightCards.map((card) => (
+                <article key={card.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      'inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]',
+                      card.tone === 'blue' && 'border-blue-200 bg-blue-50 text-blue-700',
+                      card.tone === 'amber' && 'border-amber-200 bg-amber-50 text-amber-700',
+                      card.tone === 'violet' && 'border-violet-200 bg-violet-50 text-violet-700',
+                    )}>
+                      {card.tone === 'blue' ? 'Cross Input' : card.tone === 'amber' ? 'Gap Alert' : 'Clinical Link'}
+                    </span>
+                  </div>
+                  <div className="mt-3 text-base font-semibold text-slate-900">{card.title}</div>
+                  <div className="mt-2 text-sm leading-6 text-slate-600">{card.summary}</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {card.evidence.map((item) => (
+                      <span key={item} className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                    {card.action}
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">综合治疗计划</div>
+                    <div className="text-xs text-slate-500 mt-1">治疗计划只消费综合 session report，不再直接依赖单次 assessment。</div>
+                  </div>
+                  <UnifiedStatusBadge
+                    status={hasVisibleTreatmentPlan ? 'success' : isGeneratingTreatmentPlan ? 'processing' : 'warning'}
+                    text={hasVisibleTreatmentPlan ? '已生成' : isGeneratingTreatmentPlan ? '生成中' : '待生成'}
+                  />
+                </div>
+
+                {treatmentPlanError ? (
+                  <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    {treatmentPlanError}
+                  </div>
+                ) : null}
+
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 min-h-[220px] whitespace-pre-wrap">
+                  {hasVisibleTreatmentPlan
+                    ? currentTreatmentPlanContent
+                    : generatedSessionReport
+                      ? '已具备综合报告，可从上方生成接诊级治疗计划。'
+                      : '请先在报告中心生成综合报告，再生成治疗计划。'}
+                </div>
+              </article>
+
+              <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="text-sm font-semibold text-slate-900">综合报告归档</div>
+                <div className="text-xs text-slate-500 mt-1">这里单独归档 session 级综合报告，与下方 assessment 级局部报告列表分开。</div>
+
+                <div className="mt-3 space-y-3 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
+                  {sessionScopedReports.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-4 text-sm text-slate-500">
+                      当前筛选范围内还没有综合报告归档。
+                    </div>
+                  ) : (
+                    sessionScopedReports.map((report) => (
+                      <div key={report.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-slate-900 truncate">{report.sessionId}</div>
+                            <div className="text-xs text-slate-500 truncate">
+                              {patientMap.get(report.patientId) || report.patientId} · {new Date(report.createdAt).toLocaleString('zh-CN')}
+                            </div>
+                          </div>
+                          <UnifiedStatusBadge status="success" text="综合报告" />
+                        </div>
+
+                        <div className="mt-2 text-sm text-slate-600 line-clamp-3 whitespace-pre-wrap">
+                          {report.markdown}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button type="button" className="btn-secondary h-8 px-3" onClick={() => setSelectedReportMarkdown(report.markdown)}>
+                            <ExternalLink size={12} />
+                            查看
+                          </button>
+                          <button type="button" className="btn-secondary h-8 px-3" onClick={() => exportSessionReportText(report)}>
+                            <FileText size={12} />
+                            文本
+                          </button>
+                          <button type="button" className="btn-secondary h-8 px-3" onClick={() => exportSessionReportJson(report)}>
+                            <FileJson size={12} />
+                            JSON
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </article>
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
           <aside className="bento-card p-4">
@@ -339,6 +774,24 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
               </select>
             </div>
 
+            {mode === 'reports' ? (
+              <div className="mb-3">
+                <div className="text-xs text-slate-500 mb-1">接诊筛选</div>
+                <select
+                  value={selectedSessionId ?? 'all'}
+                  onChange={(e) => setSelectedSessionId(e.target.value === 'all' ? null : e.target.value)}
+                  className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm"
+                >
+                  <option value="all">全部接诊</option>
+                  {sessionInputs.map((sessionInput) => (
+                    <option key={sessionInput.sessionId} value={sessionInput.sessionId}>
+                      {`${sessionInput.patientName || sessionInput.patientId} · ${sessionInput.sessionId}`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+
             <div className="space-y-2 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
               <button
                 onClick={() => setSelectedPatientId(null)}
@@ -392,13 +845,14 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                   <div className="divide-y divide-slate-200">
                     {filteredAssessments.map((assessment) => {
                       const reportStatus = getReportStatus(assessment);
-                      const reportText = getReportPreview(assessment);
+                      const reportText = getAssessmentPreview(assessment);
 
                       return (
                         <div key={assessment.id} className="px-4 py-3 grid grid-cols-[1.6fr_1fr_0.9fr_1fr_auto] gap-3 items-center hover:bg-slate-50">
                           <div className="min-w-0">
                             <div className="text-sm font-semibold text-slate-900 truncate">{typeLabelMap[assessment.type]}</div>
                             <div className="text-xs text-slate-500 truncate">{patientMap.get(assessment.patientId) || assessment.patientId}</div>
+                            <div className="text-[11px] text-slate-400 truncate mt-1">{assessment.sessionId}</div>
                           </div>
 
                           <div className="text-sm text-slate-600">

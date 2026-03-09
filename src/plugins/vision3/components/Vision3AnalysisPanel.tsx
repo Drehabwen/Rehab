@@ -3,7 +3,6 @@ import {
   Activity,
   FileText,
   Layers,
-  Loader2,
   Sparkles,
   TriangleAlert,
   Zap,
@@ -14,7 +13,7 @@ import { Vision3Dashboard } from './Vision3Dashboard';
 import { PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
 import { AssessmentType } from '../store/usePostureAssessmentStore';
 import { ASSESSMENT_TEXTS, PANEL_TEXTS } from '../constants/uiText';
-import { ANIMATIONS } from '@/constants/uiStyles';
+import { buildImmediateBasicReport, buildReportInsightCards } from '../report-insights';
 
 type WorkspaceFocusTarget =
   | 'workspace-summary'
@@ -44,8 +43,6 @@ interface Vision3AnalysisPanelProps {
   getHipStatus: (angle: number) => { text: string; color: string; bgColor: string };
   getSeverityLabel: (severity: string) => string;
   assessmentType: AssessmentType;
-  isLoadingDeepReport?: boolean;
-  onRequestDeepAnalysis?: () => void;
   focusTarget?: WorkspaceFocusTarget;
   onNavigate?: (panel: 'dashboard' | 'report', target: WorkspaceFocusTarget) => void;
 }
@@ -102,8 +99,6 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
   getHipStatus,
   getSeverityLabel,
   assessmentType,
-  isLoadingDeepReport,
-  onRequestDeepAnalysis,
   focusTarget,
   onNavigate,
 }) => {
@@ -111,14 +106,29 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
   const hasAuxiliaryReport = Boolean(auxiliaryDiagnosis);
   const hasDeepReport = Boolean(markdownReport || streamingReport);
   const hasAnyReport = hasAuxiliaryReport || hasDeepReport;
-  const canRequestDeepReport = isCompleted && !hasDeepReport && Boolean(onRequestDeepAnalysis);
   const issueCount = result?.issues.length ?? 0;
   const deepReportContent = isStreamingReport ? streamingReport || '' : markdownReport || '';
+  const immediateBasicReport = !hasAuxiliaryReport
+    ? buildImmediateBasicReport({
+        metrics: result?.metrics,
+        issues: result?.issues,
+      })
+    : null;
+  const basicReportContent = auxiliaryDiagnosis || immediateBasicReport || null;
+  const hasBasicReportContent = Boolean(basicReportContent);
+  const insightCards = buildReportInsightCards({
+    metrics: result?.metrics,
+    issues: result?.issues,
+    auxiliaryDiagnosis,
+    markdownReport: deepReportContent || markdownReport,
+  });
   const reportIntro = hasDeepReport
-    ? '\u62a5\u544a\u4e2d\u5fc3\u4ee5\u7ed3\u8bba\u3001\u98ce\u9669\u89e3\u8bfb\u548c\u4e0b\u4e00\u6b65\u64cd\u4f5c\u4e3a\u4e3b\uff0c\u6570\u636e\u8bc1\u636e\u8bf7\u8f6c\u5165\u6570\u636e\u4e2d\u5fc3\u67e5\u770b\u3002'
+    ? '\u8fd9\u91cc\u627f\u63a5\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u7684\u62a5\u544a\u9605\u8bfb\u4e0e\u7ed3\u8bba\u68b3\u7406\uff0c\u5bf9\u5e94\u6570\u636e\u8bc1\u636e\u8bf7\u8f6c\u5165\u6570\u636e\u4e2d\u5fc3\u67e5\u770b\u3002'
     : hasAuxiliaryReport
-      ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u53ef\u5148\u9605\u8bfb\u7ed3\u8bba\uff0c\u518d\u6309\u9700\u8865\u5145\u6df1\u5ea6\u5206\u6790\u3002'
-      : '\u62a5\u544a\u4e2d\u5fc3\u4f1a\u5728\u5b8c\u6210\u62cd\u6444\u540e\u627f\u63a5\u7ed3\u8bba\u9605\u8bfb\u4e0e\u52a8\u4f5c\u5efa\u8bae\u3002';
+      ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u53ef\u5148\u9605\u8bfb\u672c\u6b21\u4f53\u6001\u7ed3\u8bba\uff1b\u7efc\u5408 LLM \u62a5\u544a\u5c06\u5728\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210\u3002'
+      : immediateBasicReport
+        ? '\u540e\u7aef\u57fa\u7840\u62a5\u544a\u6b63\u5728\u843d\u4f4d\uff0c\u76ee\u524d\u5148\u6839\u636e\u5df2\u56de\u4f20\u6307\u6807\u4e0e\u95ee\u9898\u751f\u6210\u4e00\u4efd\u5373\u65f6\u7ed3\u8bba\uff0c\u4fdd\u8bc1\u5b8c\u6210\u540e\u5c31\u80fd\u8bfb\u3002'
+        : '\u5b8c\u6210\u62cd\u6444\u540e\uff0c\u8fd9\u91cc\u4f1a\u7acb\u5373\u627f\u63a5\u672c\u6b21\u4f53\u6001\u57fa\u7840\u62a5\u544a\u4e0e\u672c\u5730\u7ed3\u8bba\u3002';
   const dataIntro = result
     ? '\u6570\u636e\u4e2d\u5fc3\u7528\u4e8e\u67e5\u770b\u6307\u6807\u3001\u5f02\u5e38\u8bc1\u636e\u3001\u5934\u90e8\u4f4d\u59ff\u548c\u98ce\u9669\u6765\u6e90\uff0c\u652f\u6491\u62a5\u544a\u7ed3\u8bba\u3002'
     : '\u6570\u636e\u4e2d\u5fc3\u4f1a\u5728\u6709\u6548\u7ed3\u679c\u56de\u4f20\u540e\u663e\u793a\u91cf\u5316\u8bc1\u636e\u548c\u5206\u6790\u652f\u6491\u3002';
@@ -148,7 +158,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
             {assessmentType === 'quick' ? ASSESSMENT_TEXTS.quick.label : ASSESSMENT_TEXTS.standard.label}
           </span>
           <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium', centerChipClass(activePanel === 'report' ? 'violet' : 'blue'))}>
-            {activePanel === 'report' ? '\u62a5\u544a\u4e2d\u5fc3' : '\u6570\u636e\u4e2d\u5fc3'}
+            {activePanel === 'report' ? '\u8bc4\u4f30\u62a5\u544a' : '\u6570\u636e\u4e2d\u5fc3'}
           </span>
         </div>
 
@@ -157,7 +167,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
             {PANEL_TEXTS.dataPanel}
           </button>
           <button type="button" onClick={() => setActivePanel('report')} className={panelButtonClass(activePanel === 'report', 'violet')}>
-            {PANEL_TEXTS.aiReport}
+            {'\u8bc4\u4f30\u62a5\u544a'}
           </button>
         </div>
       </div>
@@ -166,7 +176,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
         <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,rgba(250,250,255,0.98),rgba(255,255,255,1))] p-4 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Report Center</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Assessment Report</p>
               <h3 className="mt-1 text-xl font-semibold text-slate-900">{'\u7ed3\u8bba\u4e0e\u52a8\u4f5c'}</h3>
               <p className="mt-1 text-sm text-slate-500">{reportIntro}</p>
             </div>
@@ -182,42 +192,22 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                   {'\u67e5\u770b\u6570\u636e\u8bc1\u636e'}
                 </button>
               ) : null}
-              {canRequestDeepReport ? (
-                <button
-                  type="button"
-                  onClick={() => onRequestDeepAnalysis?.()}
-                  disabled={isLoadingDeepReport}
-                  className="btn-primary h-9 whitespace-nowrap px-3"
-                >
-                  {isLoadingDeepReport ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      {'\u751f\u6210\u4e2d...'}
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={14} />
-                      {PANEL_TEXTS.deepAnalysis}
-                    </>
-                  )}
-                </button>
-              ) : null}
             </div>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium', centerChipClass(hasAuxiliaryReport ? 'cyan' : 'slate'))}>
+            <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium', centerChipClass(hasBasicReportContent ? 'cyan' : 'slate'))}>
               {'\u57fa\u7840\u62a5\u544a'}
-              {hasAuxiliaryReport ? '\u00b7\u5df2\u751f\u6210' : '\u00b7\u5f85\u751f\u6210'}
+              {hasAuxiliaryReport ? '\u00b7\u5df2\u751f\u6210' : immediateBasicReport ? '\u00b7\u5373\u65f6\u7ed3\u8bba' : '\u00b7\u5f85\u751f\u6210'}
             </span>
             <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium', centerChipClass(hasDeepReport ? 'violet' : 'slate'))}>
-              {'\u6df1\u5ea6\u62a5\u544a'}
-              {hasDeepReport ? '\u00b7\u5df2\u751f\u6210' : canRequestDeepReport ? '\u00b7\u53ef\u53d1\u8d77' : '\u00b7\u672a\u5c31\u7eea'}
+              {'\u62a5\u544a\u6269\u5c55'}
+              {hasDeepReport ? '\u00b7\u5df2\u540c\u6b65' : '\u00b7\u7531\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210'}
             </span>
             <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium', centerChipClass(issueCount > 0 ? 'amber' : 'blue'))}>
               {`\u98ce\u9669\u89e3\u8bfb\u00b7${issueCount}`}
             </span>
-            {hasAuxiliaryReport ? (
+            {hasBasicReportContent ? (
               <button
                 type="button"
                 className="inline-flex items-center rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-50"
@@ -226,13 +216,13 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                 {'\u5b9a\u4f4d\u57fa\u7840\u62a5\u544a'}
               </button>
             ) : null}
-            {hasDeepReport || canRequestDeepReport ? (
+            {hasDeepReport ? (
               <button
                 type="button"
                 className="inline-flex items-center rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-medium text-violet-700 transition-colors hover:bg-violet-50"
                 onClick={() => onNavigate?.('report', 'report-deep')}
               >
-                {'\u5b9a\u4f4d\u6df1\u5ea6\u62a5\u544a'}
+                {'\u5b9a\u4f4d\u62a5\u544a\u6269\u5c55'}
               </button>
             ) : null}
           </div>
@@ -306,20 +296,83 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
       )}
 
       <div className="min-h-0 flex-1 overflow-hidden">
-        {activePanel === 'report' ? (
-          <div className={cn('h-full overflow-y-auto custom-scrollbar space-y-4 pr-1', ANIMATIONS.fadeIn)}>
-            {hasAnyReport || isLoadingDeepReport ? (
-              <div className={cn('grid gap-4', hasAuxiliaryReport && (hasDeepReport || isLoadingDeepReport) ? 'xl:grid-cols-[0.92fr_1.08fr]' : 'grid-cols-1')}>
-                {hasAuxiliaryReport ? (
+        <div className={cn('h-full overflow-y-auto custom-scrollbar space-y-4 pr-1', activePanel !== 'report' && 'hidden')}>
+            {hasAnyReport ? (
+              <div className="space-y-4">
+                {insightCards.length > 0 ? (
+                  <section className="rounded-[26px] border border-slate-200 bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] p-4 shadow-sm">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="inline-flex items-center gap-2 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700 ring-1 ring-slate-200">
+                          <Sparkles size={12} />
+                          {'\u6d1e\u5bdf\u5efa\u8bae\u5361'}
+                        </div>
+                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{'\u57fa\u4e8e\u5df2\u63a5\u6536\u62a5\u544a\u4fe1\u606f\u7684\u53ef\u89c6\u5efa\u8bae'}</h3>
+                        <p className="mt-1 text-sm text-slate-500">{'\u8fd9\u91cc\u7684\u5efa\u8bae\u57fa\u4e8e\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u5df2\u63a5\u6536\u7684\u62a5\u544a\u3001\u95ee\u9898\u5217\u8868\u548c\u91cf\u5316\u6307\u6807\u63d0\u70bc\u800c\u6210\uff0c\u4e0d\u7b49\u540c\u4e8e\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7684\u7efc\u5408 LLM \u62a5\u544a\u3002'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-secondary h-9 px-3"
+                        onClick={() => onNavigate?.('dashboard', issueCount > 0 ? 'data-issues' : 'data-metrics')}
+                      >
+                        <Activity size={14} />
+                        {'\u5bf9\u7167\u6570\u636e\u8bc1\u636e'}
+                      </button>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 xl:grid-cols-3">
+                      {insightCards.map((card) => (
+                        <article
+                          key={card.id}
+                          className={cn(
+                            'rounded-[22px] border bg-white/92 p-4 shadow-sm',
+                            card.tone === 'violet' && 'border-violet-100',
+                            card.tone === 'amber' && 'border-amber-100',
+                            card.tone === 'blue' && 'border-blue-100',
+                          )}
+                        >
+                          <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]', centerChipClass(card.tone))}>
+                            {card.eyebrow}
+                          </span>
+                          <h4 className="mt-3 text-base font-semibold text-slate-900">{card.title}</h4>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">{card.summary}</p>
+
+                          <div className="mt-4 rounded-2xl bg-slate-50 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{'\u6839\u636e'}</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {card.evidence.map((item) => (
+                                <span key={item} className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs text-slate-600 ring-1 ring-slate-200">
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{'\u5efa\u8bae\u52a8\u4f5c'}</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-700">{card.action}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                <div className={cn('grid gap-4', hasBasicReportContent && hasDeepReport ? 'xl:grid-cols-[1fr_1fr]' : 'grid-cols-1')}>
+                  {hasBasicReportContent ? (
                   <section ref={basicReportRef} className="rounded-[26px] border border-cyan-100 bg-gradient-to-b from-cyan-50/70 to-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700 ring-1 ring-cyan-100">
                           <Zap size={12} />
-                          {'\u5feb\u901f\u7ed3\u8bba'}
+                          {hasAuxiliaryReport ? '\u5feb\u901f\u7ed3\u8bba' : '\u5373\u65f6\u7ed3\u8bba'}
                         </div>
                         <h3 className="mt-3 text-lg font-semibold text-slate-900">{PANEL_TEXTS.auxiliaryDiagnosis}</h3>
-                        <p className="mt-1 text-sm text-slate-500">{'\u9762\u5411\u7b5b\u67e5\u548c\u521d\u6b65\u5224\u65ad\u7684\u57fa\u7840\u7ed3\u8bba\uff0c\u53ef\u5148\u7528\u4e8e\u5feb\u901f\u8bfb\u53d6\u5f53\u524d\u98ce\u9669\u3002'}</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {hasAuxiliaryReport
+                            ? '\u9762\u5411\u7b5b\u67e5\u548c\u521d\u6b65\u5224\u65ad\u7684\u57fa\u7840\u7ed3\u8bba\uff0c\u53ef\u5148\u7528\u4e8e\u5feb\u901f\u8bfb\u53d6\u5f53\u524d\u98ce\u9669\u3002'
+                            : '\u8fd9\u662f\u5b8c\u6210\u8bc4\u4f30\u540e\u7acb\u5373\u751f\u6210\u7684\u672c\u5730\u7ed3\u8bba\uff0c\u7528\u6765\u907f\u514d\u62a5\u544a\u672a\u843d\u4f4d\u65f6\u53f3\u4fa7\u51fa\u73b0\u7a7a\u767d\u3002'}
+                        </p>
                       </div>
 
                       <button
@@ -334,46 +387,35 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
 
                     <div className="mt-4">
                       <MarkdownReport
-                        content={auxiliaryDiagnosis || ''}
+                        content={basicReportContent}
                         loading={false}
                         animate={false}
                         showChrome={false}
                         tone="cyan"
-                        className="min-h-[260px] bg-white/90 sm:min-h-[300px]"
+                        className="min-h-[300px] bg-white/90 sm:min-h-[340px]"
                       />
                     </div>
                   </section>
                 ) : null}
 
-                {hasDeepReport || isLoadingDeepReport ? (
-                  <section ref={deepReportRef} className="rounded-[26px] border border-violet-100 bg-gradient-to-b from-violet-50/70 to-white p-4 shadow-sm">
+                  {hasDeepReport ? (
+                    <section ref={deepReportRef} className="rounded-[26px] border border-violet-100 bg-gradient-to-b from-violet-50/70 to-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700 ring-1 ring-violet-100">
                           <Sparkles size={12} />
-                          {'AI Insight'}
+                          {'Report Sync'}
                         </div>
-                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{PANEL_TEXTS.deepAnalysis}</h3>
+                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{'\u62a5\u544a\u6269\u5c55\u5185\u5bb9'}</h3>
                         <p className="mt-1 text-sm text-slate-500">
-                          {hasDeepReport ? '\u8fd9\u4e00\u533a\u57df\u4e13\u6ce8\u4e8e\u7ed3\u8bba\u89e3\u91ca\u3001\u98ce\u9669\u62c6\u89e3\u548c\u5efa\u8bae\u52a8\u4f5c\uff0c\u5bf9\u5e94\u6570\u636e\u8bc1\u636e\u8bf7\u8df3\u8f6c\u5230\u6570\u636e\u4e2d\u5fc3\u3002' : '\u6df1\u5ea6\u5206\u6790\u6b63\u5728\u751f\u6210\uff0c\u751f\u6210\u671f\u95f4\u53ef\u5148\u9605\u8bfb\u57fa\u7840\u62a5\u544a\u3002'}
+                          {'\u5982\u679c\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u5df2\u540c\u6b65\u56de\u4f20\u62a5\u544a\u6269\u5c55\u5185\u5bb9\uff0c\u4f1a\u5728\u8fd9\u91cc\u4e0e\u672c\u5730\u4f53\u6001\u57fa\u7840\u62a5\u544a\u4e00\u8d77\u9605\u8bfb\u3002'}
                         </p>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        {!hasDeepReport && onRequestDeepAnalysis && !isLoadingDeepReport ? (
-                          <button
-                            type="button"
-                            className="btn-primary h-9 px-3"
-                            onClick={() => onRequestDeepAnalysis()}
-                          >
-                            <Sparkles size={14} />
-                            {PANEL_TEXTS.deepAnalysis}
-                          </button>
-                        ) : (
-                          <span className={cn('status-badge h-7 px-3', hasDeepReport ? 'status-success' : 'status-processing')}>
-                            {hasDeepReport ? '\u5df2\u751f\u6210' : '\u751f\u6210\u4e2d'}
-                          </span>
-                        )}
+                        <span className={cn('status-badge h-7 px-3', hasDeepReport ? 'status-success' : 'status-processing')}>
+                          {hasDeepReport ? '\u5df2\u540c\u6b65' : '\u5f85\u62a5\u544a\u4e2d\u5fc3'}
+                        </span>
                         <button
                           type="button"
                           className="btn-secondary h-8 px-3"
@@ -385,71 +427,47 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                       </div>
                     </div>
 
-                    {(isStreamingReport || isLoadingDeepReport) && !markdownReport ? (
-                      <div className="mt-4 rounded-2xl border border-violet-100 bg-white/80 p-4">
-                        <div className="flex items-center gap-2 text-sm font-medium text-violet-700">
-                          <Loader2 size={14} className="animate-spin" />
-                          {'\u6b63\u5728\u8f93\u51fa\u6df1\u5ea6\u5206\u6790'}
-                        </div>
-                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-violet-100">
-                          <div className="h-full w-1/3 animate-pulse rounded-full bg-violet-500" />
-                        </div>
-                        <p className="mt-3 text-xs text-slate-500">{'\u6df1\u5ea6\u62a5\u544a\u4f1a\u6301\u7eed\u8865\u5168\uff0c\u5173\u952e\u6307\u6807\u53ef\u5148\u5728\u6570\u636e\u4e2d\u5fc3\u67e5\u770b\u3002'}</p>
-                      </div>
-                    ) : null}
-
                     <div className="mt-4">
                       <MarkdownReport
                         content={deepReportContent}
-                        loading={Boolean(isLoadingDeepReport && !deepReportContent)}
-                        animate={!isStreamingReport}
+                        loading={false}
+                        animate={Boolean(isStreamingReport)}
                         showChrome={false}
                         tone="violet"
-                        className="min-h-[260px] bg-white/90 sm:min-h-[300px]"
-                        emptyTitle={'\u6682\u65e0\u6df1\u5ea6\u62a5\u544a'}
-                        emptyDescription={'\u53ef\u5728\u8bc4\u4f30\u5b8c\u6210\u540e\u53d1\u8d77 AI \u6df1\u5ea6\u5206\u6790\u3002'}
+                        className="min-h-[300px] bg-white/90 sm:min-h-[340px]"
+                        emptyTitle={'\u6682\u65e0\u62a5\u544a\u6269\u5c55\u5185\u5bb9'}
+                        emptyDescription={'\u8fd9\u4e00\u533a\u57df\u4f1a\u5728\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u540c\u6b65\u56de\u4f20\u540e\u663e\u793a\u6269\u5c55\u62a5\u544a\u5185\u5bb9\u3002'}
                       />
                     </div>
-                  </section>
-                ) : null}
+                    </section>
+                  ) : null}
+                </div>
               </div>
             ) : (
               <div className="state-panel flex min-h-[360px] flex-col items-center justify-center gap-3">
                 <FileText className="h-10 w-10 text-slate-400" />
                 <h3>{'\u6682\u65e0\u62a5\u544a'}</h3>
-                <p>{'\u5b8c\u6210\u62cd\u6444\u540e\u4f1a\u81ea\u52a8\u751f\u6210\u57fa\u7840\u62a5\u544a\uff0c\u4f60\u4e5f\u53ef\u4ee5\u5728\u5b8c\u6210\u540e\u53d1\u8d77\u6df1\u5ea6\u5206\u6790\u3002'}</p>
-                {isCompleted && onRequestDeepAnalysis ? (
-                  <button
-                    type="button"
-                    className="btn-secondary mt-2"
-                    onClick={() => onRequestDeepAnalysis()}
-                    disabled={isLoadingDeepReport}
-                  >
-                    <Sparkles size={14} />
-                    {'\u751f\u6210\u6df1\u5ea6\u5206\u6790'}
-                  </button>
-                ) : null}
+                <p>{isCompleted ? '\u5b8c\u6210\u62cd\u6444\u540e\u4f1a\u81ea\u52a8\u751f\u6210\u672c\u6b21\u4f53\u6001\u57fa\u7840\u62a5\u544a\uff0c\u7efc\u5408 LLM \u62a5\u544a\u5219\u7531\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210\u3002' : '\u62cd\u6444\u5b8c\u6210\u540e\u8fd9\u91cc\u4f1a\u627f\u63a5\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u7684\u57fa\u7840\u62a5\u544a\u3002'}</p>
               </div>
             )}
-          </div>
-        ) : (
-          <div className={cn('h-full', ANIMATIONS.fadeIn)}>
-            <Vision3Dashboard
-              activeTab={activeTab}
-              result={result}
-              showHeadAxes={showHeadAxes}
-              setShowHeadAxes={setShowHeadAxes}
-              axesScale={axesScale}
-              setAxesScale={setAxesScale}
-              getShoulderStatus={getShoulderStatus}
-              getHeadStatus={getHeadStatus}
-              getHipStatus={getHipStatus}
-              getSeverityLabel={getSeverityLabel}
-              focusTarget={focusTarget}
-              onNavigateToReport={(target) => onNavigate?.('report', target)}
-            />
-          </div>
-        )}
+        </div>
+
+        <div className={cn('h-full', activePanel !== 'dashboard' && 'hidden')}>
+          <Vision3Dashboard
+            activeTab={activeTab}
+            result={result}
+            showHeadAxes={showHeadAxes}
+            setShowHeadAxes={setShowHeadAxes}
+            axesScale={axesScale}
+            setAxesScale={setAxesScale}
+            getShoulderStatus={getShoulderStatus}
+            getHeadStatus={getHeadStatus}
+            getHipStatus={getHipStatus}
+            getSeverityLabel={getSeverityLabel}
+            focusTarget={focusTarget}
+            onNavigateToReport={(target) => onNavigate?.('report', target)}
+          />
+        </div>
       </div>
     </div>
   );

@@ -131,10 +131,22 @@ class TreatmentPlanRequest(BaseModel):
     createdBy: str
 
 
+class SessionTreatmentPlanRequest(BaseModel):
+    patientId: str
+    sessionId: str
+    sessionReportId: str
+    sessionReportMarkdown: str
+    insights: List[str] = []
+    recommendations: List[str] = []
+    createdBy: str
+
+
 class TreatmentPlanResponse(BaseModel):
     id: Optional[int] = None
     patientId: str
-    assessmentId: str
+    assessmentId: Optional[str] = None
+    sessionId: Optional[str] = None
+    sessionReportId: Optional[str] = None
     version: int = 1
     content: str
     isCurrent: bool = True
@@ -146,3 +158,39 @@ class TreatmentPlanResponse(BaseModel):
 class TreatmentPlanStreamResponse(BaseModel):
     chunk: str
     done: bool = False
+
+
+class SessionReportSectionInput(BaseModel):
+    title: str
+    status: str
+    preview: Optional[str] = None
+    evidenceCount: int = 0
+
+
+class SessionReportReadiness(BaseModel):
+    readyCount: int
+    partialCount: int
+    missingTypes: List[str] = []
+    availableTypes: List[str] = []
+
+
+class SessionReportRequest(BaseModel):
+    sessionId: str
+    patientId: str
+    patientName: Optional[str] = None
+    sourceAssessmentIds: List[str] = []
+    readiness: SessionReportReadiness
+    posture: Optional[SessionReportSectionInput] = None
+    rom: Optional[SessionReportSectionInput] = None
+    medvoice: Optional[SessionReportSectionInput] = None
+
+
+class SessionReportResponse(BaseModel):
+    id: str
+    sessionId: str
+    patientId: str
+    markdown: str
+    insights: List[str] = []
+    recommendations: List[str] = []
+    createdAt: int
+    sourceAssessmentIds: List[str] = []

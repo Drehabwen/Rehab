@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { useCaseStore, StructuredCase } from '@/store/useCaseStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
+import { usePatientStore } from '@/store/usePatientStore';
+import { useSessionStore } from '@/store/useSessionStore';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { CONFIG } from '@/config';
 import { PageTitleSection, UnifiedStatusBadge, StatePanel } from '@/components/layout';
@@ -112,6 +114,10 @@ export const MedVoicePlugin: React.FC = () => {
 
   const { structuredCase, setStructuredCase, patientInfo } = useCaseStore();
   const { addAssessment } = useAssessmentStore();
+  const currentPatient = usePatientStore((state) => state.currentPatient);
+  const currentSession = useSessionStore((state) => state.currentSession);
+  const sessions = useSessionStore((state) => state.sessions);
+  const startSession = useSessionStore((state) => state.startSession);
   const [activeSection, setActiveSection] = useState<string>('主诉');
 
   const { activeMeasurements, savedMeasurements } = useMeasurementStore();
@@ -133,6 +139,7 @@ export const MedVoicePlugin: React.FC = () => {
 
   const hasTranscript = transcript.trim().length > 0;
   const structuredReady = hasStructuredContent(structuredCase);
+  const canSaveToReportCenter = Boolean(structuredReady && hasTranscript && currentPatient);
 
   const recordingStatus = isRecording
     ? { tone: 'processing' as const, text: `录音中 ${formatTime(recordTime)}` }
@@ -192,13 +199,19 @@ export const MedVoicePlugin: React.FC = () => {
   };
 
   const handleSaveToAssessment = async () => {
-    if (!structuredCase || !hasTranscript) return;
+    if (!structuredCase || !hasTranscript || !currentPatient) return;
 
     setIsSaving(true);
     try {
+      const patientId = currentPatient.id;
+      const sessionId =
+        (currentSession?.patientId === patientId ? currentSession.id : undefined)
+        ?? sessions.find((session) => session.patientId === patientId)?.id
+        ?? (await startSession(patientId)).id;
+
       await addAssessment({
-        sessionId: `session_${Date.now()}`,
-        patientId: patientInfo.case_id,
+        sessionId,
+        patientId,
         type: 'medvoice',
         mode: 'voice',
         data: {
@@ -206,7 +219,11 @@ export const MedVoicePlugin: React.FC = () => {
             mode: 'voice',
             transcript,
             structuredCase,
-            patientInfo,
+            patientInfo: {
+              ...patientInfo,
+              name: currentPatient.name || patientInfo.name,
+              case_id: patientId,
+            },
             viewMode,
           },
         },
@@ -274,8 +291,8 @@ export const MedVoicePlugin: React.FC = () => {
           ) : (
             <button
               onClick={handleSaveToAssessment}
-              disabled={!structuredReady || !hasTranscript || isSaving}
-              className={cn('btn-primary', (!structuredReady || !hasTranscript || isSaving) && 'opacity-50 cursor-not-allowed')}
+              disabled={!canSaveToReportCenter || isSaving}
+              className={cn('btn-primary', (!canSaveToReportCenter || isSaving) && 'opacity-50 cursor-not-allowed')}
             >
               <Save size={14} />
               {isSaving ? '保存中...' : '保存到报告中心'}
@@ -366,7 +383,7 @@ export const MedVoicePlugin: React.FC = () => {
 
             {!isRecording && structuredReady && !isSaved ? (
               <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                当前病历已解析，建议核对后保存到报告中心。
+                {currentPatient ? '当前病历已解析，建议核对后保存到报告中心。' : '请先进入具体患者工作台，再将病历保存到报告中心。'}
               </div>
             ) : null}
 

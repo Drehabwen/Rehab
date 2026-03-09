@@ -31,10 +31,15 @@ export const useVision3AutoSave = ({
   const hasSavedAuxiliaryRef = useRef(false);
   const hasSavedDeepRef = useRef(false);
   const { currentPatient, patients } = usePatientStore();
-  const { sessions, startSession } = useSessionStore();
+  const { currentSession, sessions, startSession } = useSessionStore();
   const { addAssessment, updateAssessment } = useAssessmentStore();
   const { postureReports } = useMeasurementStore();
   const currentAssessmentIdRef = useRef<string | null>(null);
+  const pickLatestReport = () => (
+    postureReports.find((report) => report.view === view && (report.markdown || report.auxiliaryDiagnosis || report.metrics || (report.issues?.length ?? 0) > 0))
+    ?? postureReports.find((report) => report.markdown || report.auxiliaryDiagnosis || report.metrics || (report.issues?.length ?? 0) > 0)
+    ?? null
+  );
 
   useEffect(() => {
     const saveAssessment = async () => {
@@ -46,14 +51,15 @@ export const useVision3AutoSave = ({
           const patientId = currentPatient?.id;
           if (!patientId) return;
           
-          let sessionId = sessions.find(s => s.patientId === patientId)?.id;
+          let sessionId =
+            (currentSession?.patientId === patientId ? currentSession.id : undefined)
+            ?? sessions.find((session) => session.patientId === patientId)?.id;
           if (!sessionId) {
             const newSession = await startSession(patientId);
             sessionId = newSession.id;
           }
           
-          // Get the latest report for current view inside useEffect
-          const latestReport = postureReports.find(r => r.view === view);
+          const latestReport = pickLatestReport();
           
           // Use data from latestReport if available, otherwise fall back to wsResult
           const reportMetrics = latestReport?.metrics || wsResult?.metrics;
@@ -103,8 +109,7 @@ export const useVision3AutoSave = ({
       if (markdownReport && !hasSavedDeepRef.current && currentAssessmentIdRef.current) {
         hasSavedDeepRef.current = true;
         try {
-          // Get the latest report for current view inside useEffect
-          const latestReport = postureReports.find(r => r.view === view);
+          const latestReport = pickLatestReport();
           
           // Use data from latestReport if available, otherwise fall back to props
           const reportMetrics = latestReport?.metrics || wsResult?.metrics;
@@ -135,7 +140,7 @@ export const useVision3AutoSave = ({
     };
     
     saveAssessment();
-  }, [step, wsResult, markdownReport, auxiliaryDiagnosis, timeSeriesData, currentPatient, patients, sessions, startSession, addAssessment, updateAssessment, assessmentMode, view, postureReports]);
+  }, [step, wsResult, markdownReport, auxiliaryDiagnosis, timeSeriesData, currentPatient, patients, currentSession, sessions, startSession, addAssessment, updateAssessment, assessmentMode, view, postureReports]);
 
   useEffect(() => {
     if (step !== 'completed') {

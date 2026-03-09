@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Results } from '@/lib/mediapipe-utils';
-import { Activity, AlertTriangle, ChevronDown, FileText, RefreshCw, Sparkles } from 'lucide-react';
+import { Activity, AlertTriangle, ChevronDown, FileText, RefreshCw } from 'lucide-react';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { useVision3Camera } from './hooks/useVision3Camera';
 import { usePostureAnalysis } from './hooks/usePostureAnalysis';
@@ -36,7 +36,6 @@ export const Vision3Plugin: React.FC = () => {
   const [showHeadAxes, setShowHeadAxes] = useState(true);
   const [axesScale, setAxesScale] = useState(1);
   const [activePanel, setActivePanel] = useState<'dashboard' | 'report'>('dashboard');
-  const [isLoadingDeepReport, setIsLoadingDeepReport] = useState(false);
   const [focusTarget, setFocusTarget] = useState<WorkspaceFocusTarget>('workspace-summary');
   const [isContextPanelOpen, setIsContextPanelOpen] = useState(false);
 
@@ -67,7 +66,6 @@ export const Vision3Plugin: React.FC = () => {
     steppedResults,
     setSteppedResults,
     analyzeStepped,
-    requestDeepAnalysis,
     headAxes,
     annotations,
     markdownReport,
@@ -115,7 +113,14 @@ export const Vision3Plugin: React.FC = () => {
     postureReports,
   } = useMeasurementStore();
 
-  const currentReport = postureReports.find((report) => report.view === view);
+  const hasReportPayload = useCallback((report?: (typeof postureReports)[number] | null) => (
+    Boolean(report?.markdown || report?.auxiliaryDiagnosis || report?.metrics || (report?.issues?.length ?? 0) > 0)
+  ), []);
+  const normalizeReportContent = useCallback((value?: string | null) => (value ?? '').trim(), []);
+  const currentViewReport = postureReports.find((report) => report.view === view && hasReportPayload(report));
+  const fallbackReport = postureReports.find((report) => hasReportPayload(report)) ?? postureReports[0] ?? null;
+  const currentReport = currentViewReport ?? fallbackReport;
+  const reportSource = currentViewReport ? 'current-view' : currentReport ? 'latest-available' : 'none';
 
   useEffect(() => {
     console.log('[Vision3Plugin] postureReports changed:', {
@@ -132,6 +137,7 @@ export const Vision3Plugin: React.FC = () => {
       currentReport
         ? {
             view: currentReport.view,
+            source: reportSource,
             hasMarkdown: !!currentReport.markdown,
             markdownLength: currentReport.markdown?.length,
             hasAuxiliary: !!currentReport.auxiliaryDiagnosis,
@@ -140,7 +146,7 @@ export const Vision3Plugin: React.FC = () => {
         : 'null',
     );
     console.log('[Vision3Plugin] current view:', view);
-  }, [postureReports, currentReport, view]);
+  }, [postureReports, currentReport, reportSource, view]);
 
   const displayResult = wsResult ?? (currentReport?.metrics
     ? {
@@ -150,7 +156,21 @@ export const Vision3Plugin: React.FC = () => {
       }
     : null);
 
-  const displayMarkdownReport = markdownReport || currentReport?.markdown || null;
+  const liveBasicReport = normalizeReportContent(auxiliaryDiagnosis);
+  const cachedBasicReport = normalizeReportContent(currentReport?.auxiliaryDiagnosis);
+  const liveExpandedReport = normalizeReportContent(markdownReport);
+  const cachedExpandedReport = normalizeReportContent(currentReport?.markdown);
+  const displayMarkdownReport = (() => {
+    if (liveExpandedReport && liveExpandedReport !== liveBasicReport) {
+      return markdownReport;
+    }
+
+    if (cachedExpandedReport && cachedExpandedReport !== cachedBasicReport) {
+      return currentReport?.markdown || null;
+    }
+
+    return null;
+  })();
   const displayAuxiliaryDiagnosis = auxiliaryDiagnosis || currentReport?.auxiliaryDiagnosis || null;
   const completedMetricCount = displayResult
     ? Object.values(displayResult.metrics).filter((value) => typeof value === 'number' && Number.isFinite(value)).length
@@ -186,37 +206,24 @@ export const Vision3Plugin: React.FC = () => {
     }
   }, [captureStatus]);
 
-  const handleRequestDeepAnalysis = useCallback(() => {
-    console.log('[Vision3Plugin] handleRequestDeepAnalysis called');
-    setIsLoadingDeepReport(true);
-    setFocusTarget('report-deep');
-    setActivePanel('report');
-    requestDeepAnalysis();
-  }, [requestDeepAnalysis]);
-
   const handleNavigateWorkspace = useCallback((panel: 'dashboard' | 'report', target: WorkspaceFocusTarget) => {
     setActivePanel(panel);
     setFocusTarget(target);
   }, []);
 
   useEffect(() => {
-    if (markdownReport) {
-      setIsLoadingDeepReport(false);
-    }
-  }, [markdownReport]);
-
-  useEffect(() => {
-    console.log('[Vision3Plugin] markdownReport or auxiliaryDiagnosis changed:', {
-      markdownReport: markdownReport ? 'exists' : 'null',
-      auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
+    console.log('[Vision3Plugin] display report state changed:', {
+      markdownReport: displayMarkdownReport ? 'exists' : 'null',
+      auxiliaryDiagnosis: displayAuxiliaryDiagnosis ? 'exists' : 'null',
+      source: reportSource,
     });
-    if (markdownReport || auxiliaryDiagnosis) {
+    if (displayMarkdownReport || displayAuxiliaryDiagnosis) {
       console.log('Report received, switching to report panel');
       setActivePanel('report');
-      setFocusTarget(markdownReport ? 'report-deep' : 'report-basic');
+      setFocusTarget(displayMarkdownReport ? 'report-deep' : 'report-basic');
       setCaptureStatus('completed');
     }
-  }, [markdownReport, auxiliaryDiagnosis, setActivePanel, setCaptureStatus]);
+  }, [displayMarkdownReport, displayAuxiliaryDiagnosis, reportSource, setActivePanel, setCaptureStatus]);
 
   useEffect(() => {
     console.log('[Vision3Plugin] captureStatus changed:', captureStatus);
@@ -291,8 +298,6 @@ export const Vision3Plugin: React.FC = () => {
       getHipStatus={getHipStatus}
       getSeverityLabel={getSeverityLabel}
       assessmentType={assessmentType}
-      isLoadingDeepReport={isLoadingDeepReport}
-      onRequestDeepAnalysis={handleRequestDeepAnalysis}
       focusTarget={focusTarget}
       onNavigate={handleNavigateWorkspace}
     />
@@ -335,23 +340,23 @@ export const Vision3Plugin: React.FC = () => {
               />
             ) : (
               <div
-                className={`flex-1 min-h-0 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 ${
-                  isCompletedView ? 'p-1 sm:p-2' : 'grid grid-cols-12 grid-rows-6 gap-4 md:gap-6 lg:gap-8'
+                className={`flex-1 min-h-0 overflow-hidden ${
+                  isCompletedView ? 'p-1 sm:p-2' : 'animate-in fade-in slide-in-from-bottom-4 duration-700 grid grid-cols-12 grid-rows-6 gap-4 md:gap-6 lg:gap-8'
                 }`}
               >
                 {isCompletedView ? (
-                  <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.08),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.08),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-3 shadow-[0_28px_80px_rgba(15,23,42,0.08)] sm:p-4 lg:p-5">
-                    <div className="rounded-[1.6rem] border border-white/70 bg-white/85 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5">
+                  <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.06),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-3 shadow-[0_24px_64px_rgba(15,23,42,0.07)] sm:p-4">
+                    <div className="rounded-[1.5rem] border border-white/70 bg-white/90 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
                           <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Posture Workspace</p>
                           <h2 className="mt-1 text-xl font-semibold text-slate-900 sm:text-2xl">{'\u4f53\u6001\u8bc4\u4f30\u5de5\u4f5c\u53f0'}</h2>
                           <p className="mt-1 max-w-3xl text-sm text-slate-500">
                             {displayMarkdownReport
-                              ? '\u5f53\u524d\u5df2\u8fdb\u5165\u5b8c\u6210\u6001\uff0c\u53ef\u76f4\u63a5\u5728\u53f3\u4fa7\u7ee7\u7eed\u9605\u8bfb\u6df1\u5ea6\u62a5\u544a\uff0c\u5de6\u4fa7\u4fdd\u7559\u9884\u89c8\u4e0e\u8bc4\u4f30\u6458\u8981\u3002'
+                              ? '\u5f53\u524d\u5df2\u8fdb\u5165\u8bc4\u4f30\u7ed3\u679c\u5de5\u4f5c\u53f0\uff0c\u53ef\u76f4\u63a5\u67e5\u770b\u672c\u6b21\u4f53\u6001\u57fa\u7840\u62a5\u544a\u4e0e\u5df2\u540c\u6b65\u7684\u62a5\u544a\u5185\u5bb9\u3002'
                               : displayAuxiliaryDiagnosis
-                                ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u5f53\u524d\u5de5\u4f5c\u53f0\u4f1a\u4f18\u5148\u7a81\u51fa\u7ed3\u8bba\u9605\u8bfb\u4e0e\u540e\u7eed\u6df1\u5ea6\u5206\u6790\u5165\u53e3\u3002'
-                                : '\u62cd\u6444\u4e0e\u5206\u6790\u5df2\u7ed3\u675f\uff0c\u53f3\u4fa7\u62a5\u544a\u533a\u4f1a\u7ee7\u7eed\u66f4\u65b0\u5f53\u524d\u7ed3\u679c\uff0c\u5de6\u4fa7\u4fdd\u7559\u9884\u89c8\u548c\u6458\u8981\u3002'}
+                                ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u53ef\u76f4\u63a5\u5728\u53f3\u4fa7\u9605\u8bfb\u672c\u6b21\u4f53\u6001\u7ed3\u8bba\uff1b\u7efc\u5408 LLM \u62a5\u544a\u5c06\u5728\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210\u3002'
+                                : '\u62cd\u6444\u4e0e\u5206\u6790\u5df2\u7ed3\u675f\uff0c\u53f3\u4fa7\u4f1a\u4f18\u5148\u627f\u63a5\u672c\u6b21\u4f53\u6001\u57fa\u7840\u62a5\u544a\u4e0e\u6570\u636e\u8bc1\u636e\u3002'}
                           </p>
                         </div>
                       </div>
@@ -397,7 +402,7 @@ export const Vision3Plugin: React.FC = () => {
                             onClick={() => handleNavigateWorkspace('report', displayMarkdownReport ? 'report-deep' : 'report-basic')}
                           >
                             <FileText size={14} className="mr-2 inline-flex" />
-                            {`\u62a5\u544a\u4e2d\u5fc3`}
+                            {`\u8bc4\u4f30\u62a5\u544a`}
                           </button>
                           <button
                             type="button"
@@ -411,33 +416,22 @@ export const Vision3Plugin: React.FC = () => {
                             <Activity size={14} className="mr-2 inline-flex" />
                             {`\u6570\u636e\u4e2d\u5fc3`}
                           </button>
-                          {!displayMarkdownReport && displayAuxiliaryDiagnosis ? (
-                            <button
-                              type="button"
-                              className="btn-primary h-9 px-3"
-                              onClick={handleRequestDeepAnalysis}
-                              disabled={isLoadingDeepReport}
-                            >
-                              <Sparkles size={14} />
-                              {isLoadingDeepReport ? '\u751f\u6210\u4e2d...' : '\u751f\u6210\u6df1\u5ea6\u5206\u6790'}
-                            </button>
-                          ) : null}
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 flex min-h-0 flex-col gap-4 xl:flex-row xl:items-stretch xl:gap-5">
-                      <div className={`order-2 w-full flex-shrink-0 flex-col gap-4 xl:order-1 xl:flex xl:w-[min(420px,32%)] xl:min-w-[340px] ${
+                    <div className="mt-4 flex min-h-0 flex-col gap-4 xl:flex-row xl:items-stretch xl:gap-4">
+                      <div className={`order-2 w-full flex-shrink-0 flex-col gap-3 xl:order-1 xl:flex xl:w-[min(360px,29%)] xl:min-w-[300px] ${
                         isContextPanelOpen ? 'flex' : 'hidden xl:flex'
                       }`}>
                         {cameraStage}
 
-                        <section className="bento-card animate-in space-y-4 border border-slate-200/80 bg-white/92 p-5 shadow-sm fade-in slide-in-from-bottom-4 duration-500">
+                        <section className="bento-card space-y-3 border border-slate-200/80 bg-white/94 p-4 shadow-sm">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Session Snapshot</p>
-                              <h3 className="mt-1 text-lg font-semibold text-slate-900">{'\u672c\u6b21\u8bc4\u4f30\u6458\u8981'}</h3>
-                              <p className="mt-1 text-sm text-slate-500">{'\u8fd9\u91cc\u6536\u62e2\u5f53\u524d\u62cd\u6444\u7ed3\u679c\uff0c\u4fbf\u4e8e\u5728\u9605\u8bfb\u62a5\u544a\u65f6\u5feb\u901f\u56de\u770b\u3002'}</p>
+                              <h3 className="mt-1 text-base font-semibold text-slate-900">{'\u672c\u6b21\u8bc4\u4f30\u6458\u8981'}</h3>
+                              <p className="mt-1 text-sm text-slate-500">{'\u538b\u7f29\u4fdd\u7559\u672c\u6b21\u89c6\u56fe\u3001\u98ce\u9669\u548c\u6307\u6807\u6458\u8981\uff0c\u51cf\u5c11\u53f3\u4fa7\u9605\u8bfb\u65f6\u7684\u89c6\u89c9\u6253\u6270\u3002'}</p>
                             </div>
                             <button
                               type="button"
@@ -449,61 +443,49 @@ export const Vision3Plugin: React.FC = () => {
                             </button>
                           </div>
 
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div className="space-y-3">
                             <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
-                              <p className="text-xs text-slate-500">{'\u89c6\u56fe'}</p>
-                              <p className="mt-2 text-lg font-semibold text-slate-900">{currentViewLabel}</p>
-                              <p className="mt-1 text-xs text-slate-500">{assessmentType === 'quick' ? '\u5feb\u901f\u7b5b\u67e5\u89c6\u56fe' : '\u5f53\u524d\u805a\u7126\u89c6\u56fe'}</p>
-                            </div>
-
-                            <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
-                              <p className="text-xs text-slate-500">{'\u8bc4\u4f30\u6a21\u5f0f'}</p>
-                              <p className="mt-2 text-lg font-semibold text-slate-900">{assessmentType === 'quick' ? '\u5feb\u901f\u8bc4\u4f30' : '\u6807\u51c6\u8bc4\u4f30'}</p>
-                              <p className="mt-1 text-xs text-slate-500">{assessmentMode === 'stepped' ? '\u5206\u6b65\u62cd\u6444' : '\u5b9e\u65f6\u5206\u6790'}</p>
-                            </div>
-
-                            <div className="rounded-20 border border-slate-200 bg-white p-4">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs text-slate-500">{'\u98ce\u9669\u9879'}</p>
-                                <AlertTriangle size={14} className={completedIssueCount > 0 ? 'text-amber-500' : 'text-emerald-500'} />
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <p className="text-xs text-slate-500">{'\u89c6\u56fe\u4e0e\u6a21\u5f0f'}</p>
+                                  <p className="mt-2 text-base font-semibold text-slate-900">
+                                    {`${currentViewLabel} · ${assessmentType === 'quick' ? '\u5feb\u901f\u8bc4\u4f30' : '\u6807\u51c6\u8bc4\u4f30'}`}
+                                  </p>
+                                  <p className="mt-1 text-xs text-slate-500">{assessmentMode === 'stepped' ? '\u5206\u6b65\u62cd\u6444' : '\u5b9e\u65f6\u5206\u6790'}</p>
+                                </div>
+                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                                  {currentViewLabel}
+                                </span>
                               </div>
-                              <p className="mt-2 text-2xl font-semibold text-slate-900">{completedIssueCount}</p>
-                              <p className="mt-1 text-xs text-slate-500">{completedIssueCount > 0 ? '\u53f3\u4fa7\u62a5\u544a\u533a\u67e5\u770b\u8be6\u7ec6\u7ed3\u8bba' : '\u76ee\u524d\u672a\u89c1\u663e\u8457\u5f02\u5e38'}</p>
                             </div>
 
-                            <div className="rounded-20 border border-slate-200 bg-white p-4">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs text-slate-500">{'\u53ef\u7528\u6307\u6807'}</p>
-                                <Activity size={14} className="text-blue-600" />
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="rounded-20 border border-slate-200 bg-white p-4">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs text-slate-500">{'\u98ce\u9669\u9879'}</p>
+                                  <AlertTriangle size={14} className={completedIssueCount > 0 ? 'text-amber-500' : 'text-emerald-500'} />
+                                </div>
+                                <p className="mt-2 text-2xl font-semibold text-slate-900">{completedIssueCount}</p>
+                                <p className="mt-1 text-xs text-slate-500">{completedIssueCount > 0 ? '\u5df2\u53ef\u5728\u53f3\u4fa7\u7ed3\u8bba\u533a\u67e5\u770b' : '\u672a\u89c1\u663e\u8457\u5f02\u5e38'}</p>
                               </div>
-                              <p className="mt-2 text-2xl font-semibold text-slate-900">{completedMetricCount}</p>
-                              <p className="mt-1 text-xs text-slate-500">{'\u5df2\u8fdb\u5165\u57fa\u7840\u6570\u636e\u9762\u677f'}</p>
-                            </div>
-                          </div>
 
-                          <div className="rounded-20 border border-slate-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.95),rgba(255,255,255,1))] p-4">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div>
-                                <p className="text-sm font-semibold text-slate-900">{'\u63a8\u8350\u64cd\u4f5c'}</p>
-                                <p className="mt-1 text-xs leading-6 text-slate-600">
-                                  {displayMarkdownReport
-                                    ? '\u53f3\u4fa7\u5df2\u6709\u6df1\u5ea6\u62a5\u544a\uff0c\u53ef\u76f4\u63a5\u8fdb\u884c\u7ec6\u8bfb\u3002'
-                                    : displayAuxiliaryDiagnosis
-                                      ? '\u5148\u9605\u8bfb\u57fa\u7840\u62a5\u544a\uff0c\u5982\u9700\u66f4\u8be6\u7ec6\u8bf4\u660e\u53ef\u7ee7\u7eed\u751f\u6210\u6df1\u5ea6\u5206\u6790\u3002'
-                                      : '\u53f3\u4fa7\u62a5\u544a\u533a\u4f1a\u7ee7\u7eed\u66f4\u65b0\u5f53\u524d\u8bc4\u4f30\u7ed3\u679c\u3002'}
-                                </p>
+                              <div className="rounded-20 border border-slate-200 bg-white p-4">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-xs text-slate-500">{'\u53ef\u7528\u6307\u6807'}</p>
+                                  <Activity size={14} className="text-blue-600" />
+                                </div>
+                                <p className="mt-2 text-2xl font-semibold text-slate-900">{completedMetricCount}</p>
+                                <p className="mt-1 text-xs text-slate-500">{'\u5df2\u8fdb\u5165\u6570\u636e\u8bc1\u636e\u533a'}</p>
                               </div>
-                              {!displayMarkdownReport && displayAuxiliaryDiagnosis ? (
-                                <button
-                                  type="button"
-                                  className="btn-primary h-9 self-start px-3"
-                                  onClick={handleRequestDeepAnalysis}
-                                  disabled={isLoadingDeepReport}
-                                >
-                                  <Sparkles size={14} />
-                                  {isLoadingDeepReport ? '\u751f\u6210\u4e2d...' : '\u751f\u6210\u6df1\u5ea6\u5206\u6790'}
-                                </button>
-                              ) : null}
+                            </div>
+
+                            <div className="rounded-20 border border-slate-200 bg-[linear-gradient(135deg,rgba(239,246,255,0.82),rgba(255,255,255,1))] p-4">
+                              <p className="text-sm font-semibold text-slate-900">{'\u5f53\u524d\u9605\u8bfb\u6307\u5f15'}</p>
+                              <p className="mt-1 text-xs leading-6 text-slate-600">
+                                {displayAuxiliaryDiagnosis
+                                  ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u53ef\u5728\u53f3\u4fa7\u76f4\u63a5\u9605\u8bfb\u5f53\u524d\u4f53\u6001\u7ed3\u8bba\u3002'
+                                  : '\u62a5\u544a\u533a\u6b63\u5728\u627f\u63a5\u672c\u6b21\u4f53\u6001\u7ed3\u679c\uff0c\u6570\u636e\u8bc1\u636e\u53ef\u968f\u65f6\u5bf9\u7167\u67e5\u770b\u3002'}
+                              </p>
                             </div>
                           </div>
                         </section>

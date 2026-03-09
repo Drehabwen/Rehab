@@ -65,6 +65,10 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     height: number;
   } | null>(null);
 
+  const normalizeReportText = useCallback((value: unknown) => (
+    typeof value === 'string' ? value.trim() : ''
+  ), []);
+
   useEffect(() => {
     savePostureReportRef.current = savePostureReport;
   }, [savePostureReport]);
@@ -76,6 +80,16 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   useEffect(() => {
     auxiliaryDiagnosisRef.current = auxiliaryDiagnosis;
   }, [auxiliaryDiagnosis]);
+
+  const applyResultState = useCallback((nextResult: AnalysisResult | null) => {
+    resultRef.current = nextResult;
+    setResult(nextResult);
+  }, []);
+
+  const applyAuxiliaryDiagnosisState = useCallback((nextDiagnosis: string | null) => {
+    auxiliaryDiagnosisRef.current = nextDiagnosis;
+    setAuxiliaryDiagnosis(nextDiagnosis);
+  }, []);
 
   const clearStreamingBuffer = useCallback(() => {
     streamingBufferRef.current = '';
@@ -150,9 +164,9 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
           const data = JSON.parse(event.data);
           console.log('[usePostureWS] Received message type:', data.type);
           if (data.type === 'ANALYSIS_RESULT') {
-            setResult(data);
+            applyResultState(data);
             const auxReport = generateAuxiliaryReport(data);
-            setAuxiliaryDiagnosis(auxReport);
+            applyAuxiliaryDiagnosisState(auxReport);
           } else if (data.type === 'POSTURE_ACK') {
             if (data.requestId && currentRequestIdRef.current && data.requestId !== currentRequestIdRef.current) {
               return;
@@ -168,13 +182,18 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             
             // 处理深度报告 (markdown) - 只有非空时才设置
             const markdown = typeof data.markdown === 'string' ? data.markdown : '';
-            const normalized = markdown.trim();
-            if (normalized) {
+            const normalized = normalizeReportText(markdown);
+            const normalizedAuxiliaryDiagnosis = normalizeReportText(data.auxiliaryDiagnosis);
+            const hasStandaloneExpandedReport = Boolean(normalized) && (
+              isDeepReport || !normalizedAuxiliaryDiagnosis || normalized !== normalizedAuxiliaryDiagnosis
+            );
+
+            if (hasStandaloneExpandedReport) {
               console.log('[usePostureWS] Setting markdownReport, length:', normalized.length);
               console.log('[usePostureWS] Markdown content snippet:', normalized.substring(0, 100) + '...');
               setMarkdownReport(markdown);
             } else {
-              console.log('[usePostureWS] No markdown report, clearing...');
+              console.log('[usePostureWS] No standalone expanded markdown report, clearing...');
               setMarkdownReport(null);
             }
             
@@ -210,17 +229,18 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
                 effectiveIssueCount: effectiveIssues.length,
                 isDeepReport
               });
-              setResult({
+              const nextResult = {
                 metrics: effectiveMetrics,
                 issues: effectiveIssues,
                 timestamp: data.timestamp || Date.now()
-              });
+              };
+              applyResultState(nextResult);
             }
             
             // Set auxiliary diagnosis from backend (基础报告)
             if (effectiveAuxiliaryDiagnosis !== null) {
               console.log('[usePostureWS] Applying auxiliaryDiagnosis, length:', effectiveAuxiliaryDiagnosis.length);
-              setAuxiliaryDiagnosis(effectiveAuxiliaryDiagnosis);
+              applyAuxiliaryDiagnosisState(effectiveAuxiliaryDiagnosis);
             }
             
             console.log('[usePostureWS] Saving posture report:', {
@@ -235,7 +255,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             savePostureReportRef.current(
               currentViewRef.current, 
               effectiveAuxiliaryDiagnosis || normalized, 
-              normalized || null, 
+              hasStandaloneExpandedReport ? normalized : null,
               timeSeries,
               effectiveMetrics,
               effectiveIssues,
@@ -287,7 +307,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       console.error('Connection error:', e);
       setStatus('error');
     }
-  }, [url, flushPending, clearStreamingBuffer, scheduleStreamingFlush]); // Removed savePostureReport from dependencies as it's a stable store method
+  }, [url, flushPending, clearStreamingBuffer, scheduleStreamingFlush, applyResultState, applyAuxiliaryDiagnosisState, normalizeReportText]); // Removed savePostureReport from dependencies as it's a stable store method
 
   useEffect(() => {
     console.log('[usePostureWS] Initializing WebSocket connection');
@@ -305,11 +325,11 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     console.log('[usePostureWS] analyze called:', { view, landmarksCount: timeSeriesLandmarks.length, width, height });
     clearStreamingBuffer();
     setMarkdownReport(null);
-    setAuxiliaryDiagnosis(null);
+    applyAuxiliaryDiagnosisState(null);
     setTimeSeriesData(null);
     setIsStreamingReport(false);
     setStreamingReport('');
-    setResult(null);
+    applyResultState(null);
     currentViewRef.current = view;
     // 保存分析数据用于后续深度分析请求
     lastAnalysisDataRef.current = { view, timeSeriesLandmarks, width, height };
@@ -322,7 +342,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     };
     console.log('[usePostureWS] Sending POSTURE_SYNC message');
     sendMessage(message);
-  }, [sendMessage, clearStreamingBuffer]);
+  }, [sendMessage, clearStreamingBuffer, applyAuxiliaryDiagnosisState, applyResultState]);
 
   const analyzeJoint = useCallback((
     measurements: { id: string; jointType: string; direction: string; side?: string }[],
@@ -339,16 +359,16 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       landmarks,
       worldLandmarks
     });
-  }, [sendMessage]);
+  }, [sendMessage, applyAuxiliaryDiagnosisState, applyResultState]);
 
   const analyzeBatch = useCallback((analysis: TemporalAnalysis & { timeSeriesLandmarks?: Landmark[][] }) => {
     console.log('[usePostureWS] analyzeBatch called:', { view: analysis.view, landmarksCount: analysis.timeSeriesLandmarks?.length || 0 });
     setMarkdownReport(null);
-    setAuxiliaryDiagnosis(null);
+    applyAuxiliaryDiagnosisState(null);
     setTimeSeriesData(null);
     setIsStreamingReport(false);
     setStreamingReport('');
-    setResult(null);
+    applyResultState(null);
     currentViewRef.current = analysis.view;
     lastBatchTimeSeriesRef.current = analysis.timeSeries;
     sendMessage({
@@ -383,9 +403,9 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     console.log('[usePostureWS] Stored raw frames data for deep analysis:', framesData.length, 'frames');
     
     // 清除之前的报告状态
-    setResult(null);
+    applyResultState(null);
     setMarkdownReport(null);
-    setAuxiliaryDiagnosis(null);
+    applyAuxiliaryDiagnosisState(null);
     setTimeSeriesData(null);
     setIsStreamingReport(false);
     setStreamingReport('');
@@ -428,7 +448,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     sendMessage(message);
     console.log('[usePostureWS] Message sent successfully');
     console.log('[usePostureWS] ========== analyzeStepped END ==========');
-  }, [sendMessage, connect]);
+  }, [sendMessage, connect, applyAuxiliaryDiagnosisState, applyResultState]);
 
   // 新增：请求深度报告
   const requestDeepAnalysis = useCallback(() => {

@@ -56,7 +56,10 @@ export interface TreatmentPlanVersion {
   id: string;
   version: number;
   content: string;
-  assessmentId: string;
+  assessmentId?: string;
+  sessionId?: string;
+  sessionReportId?: string;
+  sourceType?: 'assessment' | 'session-report';
   patientId: string;
   createdAt: string;
   updatedAt: string;

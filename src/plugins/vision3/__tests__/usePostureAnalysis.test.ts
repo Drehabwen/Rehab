@@ -188,6 +188,28 @@ describe('usePostureAnalysis', () => {
     });
   });
 
+  it('marks the assessment step completed when auxiliary diagnosis arrives without markdown', async () => {
+    const { rerender } = renderHook(() => usePostureAnalysis({
+      axesScale: 1,
+      view: 'front',
+      assessmentMode: 'realtime',
+      assessmentType: 'standard'
+    }));
+
+    expect(usePostureAssessmentStore.getState().step).toBe('idle');
+
+    mockUsePostureWS.mockReturnValue({
+      ...defaultWsValue,
+      auxiliaryDiagnosis: '### Basic report'
+    });
+
+    rerender();
+
+    await waitFor(() => {
+      expect(usePostureAssessmentStore.getState().step).toBe('completed');
+    });
+  });
+
   it('forwards pose results to the capture state machine and monitor', () => {
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
