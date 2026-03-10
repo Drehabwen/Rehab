@@ -44,12 +44,12 @@ export const Vision3Header: React.FC<Vision3HeaderProps> = ({
 
         {!isEntryMode ? (
           <>
-            <div className="flex items-center p-1 rounded-xl border border-slate-300 bg-white">
+            <div className="segmented-control">
               {(Object.keys(viewLabels) as ViewType[]).map((item) => (
                 <button
                   key={item}
                   onClick={() => setView(item)}
-                  className={cn('h-8 px-3 rounded-lg text-sm', view === item ? 'bg-slate-100 text-slate-900' : 'text-slate-600')}
+                  className={cn('segmented-control-tab', view === item ? 'segmented-control-tab-subtle' : 'segmented-control-tab-inactive')}
                 >
                   {viewLabels[item]}
                 </button>

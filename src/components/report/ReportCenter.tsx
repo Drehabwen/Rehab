@@ -1,11 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/Card';
-import { Button } from '../ui/Button';
-import { ReportGenerator, ReportType, ReportFormat } from '../../services/ReportGenerator';
-import { ReportViewer } from './ReportViewer';
-import { DataCenterService } from '../../services/DataCenterService';
-import { Assessment } from '../../types/assessment';
+import React, { useEffect, useState } from 'react';
+import { ReportFormat, ReportGenerator, ReportType } from '../../services/ReportGenerator';
 import { formatDate } from '../assessment/utils/assessmentHistoryUtils';
+import { Button } from '../ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/Card';
+import { ReportViewer } from './ReportViewer';
 
 interface ReportCenterProps {
   patientId: string;
@@ -16,8 +14,7 @@ export const ReportCenter: React.FC<ReportCenterProps> = ({ patientId }) => {
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showGenerator, setShowGenerator] = useState(false);
-  
-  // 报告生成配置
+
   const [reportConfig, setReportConfig] = useState({
     type: 'comprehensive' as ReportType,
     format: 'markdown' as ReportFormat,
@@ -36,8 +33,7 @@ export const ReportCenter: React.FC<ReportCenterProps> = ({ patientId }) => {
   }, [patientId]);
 
   const loadReports = () => {
-    const patientReports = ReportGenerator.loadReports(patientId);
-    setReports(patientReports);
+    setReports(ReportGenerator.loadReports(patientId));
   };
 
   const handleGenerateReport = async () => {
@@ -56,12 +52,12 @@ export const ReportCenter: React.FC<ReportCenterProps> = ({ patientId }) => {
   };
 
   const handleDeleteReport = (reportId: string) => {
-    if (window.confirm('确定要删除这份报告吗？')) {
-      ReportGenerator.deleteReport(reportId);
-      loadReports();
-      if (selectedReport && selectedReport.id === reportId) {
-        setSelectedReport(null);
-      }
+    if (!window.confirm('确定要删除这份报告吗？')) return;
+
+    ReportGenerator.deleteReport(reportId);
+    loadReports();
+    if (selectedReport?.id === reportId) {
+      setSelectedReport(null);
     }
   };
 
@@ -70,89 +66,103 @@ export const ReportCenter: React.FC<ReportCenterProps> = ({ patientId }) => {
       type: report.format === 'markdown' ? 'text/markdown' : 'text/html',
     });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${report.title.replace(/\s+/g, '_')}.${report.format}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${report.title.replace(/\s+/g, '_')}.${report.format}`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
   };
 
+  const reportListItemClass = (active: boolean) =>
+    active
+      ? 'rounded-xl border border-blue-500 bg-blue-50 p-3 cursor-pointer transition-all'
+      : 'rounded-xl border border-slate-200 bg-white p-3 cursor-pointer transition-all hover:border-slate-300';
+
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">报告中心</h2>
-        <Button onClick={() => setShowGenerator(true)}>
-          生成新报告
-        </Button>
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-slate-900">报告中心</h2>
+        <Button onClick={() => setShowGenerator(true)}>生成新报告</Button>
       </div>
 
-      {showGenerator && (
+      {showGenerator ? (
         <Card>
           <CardHeader>
             <CardTitle>生成报告</CardTitle>
             <CardDescription>配置报告生成选项</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">报告类型</label>
-                  <select
-                    value={reportConfig.type}
-                    onChange={(e) => setReportConfig({ ...reportConfig, type: e.target.value as ReportType })}
-                    className="w-full px-4 py-2 border rounded-lg"
-                  >
-                    <option value="assessment">评估报告</option>
-                    <option value="treatment">治疗计划报告</option>
-                    <option value="progress">康复进度报告</option>
-                    <option value="comprehensive">综合康复报告</option>
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">报告格式</label>
-                  <select
-                    value={reportConfig.format}
-                    onChange={(e) => setReportConfig({ ...reportConfig, format: e.target.value as ReportFormat })}
-                    className="w-full px-4 py-2 border rounded-lg"
-                  >
-                    <option value="markdown">Markdown</option>
-                    <option value="html">HTML</option>
-                    <option value="pdf">PDF</option>
-                  </select>
-                </div>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">报告类型</label>
+                <select
+                  value={reportConfig.type}
+                  onChange={(event) =>
+                    setReportConfig({ ...reportConfig, type: event.target.value as ReportType })
+                  }
+                  className="field-select"
+                >
+                  <option value="assessment">评估报告</option>
+                  <option value="treatment">治疗计划报告</option>
+                  <option value="progress">康复进度报告</option>
+                  <option value="comprehensive">综合康复报告</option>
+                </select>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">时间范围</label>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={new Date(reportConfig.timeRange.start).toISOString().split('T')[0]}
-                    onChange={(e) => setReportConfig({
+                <label className="text-sm font-medium text-slate-700">报告格式</label>
+                <select
+                  value={reportConfig.format}
+                  onChange={(event) =>
+                    setReportConfig({
                       ...reportConfig,
-                      timeRange: {
-                        ...reportConfig.timeRange,
-                        start: new Date(e.target.value).getTime(),
-                      },
-                    })}
-                    className="flex-1 px-4 py-2 border rounded-lg"
-                  />
-                  <input
-                    type="date"
-                    value={new Date(reportConfig.timeRange.end).toISOString().split('T')[0]}
-                    onChange={(e) => setReportConfig({
-                      ...reportConfig,
-                      timeRange: {
-                        ...reportConfig.timeRange,
-                        end: new Date(e.target.value).getTime(),
-                      },
-                    })}
-                    className="flex-1 px-4 py-2 border rounded-lg"
-                  />
-                </div>
+                      format: event.target.value as ReportFormat,
+                    })
+                  }
+                  className="field-select"
+                >
+                  <option value="markdown">Markdown</option>
+                  <option value="html">HTML</option>
+                  <option value="pdf">PDF</option>
+                </select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">时间范围</label>
+              <div className="flex gap-2">
+                <input
+                  type="date"
+                  value={new Date(reportConfig.timeRange.start).toISOString().split('T')[0]}
+                  onChange={(event) =>
+                    setReportConfig({
+                      ...reportConfig,
+                      timeRange: {
+                        ...reportConfig.timeRange,
+                        start: new Date(event.target.value).getTime(),
+                      },
+                    })
+                  }
+                  className="field-input flex-1"
+                />
+                <input
+                  type="date"
+                  value={new Date(reportConfig.timeRange.end).toISOString().split('T')[0]}
+                  onChange={(event) =>
+                    setReportConfig({
+                      ...reportConfig,
+                      timeRange: {
+                        ...reportConfig.timeRange,
+                        end: new Date(event.target.value).getTime(),
+                      },
+                    })
+                  }
+                  className="field-input flex-1"
+                />
+              </div>
+            </div>
 
             <div className="flex gap-2">
               <Button onClick={handleGenerateReport} disabled={isGenerating}>
@@ -164,49 +174,46 @@ export const ReportCenter: React.FC<ReportCenterProps> = ({ patientId }) => {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-1">
           <Card>
             <CardHeader>
               <CardTitle>报告列表</CardTitle>
-              <CardDescription>所有生成的报告</CardDescription>
+              <CardDescription>所有已生成报告</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 {reports.length === 0 ? (
-                  <p className="text-gray-500">暂无报告</p>
+                  <div className="state-panel">
+                    <p>暂无报告</p>
+                  </div>
                 ) : (
                   reports.map((report) => (
                     <div
                       key={report.id}
-                      className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                        selectedReport?.id === report.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={reportListItemClass(selectedReport?.id === report.id)}
                       onClick={() => setSelectedReport(report)}
                     >
-                      <div className="flex justify-between items-start">
-                        <h3 className="font-medium">{report.title}</h3>
+                      <div className="flex items-start justify-between">
+                        <h3 className="font-medium text-slate-900">{report.title}</h3>
                         <div className="flex gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={(event) => {
+                              event.stopPropagation();
                               handleExportReport(report);
                             }}
                           >
                             导出
                           </Button>
                           <Button
-                            variant="ghost"
+                            variant="danger"
                             size="sm"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={(event) => {
+                              event.stopPropagation();
                               handleDeleteReport(report.id);
                             }}
                           >
@@ -214,10 +221,10 @@ export const ReportCenter: React.FC<ReportCenterProps> = ({ patientId }) => {
                           </Button>
                         </div>
                       </div>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-slate-600">
                         生成时间: {formatDate(new Date(report.createdAt).toISOString())}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-slate-500">
                         类型: {report.type} | 格式: {report.format}
                       </p>
                     </div>
@@ -233,8 +240,8 @@ export const ReportCenter: React.FC<ReportCenterProps> = ({ patientId }) => {
             <ReportViewer report={selectedReport} />
           ) : (
             <Card>
-              <CardContent className="flex items-center justify-center h-64">
-                <p className="text-gray-500">请选择或生成一份报告</p>
+              <CardContent className="flex h-64 items-center justify-center">
+                <p className="text-slate-500">请选择或生成一份报告</p>
               </CardContent>
             </Card>
           )}

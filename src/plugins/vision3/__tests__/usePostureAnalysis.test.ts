@@ -4,18 +4,18 @@ import { usePostureAnalysis } from '../hooks/usePostureAnalysis';
 import { usePostureAssessmentStore } from '../store/usePostureAssessmentStore';
 
 vi.mock('@/hooks/usePostureWS', () => ({
-  usePostureWS: vi.fn()
+  usePostureWS: vi.fn(),
 }));
 
 vi.mock('../hooks/useCaptureStateMachine', () => ({
-  useCaptureStateMachine: vi.fn()
+  useCaptureStateMachine: vi.fn(),
 }));
 
 vi.mock('../services/GlobalMonitor', () => ({
   globalMonitor: {
     onFrame: vi.fn(),
-    registerAnalysisCallback: vi.fn()
-  }
+    registerAnalysisCallback: vi.fn(),
+  },
 }));
 
 import { usePostureWS } from '@/hooks/usePostureWS';
@@ -24,6 +24,8 @@ import { globalMonitor } from '../services/GlobalMonitor';
 
 const mockUsePostureWS = vi.mocked(usePostureWS);
 const mockUseCaptureStateMachine = vi.mocked(useCaptureStateMachine);
+const QUICK_ANALYSIS_ERROR_MESSAGE =
+  '\u5feb\u901f\u8bc4\u4f30\u81ea\u52a8\u5206\u6790\u89e6\u53d1\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u4e00\u6b21\u3002';
 
 describe('usePostureAnalysis', () => {
   const mockAnalyze = vi.fn();
@@ -49,11 +51,12 @@ describe('usePostureAnalysis', () => {
     timeSeriesData: null,
     analysisAckAt: null,
     connect: vi.fn(),
-    disconnect: vi.fn()
+    disconnect: vi.fn(),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     usePostureAssessmentStore.getState().reset();
 
     mockUsePostureWS.mockReturnValue(defaultWsValue);
@@ -64,7 +67,7 @@ describe('usePostureAnalysis', () => {
       recordingProgress: 0,
       isInPosition: false,
       error: null,
-      processLandmarks: mockProcessLandmarks
+      processLandmarks: mockProcessLandmarks,
     }));
   });
 
@@ -73,7 +76,7 @@ describe('usePostureAnalysis', () => {
       axesScale: 1,
       view: 'front',
       assessmentMode: 'realtime',
-      assessmentType: 'standard'
+      assessmentType: 'standard',
     }));
 
     expect(result.current.captureStatus).toBe('idle');
@@ -95,7 +98,7 @@ describe('usePostureAnalysis', () => {
       axesScale: 1,
       view: 'front',
       assessmentMode: 'realtime',
-      assessmentType: 'standard'
+      assessmentType: 'standard',
     }));
 
     expect(globalMonitor.registerAnalysisCallback).toHaveBeenCalled();
@@ -106,7 +109,7 @@ describe('usePostureAnalysis', () => {
       frameCount: 30,
       averages: { swayOffset: 1 },
       stability: { sd: 0.1, maxDeviation: 0.2, velocity: 0.3, swayArea: 0.4 },
-      timeSeries: []
+      timeSeries: [],
     };
 
     act(() => {
@@ -125,21 +128,21 @@ describe('usePostureAnalysis', () => {
             { x: 0.5, y: 0.5 },
             { x: 0.6, y: 0.5 },
             { x: 0.5, y: 0.6 },
-            { x: 0.5, y: 0.4 }
+            { x: 0.5, y: 0.4 },
           ],
-          swayOffset: 1
+          swayOffset: 1,
         },
         issues: [],
         annotations: [],
-        timestamp: Date.now()
-      }
+        timestamp: Date.now(),
+      },
     });
 
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
       view: 'front',
       assessmentMode: 'realtime',
-      assessmentType: 'standard'
+      assessmentType: 'standard',
     }));
 
     await waitFor(() => {
@@ -152,7 +155,7 @@ describe('usePostureAnalysis', () => {
       axesScale: 1,
       view: 'front',
       assessmentMode: 'realtime',
-      assessmentType: 'standard'
+      assessmentType: 'standard',
     }));
 
     act(() => {
@@ -171,14 +174,14 @@ describe('usePostureAnalysis', () => {
       axesScale: 1,
       view: 'front',
       assessmentMode: 'realtime',
-      assessmentType: 'standard'
+      assessmentType: 'standard',
     }));
 
     expect(usePostureAssessmentStore.getState().step).toBe('idle');
 
     mockUsePostureWS.mockReturnValue({
       ...defaultWsValue,
-      markdownReport: '### Report'
+      markdownReport: '### Report',
     });
 
     rerender();
@@ -193,14 +196,14 @@ describe('usePostureAnalysis', () => {
       axesScale: 1,
       view: 'front',
       assessmentMode: 'realtime',
-      assessmentType: 'standard'
+      assessmentType: 'standard',
     }));
 
     expect(usePostureAssessmentStore.getState().step).toBe('idle');
 
     mockUsePostureWS.mockReturnValue({
       ...defaultWsValue,
-      auxiliaryDiagnosis: '### Basic report'
+      auxiliaryDiagnosis: '### Basic report',
     });
 
     rerender();
@@ -215,22 +218,70 @@ describe('usePostureAnalysis', () => {
       axesScale: 1,
       view: 'front',
       assessmentMode: 'realtime',
-      assessmentType: 'standard'
+      assessmentType: 'standard',
     }));
 
     const landmarks = [
       { x: 0.5, y: 0.5, z: 0.1, visibility: 0.9 },
-      { x: 0.6, y: 0.6, z: 0.2, visibility: 0.9 }
+      { x: 0.6, y: 0.6, z: 0.2, visibility: 0.9 },
     ];
 
     act(() => {
       result.current.onResults({
         poseLandmarks: landmarks,
-        image: { width: 640, height: 480 }
+        image: { width: 640, height: 480 },
       } as never);
     });
 
     expect(mockProcessLandmarks).toHaveBeenCalledWith(landmarks, 640, 480);
     expect(globalMonitor.onFrame).toHaveBeenCalledWith(landmarks);
+  });
+
+  it('surfaces an error when quick stepped auto analysis fails', async () => {
+    vi.useFakeTimers();
+    mockAnalyzeStepped.mockImplementation(() => {
+      throw new Error('socket unavailable');
+    });
+
+    const { result } = renderHook(() => usePostureAnalysis({
+      axesScale: 1,
+      view: 'front',
+      assessmentMode: 'stepped',
+      assessmentType: 'quick',
+    }));
+
+    act(() => {
+      result.current.simulateMockCapture();
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(usePostureAssessmentStore.getState().error).toBe(QUICK_ANALYSIS_ERROR_MESSAGE);
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: 'SET_ERROR',
+      payload: QUICK_ANALYSIS_ERROR_MESSAGE,
+    });
+  });
+
+  it('preserves the selected quick view when auto-triggering stepped analysis', () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => usePostureAnalysis({
+      axesScale: 1,
+      view: 'side',
+      assessmentMode: 'stepped',
+      assessmentType: 'quick',
+    }));
+
+    act(() => {
+      result.current.simulateMockCapture();
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(mockAnalyzeStepped).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ view: 'side' }),
+      ]),
+      'quick',
+    );
   });
 });

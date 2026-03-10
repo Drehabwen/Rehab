@@ -1,41 +1,41 @@
 import React, { useMemo } from 'react';
+import {
+  Activity,
+  Calendar,
+  ChevronRight,
+  Clock,
+  FileText,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useAssessmentRecordStore } from '../../store/useAssessmentRecordStore';
 import { useTreatmentPlanStore } from '../../store/useTreatmentPlanStore';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { 
-  Activity,
-  FileText,
-  Calendar,
-  Clock,
-  TrendingUp,
-  TrendingDown,
-  ChevronRight
-} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 
 export const TreatmentTimeline: React.FC = () => {
   const { records, setCurrentRecord } = useAssessmentRecordStore();
   const { versions, setCurrentVersion } = useTreatmentPlanStore();
 
   const timelineData = useMemo(() => {
-    const assessmentRecords = records.map(record => ({
+    const assessmentRecords = records.map((record) => ({
       id: record.id,
       timestamp: record.timestamp,
       type: 'assessment' as const,
       data: record,
     }));
 
-    const treatmentRecords = versions.map(version => ({
+    const treatmentRecords = versions.map((version) => ({
       id: version.id,
       timestamp: version.createdAt,
       type: 'treatment' as const,
       data: version,
     }));
 
-    const allRecords = [...assessmentRecords, ...treatmentRecords];
-    return allRecords.sort((a, b) => 
-      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    return [...assessmentRecords, ...treatmentRecords].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
   }, [records, versions]);
 
@@ -63,11 +63,11 @@ export const TreatmentTimeline: React.FC = () => {
   const getRecordIcon = (type: string) => {
     switch (type) {
       case 'assessment':
-        return <Activity className="w-5 h-5" />;
+        return <Activity className="h-5 w-5" />;
       case 'treatment':
-        return <FileText className="w-5 h-5" />;
+        return <FileText className="h-5 w-5" />;
       default:
-        return <Clock className="w-5 h-5" />;
+        return <Clock className="h-5 w-5" />;
     }
   };
 
@@ -93,25 +93,28 @@ export const TreatmentTimeline: React.FC = () => {
 
   const getImprovementBadge = (record: any) => {
     if (record.type !== 'assessment') return null;
-    
+
     const improvement = record.data.improvement;
     if (improvement === undefined) return null;
 
     if (improvement > 0) {
       return (
         <Badge variant="success" className="flex items-center gap-1">
-          <TrendingUp className="w-3 h-3" />
+          <TrendingUp className="h-3 w-3" />
           改善 {improvement}%
         </Badge>
       );
-    } else if (improvement < 0) {
+    }
+
+    if (improvement < 0) {
       return (
         <Badge variant="warning" className="flex items-center gap-1">
-          <TrendingDown className="w-3 h-3" />
+          <TrendingDown className="h-3 w-3" />
           下降 {Math.abs(improvement)}%
         </Badge>
       );
     }
+
     return null;
   };
 
@@ -123,6 +126,8 @@ export const TreatmentTimeline: React.FC = () => {
     }
   };
 
+  const recordShellClass = 'rounded-20 border border-slate-200 bg-white p-4 transition-shadow hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)]';
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -130,130 +135,115 @@ export const TreatmentTimeline: React.FC = () => {
       </CardHeader>
       <CardContent>
         {timelineData.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <Calendar className="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <div className="state-panel">
+            <Calendar className="mx-auto mb-4 h-16 w-16 opacity-50" />
             <p>暂无治疗记录</p>
-            <p className="text-sm mt-2">开始评估和治疗后，这里会显示完整的时间线</p>
+            <p className="mt-2 text-sm">开始评估和治疗后，这里会显示完整的时间线。</p>
           </div>
         ) : (
           <div className="relative">
-            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
-            
+            <div className="absolute bottom-0 left-4 top-0 w-0.5 bg-slate-200" />
+
             <div className="space-y-6">
-              {timelineData.map((record, index) => (
+              {timelineData.map((record) => (
                 <div key={record.id} className="relative pl-12">
-                  <div className="absolute left-2 w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow"></div>
-                  
-                  <div className="bg-white border rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-3">
+                  <div className="absolute left-2 h-4 w-4 rounded-full border-2 border-white bg-blue-500 shadow" />
+
+                  <div className={recordShellClass}>
+                    <div className="mb-3 flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${
-                          record.type === 'assessment' 
-                            ? 'bg-blue-100 text-blue-600' 
-                            : 'bg-green-100 text-green-600'
-                        }`}>
+                        <div
+                          className={cn(
+                            'rounded-lg p-2',
+                            record.type === 'assessment'
+                              ? 'bg-blue-100 text-blue-600'
+                              : 'bg-emerald-100 text-emerald-600',
+                          )}
+                        >
                           {getRecordIcon(record.type)}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">
-                              {getRecordTypeLabel(record.type)}
-                            </h3>
-                            <Badge variant="info">
-                              {formatDate(record.timestamp)}
-                            </Badge>
+                            <h3 className="font-semibold text-slate-900">{getRecordTypeLabel(record.type)}</h3>
+                            <Badge variant="info">{formatDate(record.timestamp)}</Badge>
                           </div>
-                          <p className="text-sm text-gray-600">
-                            {formatFullDate(record.timestamp)}
-                          </p>
+                          <p className="text-sm text-slate-600">{formatFullDate(record.timestamp)}</p>
                         </div>
                       </div>
-                      
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => handleViewDetails(record)}
-                      >
-                        <ChevronRight className="w-4 h-4" />
+
+                      <Button variant="ghost" size="sm" onClick={() => handleViewDetails(record)}>
+                        <ChevronRight className="h-4 w-4" />
                       </Button>
                     </div>
 
                     {record.type === 'assessment' ? (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <Badge variant="default">
-                            {getAssessmentTypeLabel(record.data.assessmentType)}
-                          </Badge>
+                          <Badge variant="default">{getAssessmentTypeLabel(record.data.assessmentType)}</Badge>
                           {getImprovementBadge(record)}
                         </div>
 
-                        {record.data.imageData && (
-                          <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                        {record.data.imageData ? (
+                          <div className="aspect-video overflow-hidden rounded-xl bg-slate-100">
                             <img
                               src={record.data.imageData}
                               alt={`评估图像 - ${record.id}`}
-                              className="w-full h-full object-cover"
+                              className="h-full w-full object-cover"
                             />
                           </div>
-                        )}
+                        ) : null}
 
-                        {record.data.metrics && Object.keys(record.data.metrics).length > 0 && (
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {record.data.metrics && Object.keys(record.data.metrics).length > 0 ? (
+                          <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                             {Object.entries(record.data.metrics).slice(0, 4).map(([key, value]) => (
-                              <div key={key} className="bg-gray-50 rounded p-2">
-                                <p className="text-xs text-gray-600">{key}</p>
-                                <p className="font-semibold text-sm">
+                              <div key={key} className="rounded-xl bg-slate-50 p-2">
+                                <p className="text-xs text-slate-600">{key}</p>
+                                <p className="text-sm font-semibold">
                                   {typeof value === 'number' ? value.toFixed(2) : value}
                                 </p>
                               </div>
                             ))}
                           </div>
-                        )}
+                        ) : null}
 
-                        {record.data.feedback && (
-                          <div className="p-3 bg-blue-50 rounded-lg">
-                            <p className="text-sm text-gray-700">
+                        {record.data.feedback ? (
+                          <div className="semantic-panel-soft semantic-panel-soft-info">
+                            <p className="text-sm text-slate-700">
                               <strong>反馈：</strong>
                               {record.data.feedback}
                             </p>
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     ) : (
                       <div className="space-y-3">
                         <div className="flex items-center gap-2">
-                          <Badge variant="success">
-                            版本 {record.data.version}
-                          </Badge>
-                          {record.data.isCurrent && (
-                            <Badge variant="primary">
-                              当前版本
-                            </Badge>
-                          )}
+                          <Badge variant="success">版本 {record.data.version}</Badge>
+                          {record.data.isCurrent ? <Badge variant="primary">当前版本</Badge> : null}
                         </div>
 
-                        {record.data.tags && record.data.tags.length > 0 && (
+                        {record.data.tags?.length ? (
                           <div className="flex flex-wrap gap-1">
                             {record.data.tags.map((tag: string, tagIndex: number) => (
-                              <Badge key={tagIndex} variant="default" className="text-xs">
+                              <Badge key={`${tag}-${tagIndex}`} variant="default" className="text-xs">
                                 {tag}
                               </Badge>
                             ))}
                           </div>
-                        )}
+                        ) : null}
 
-                        <div className="p-3 bg-green-50 rounded-lg">
-                          <p className="text-sm text-gray-700 line-clamp-3">
+                        <div className="semantic-panel-soft semantic-panel-soft-success">
+                          <p className="line-clamp-3 text-sm text-slate-700">
                             {record.data.content.substring(0, 200)}
-                            {record.data.content.length > 200 && '...'}
+                            {record.data.content.length > 200 ? '...' : ''}
                           </p>
                         </div>
 
-                        {record.data.assessmentId && (
-                          <div className="text-xs text-gray-500">
+                        {record.data.assessmentId ? (
+                          <div className="text-xs text-slate-500">
                             关联评估 ID: {record.data.assessmentId}
                           </div>
-                        )}
+                        ) : null}
                       </div>
                     )}
                   </div>

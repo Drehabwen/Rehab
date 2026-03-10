@@ -10,6 +10,7 @@ import {
 import JointSelector from '@/components/JointSelector';
 import MeasurementChart from '@/components/MeasurementChart';
 import { PostureMetrics } from '@/hooks/usePostureWS';
+import { COLORS } from '@/constants/uiStyles';
 import { cn } from '@/lib/utils';
 
 type DataFocusTarget =
@@ -28,7 +29,7 @@ const MetricValue: React.FC<{ value: number; unit?: string; className?: string }
 }) => (
   <div className="flex items-end gap-1">
     <span className={cn('text-2xl font-semibold tabular-nums', className)}>{value.toFixed(1)}</span>
-    {unit ? <span className="mb-1 text-xs text-slate-500">{unit}</span> : null}
+    {unit ? <span className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>{unit}</span> : null}
   </div>
 );
 
@@ -80,6 +81,37 @@ const scoreClass = (score: number) => {
   return 'status-error';
 };
 
+const sectionClass = cn('rounded-[26px] border p-5 shadow-sm', COLORS.neutral.light.border, COLORS.neutral.light.bg);
+const subCardClass = cn('rounded-20 border p-4', COLORS.neutral.light.border, COLORS.neutral.light.bgSoft);
+const compactCardClass = cn('rounded-xl border p-3', COLORS.neutral.light.border, COLORS.neutral.light.bgSoft);
+const nestedCardClass = cn('rounded-lg border p-2', COLORS.neutral.light.border, COLORS.neutral.light.bg);
+const titleClass = cn('text-lg font-semibold', COLORS.neutral.light.text);
+const bodyClass = cn('text-sm', COLORS.neutral.slate500);
+const eyebrowClass = cn('text-[11px] font-semibold uppercase tracking-[0.2em]', COLORS.neutral.light.textLight);
+const cardLabelClass = cn('text-xs', COLORS.neutral.slate500);
+const cardValueClass = cn('text-3xl font-semibold tabular-nums', COLORS.neutral.light.text);
+const neutralChipClass = cn(
+  'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+  COLORS.neutral.light.border,
+  COLORS.neutral.light.bg,
+  COLORS.neutral.slate600,
+  COLORS.neutral.light.hover,
+);
+
+const sectionJumpButtonClass = (tone: 'blue' | 'cyan' | 'slate' | 'amber') => {
+  const base = 'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors';
+  switch (tone) {
+    case 'blue':
+      return `${base} border-blue-200 bg-white text-blue-700 hover:bg-blue-50`;
+    case 'cyan':
+      return `${base} border-cyan-200 bg-white text-cyan-700 hover:bg-cyan-50`;
+    case 'amber':
+      return `${base} border-amber-200 bg-white text-amber-700 hover:bg-amber-50`;
+    default:
+      return neutralChipClass;
+  }
+};
+
 export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
   activeTab,
   result,
@@ -127,8 +159,8 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
       <div className="flex h-full flex-col gap-4 overflow-hidden pr-1">
         <div className="bento-card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-              <Settings2 size={14} className="text-slate-600" />
+            <h3 className={cn('flex items-center gap-2 text-sm font-semibold', COLORS.neutral.light.text)}>
+              <Settings2 size={14} className={COLORS.neutral.light.textMuted} />
               ROM 配置
             </h3>
             <span className="status-badge status-processing h-6">ROM</span>
@@ -136,7 +168,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
           <JointSelector />
         </div>
 
-        <div className="min-h-[420px] flex-1 rounded-20 border border-slate-200 bg-white p-4">
+        <div className={cn('min-h-[420px] flex-1 rounded-20 border p-4', COLORS.neutral.light.border, COLORS.neutral.light.bg)}>
           <MeasurementChart />
         </div>
       </div>
@@ -146,32 +178,32 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1 custom-scrollbar">
       <div className="sticky top-0 z-10 -mx-1 rounded-[1.25rem] bg-white/95 px-1 pb-1 backdrop-blur-sm">
-        <div className="flex flex-wrap items-center gap-2 rounded-[1.1rem] border border-slate-200 bg-slate-50/90 px-3 py-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Data Sections</span>
+        <div className={cn('flex flex-wrap items-center gap-2 rounded-[1.1rem] border px-3 py-2', COLORS.neutral.light.border, 'bg-slate-50/90')}>
+          <span className={cn('text-[11px] font-semibold uppercase tracking-[0.18em]', COLORS.neutral.light.textLight)}>Data Sections</span>
           <button
             type="button"
-            className="inline-flex items-center rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50"
+            className={sectionJumpButtonClass('blue')}
             onClick={() => overviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
             概览
           </button>
           <button
             type="button"
-            className="inline-flex items-center rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-50"
+            className={sectionJumpButtonClass('cyan')}
             onClick={() => metricsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
             指标
           </button>
           <button
             type="button"
-            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            className={sectionJumpButtonClass('slate')}
             onClick={() => headRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
             3D 位姿
           </button>
           <button
             type="button"
-            className="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
+            className={sectionJumpButtonClass('amber')}
             onClick={() => issuesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
             风险
@@ -181,18 +213,18 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
 
       {!result ? (
         <div className="state-panel flex min-h-[340px] flex-1 flex-col items-center justify-center gap-3">
-          <Activity size={40} className="text-slate-400" />
+          <Activity size={40} className={COLORS.neutral.light.textLight} />
           <h3>等待评估数据</h3>
           <p>完成拍摄后，这里会展示量化指标、风险证据和可追溯的数据支撑。</p>
         </div>
       ) : (
         <>
-          <section ref={overviewRef} className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+          <section ref={overviewRef} className={sectionClass}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Data Evidence</p>
-                <h3 className="mt-1 text-lg font-semibold text-slate-900">数据证据概览</h3>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className={eyebrowClass}>Data Evidence</p>
+                <h3 className={cn('mt-1', titleClass)}>数据证据概览</h3>
+                <p className={cn('mt-1', bodyClass)}>
                   这里不重复报告文案，只展示支撑结论的核心指标、异常证据和位姿观察。
                 </p>
               </div>
@@ -218,40 +250,40 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">健康指数</p>
+              <div className={subCardClass}>
+                <p className={cardLabelClass}>健康指数</p>
                 <div className="mt-2 flex items-center gap-2">
-                  <span className="text-3xl font-semibold tabular-nums text-slate-900">{healthScore}</span>
+                  <span className={cardValueClass}>{healthScore}</span>
                   {healthScore !== null ? (
                     <span className={cn('status-badge h-6', scoreClass(healthScore))}>
                       {healthScore >= 80 ? '良好' : healthScore >= 60 ? '关注' : '高风险'}
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-xs text-slate-500">当前风险项 {result.issues.length} 条</p>
+                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>当前风险项 {result.issues.length} 条</p>
               </div>
 
-              <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">可复核指标</p>
-                <p className="mt-2 text-3xl font-semibold tabular-nums text-slate-900">
+              <div className={subCardClass}>
+                <p className={cardLabelClass}>可复核指标</p>
+                <p className={cn('mt-2', cardValueClass)}>
                   {Object.values(result.metrics).filter((value) => typeof value === 'number' && Number.isFinite(value)).length}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">已回传的量化指标数量，可用于证据复核。</p>
+                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>已回传的量化指标数量，可用于证据复核。</p>
               </div>
 
-              <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">阅读路径</p>
-                <p className="mt-2 text-sm font-medium text-slate-900">先看指标，再看风险，最后回到报告。</p>
-                <p className="mt-1 text-xs text-slate-500">这样能更快定位问题来源和对应结论。</p>
+              <div className={subCardClass}>
+                <p className={cardLabelClass}>阅读路径</p>
+                <p className={cn('mt-2 text-sm font-medium', COLORS.neutral.light.text)}>先看指标，再看风险，最后回到报告。</p>
+                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>这样能更快定位问题来源和对应结论。</p>
               </div>
             </div>
           </section>
 
-          <section ref={metricsRef} className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+          <section ref={metricsRef} className={sectionClass}>
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">指标证据</h3>
-                <p className="mt-1 text-sm text-slate-500">优先展示最常用的体态偏移指标，便于快速复核。</p>
+                <h3 className={titleClass}>指标证据</h3>
+                <p className={cn('mt-1', bodyClass)}>优先展示最常用的体态偏移指标，便于快速复核。</p>
               </div>
               <button
                 type="button"
@@ -264,37 +296,37 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">肩部平衡</p>
-                <MetricValue value={result.metrics.shoulderAngle || 0} unit="deg" className="text-slate-900" />
+              <div className={subCardClass}>
+                <p className={cardLabelClass}>肩部平衡</p>
+                <MetricValue value={result.metrics.shoulderAngle || 0} unit="deg" className={COLORS.neutral.light.text} />
                 <span className={cn('status-badge mt-2 h-6', statusClassFromColor(getShoulderStatus(result.metrics.shoulderAngle || 0).color))}>
                   {getShoulderStatus(result.metrics.shoulderAngle || 0).text}
                 </span>
               </div>
 
-              <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">头前引</p>
-                <MetricValue value={result.metrics.headForward || 0} unit="deg" className="text-slate-900" />
+              <div className={subCardClass}>
+                <p className={cardLabelClass}>头前引</p>
+                <MetricValue value={result.metrics.headForward || 0} unit="deg" className={COLORS.neutral.light.text} />
                 <span className={cn('status-badge mt-2 h-6', getHeadStatus(result.metrics.headForward || 0).bgColor, getHeadStatus(result.metrics.headForward || 0).color)}>
                   {getHeadStatus(result.metrics.headForward || 0).text}
                 </span>
               </div>
 
-              <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs text-slate-500">骨盆倾斜</p>
-                <MetricValue value={result.metrics.hipAngle || 0} unit="deg" className="text-slate-900" />
+              <div className={subCardClass}>
+                <p className={cardLabelClass}>骨盆倾斜</p>
+                <MetricValue value={result.metrics.hipAngle || 0} unit="deg" className={COLORS.neutral.light.text} />
                 <span className={cn('status-badge mt-2 h-6', getHipStatus(result.metrics.hipAngle || 0).bgColor, getHipStatus(result.metrics.hipAngle || 0).color)}>
                   {getHipStatus(result.metrics.hipAngle || 0).text}
                 </span>
               </div>
             </div>
 
-            <div className="mt-4 rounded-20 border border-slate-200 bg-slate-50 p-4">
+            <div className={cn('mt-4', subCardClass)}>
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900">肩部偏移条</p>
-                <p className="text-xs text-slate-500">中心线代表理想对称位。</p>
+                <p className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>肩部偏移条</p>
+                <p className={cardLabelClass}>中心线代表理想对称位。</p>
               </div>
-              <div className="relative h-3 overflow-hidden rounded-full bg-slate-100">
+              <div className={cn('relative h-3 overflow-hidden rounded-full', COLORS.neutral.light.selected)}>
                 <div
                   className={cn(
                     'absolute top-0 bottom-0 rounded-full transition-all duration-300',
@@ -311,17 +343,17 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                     transformOrigin: 'left',
                   }}
                 />
-                <div className="absolute top-0 bottom-0 left-1/2 w-px bg-slate-400" />
+                <div className={cn('absolute top-0 bottom-0 left-1/2 w-px', COLORS.neutral.light.textLight.replace('text', 'bg'))} />
               </div>
             </div>
           </section>
 
           {result.metrics.headYaw !== undefined ? (
-            <section ref={headRef} className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+            <section ref={headRef} className={sectionClass}>
               <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900">3D 头部位姿证据</h3>
-                  <p className="mt-1 text-sm text-slate-500">这里用于查看头部偏航、俯仰和翻滚的定量结果。</p>
+                  <h3 className={titleClass}>3D 头部位姿证据</h3>
+                  <p className={cn('mt-1', bodyClass)}>这里用于查看头部偏航、俯仰和翻滚的定量结果。</p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -332,13 +364,13 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                       'h-8 rounded-lg border px-3 text-xs font-medium transition-colors',
                       showHeadAxes
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
+                        : cn(COLORS.neutral.light.border, COLORS.neutral.light.bg, COLORS.neutral.slate600, COLORS.neutral.light.hover),
                     )}
                   >
                     {showHeadAxes ? '3D 轴已开启' : '3D 轴已关闭'}
                   </button>
 
-                  <label className="flex items-center gap-2 text-xs text-slate-600">
+                  <label className={cn('flex items-center gap-2 text-xs', COLORS.neutral.light.textMuted)}>
                     轴长
                     <input
                       type="range"
@@ -354,27 +386,27 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
               </div>
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="mb-1 text-xs text-slate-500">Yaw 偏航</p>
-                  <MetricValue value={result.metrics.headYaw} unit="deg" className="text-slate-900" />
+                <div className={compactCardClass}>
+                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>Yaw 偏航</p>
+                  <MetricValue value={result.metrics.headYaw} unit="deg" className={COLORS.neutral.light.text} />
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="mb-1 text-xs text-slate-500">Pitch 俯仰</p>
-                  <MetricValue value={result.metrics.headPitch || 0} unit="deg" className="text-slate-900" />
+                <div className={compactCardClass}>
+                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>Pitch 俯仰</p>
+                  <MetricValue value={result.metrics.headPitch || 0} unit="deg" className={COLORS.neutral.light.text} />
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                  <p className="mb-1 text-xs text-slate-500">Roll 翻滚</p>
-                  <MetricValue value={result.metrics.headRoll || 0} unit="deg" className="text-slate-900" />
+                <div className={compactCardClass}>
+                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>Roll 翻滚</p>
+                  <MetricValue value={result.metrics.headRoll || 0} unit="deg" className={COLORS.neutral.light.text} />
                 </div>
               </div>
             </section>
           ) : null}
 
-          <section ref={issuesRef} className="flex min-h-0 flex-col rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+          <section ref={issuesRef} className={cn('flex min-h-0 flex-col', sectionClass)}>
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">风险证据列表</h3>
-                <p className="mt-1 text-sm text-slate-500">按影响程度查看问题描述、建议动作和回跳路径。</p>
+                <h3 className={titleClass}>风险证据列表</h3>
+                <p className={cn('mt-1', bodyClass)}>按影响程度查看问题描述、建议动作和回跳路径。</p>
               </div>
               <button
                 type="button"
@@ -393,22 +425,22 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                 </div>
               ) : (
                 result.issues.map((issue, idx) => (
-                  <div key={`${issue.type}-${idx}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div key={`${issue.type}-${idx}`} className={compactCardClass}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-2">
-                        <AlertTriangle size={15} className="mt-0.5 text-slate-500" />
+                        <AlertTriangle size={15} className={cn('mt-0.5', COLORS.neutral.slate500)} />
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">{issue.title || issue.type}</p>
-                          <p className="mt-1 text-xs text-slate-600">{issue.description}</p>
+                          <p className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>{issue.title || issue.type}</p>
+                          <p className={cn('mt-1 text-xs', COLORS.neutral.light.textMuted)}>{issue.description}</p>
                         </div>
                       </div>
                       <span className={cn('status-badge h-6', severityBadgeClass(issue.severity))}>
                         {getSeverityLabel(issue.severity)}
                       </span>
                     </div>
-                    <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2">
-                      <p className="text-xs text-slate-500">建议动作</p>
-                      <p className="mt-1 text-xs text-slate-700">{issue.recommendation}</p>
+                    <div className={cn('mt-2', nestedCardClass)}>
+                      <p className={cardLabelClass}>建议动作</p>
+                      <p className={cn('mt-1 text-xs', COLORS.neutral.light.textSoft)}>{issue.recommendation}</p>
                     </div>
                     <div className="mt-2 flex justify-end">
                       <button

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/Card';
-import { Button } from '../ui/Button';
 import { formatDate } from '../assessment/utils/assessmentHistoryUtils';
+import { Button } from '../ui/Button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/Card';
 
 interface ReportViewerProps {
   report: {
@@ -18,12 +18,13 @@ interface ReportViewerProps {
 
 export const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
   const [activeTab, setActiveTab] = useState('content');
+
   const handlePrint = () => {
     window.print();
   };
 
   const renderMarkdownContent = (content: string) => {
-    // 简单的Markdown渲染
+    // 简单的 Markdown 渲染
     const html = content
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -44,8 +45,8 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
 
   const renderPdfContent = (content: string) => {
     return (
-      <div className="text-center py-8">
-        <p>PDF格式报告需要下载查看</p>
+      <div className="py-8 text-center">
+        <p>PDF 格式报告需要下载后查看</p>
         <Button
           onClick={() => {
             const blob = new Blob([content], { type: 'application/pdf' });
@@ -53,7 +54,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
             window.open(url, '_blank');
           }}
         >
-          打开PDF
+          打开 PDF
         </Button>
       </div>
     );
@@ -75,7 +76,7 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
   return (
     <Card className="h-full">
       <CardHeader>
-        <div className="flex justify-between items-start">
+        <div className="flex items-start justify-between">
           <div>
             <CardTitle>{report.title}</CardTitle>
             <CardDescription>
@@ -91,65 +92,63 @@ export const ReportViewer: React.FC<ReportViewerProps> = ({ report }) => {
         </div>
       </CardHeader>
       <CardContent className="h-[600px] overflow-auto">
-        <div className="mb-4 border-b">
-          <div className="flex space-x-4">
+        <div className="mb-4 border-b border-slate-200 pb-4">
+          <div className="segmented-control w-fit">
             <button
-              className={`px-4 py-2 ${activeTab === 'content' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+              className={`segmented-control-tab ${activeTab === 'content' ? 'segmented-control-tab-solid' : 'segmented-control-tab-inactive'}`}
               onClick={() => setActiveTab('content')}
             >
               报告内容
             </button>
             <button
-              className={`px-4 py-2 ${activeTab === 'data' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+              className={`segmented-control-tab ${activeTab === 'data' ? 'segmented-control-tab-solid' : 'segmented-control-tab-inactive'}`}
               onClick={() => setActiveTab('data')}
             >
               原始数据
             </button>
           </div>
         </div>
-        
-        {activeTab === 'content' && (
+
+        {activeTab === 'content' ? (
           <div className="space-y-4">
-            <div className="prose max-w-none">
-              {renderContent()}
-            </div>
+            <div className="prose max-w-none">{renderContent()}</div>
           </div>
-        )}
-        
-        {activeTab === 'data' && (
+        ) : null}
+
+        {activeTab === 'data' ? (
           <div className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-medium mb-2">评估数据</h3>
-              <pre className="text-sm overflow-x-auto">
+            <div className="rounded-lg bg-gray-50 p-4">
+              <h3 className="mb-2 font-medium">评估数据</h3>
+              <pre className="overflow-x-auto text-sm">
                 {JSON.stringify(report.data.assessments, null, 2)}
               </pre>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-medium mb-2">治疗计划</h3>
-              <pre className="text-sm overflow-x-auto">
+            <div className="rounded-lg bg-gray-50 p-4">
+              <h3 className="mb-2 font-medium">治疗计划</h3>
+              <pre className="overflow-x-auto text-sm">
                 {JSON.stringify(report.data.treatmentPlans, null, 2)}
               </pre>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-medium mb-2">评估记录</h3>
-              <pre className="text-sm overflow-x-auto">
+            <div className="rounded-lg bg-gray-50 p-4">
+              <h3 className="mb-2 font-medium">评估记录</h3>
+              <pre className="overflow-x-auto text-sm">
                 {JSON.stringify(report.data.records, null, 2)}
               </pre>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-medium mb-2">评估指标</h3>
-              <pre className="text-sm overflow-x-auto">
+            <div className="rounded-lg bg-gray-50 p-4">
+              <h3 className="mb-2 font-medium">指标数据</h3>
+              <pre className="overflow-x-auto text-sm">
                 {JSON.stringify(report.data.metrics, null, 2)}
               </pre>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-medium mb-2">洞察</h3>
-              <pre className="text-sm overflow-x-auto">
+            <div className="rounded-lg bg-gray-50 p-4">
+              <h3 className="mb-2 font-medium">洞察</h3>
+              <pre className="overflow-x-auto text-sm">
                 {JSON.stringify(report.data.insights, null, 2)}
               </pre>
             </div>
           </div>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );

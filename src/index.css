@@ -1,4 +1,4 @@
-﻿@import "tailwindcss/base";
+@import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
@@ -212,6 +212,34 @@
     @apply bg-slate-100;
   }
 
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold border border-slate-300 bg-transparent text-slate-700;
+    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+  }
+
+  .btn-outline:hover {
+    @apply border-antey-primary text-antey-primary;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold bg-transparent text-slate-700;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .btn-ghost:hover {
+    @apply bg-slate-100;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold text-white;
+    background: #dc2626;
+    transition: background-color 0.2s ease;
+  }
+
+  .btn-danger:hover {
+    background: #b91c1c;
+  }
+
   .btn-icon {
     @apply inline-flex items-center justify-center h-10 w-10 rounded-xl border border-slate-300 bg-white text-slate-600;
     transition: border-color 0.2s ease, background-color 0.2s ease;
@@ -219,6 +247,132 @@
 
   .btn-icon:hover {
     @apply bg-slate-50 border-slate-400;
+  }
+
+  .btn-icon-primary {
+    @apply inline-flex items-center justify-center h-10 w-10 rounded-xl text-antey-primary bg-antey-primary/10;
+    transition: background-color 0.2s ease;
+  }
+
+  .btn-icon-primary:hover {
+    @apply bg-antey-primary/20;
+  }
+
+  .btn-icon-ghost {
+    @apply inline-flex items-center justify-center h-10 w-10 rounded-xl bg-transparent text-slate-500;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .btn-icon-ghost:hover {
+    @apply bg-slate-100;
+  }
+
+  .btn-icon-danger {
+    @apply inline-flex items-center justify-center h-10 w-10 rounded-xl bg-red-50 text-red-700;
+    transition: background-color 0.2s ease;
+  }
+
+  .btn-icon-danger:hover {
+    @apply bg-red-100;
+  }
+
+  .dialog-backdrop {
+    @apply absolute inset-0 bg-slate-900/45 backdrop-blur-[2px];
+  }
+
+  .dialog-shell {
+    @apply relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white;
+    box-shadow: var(--shadow-layer);
+  }
+
+  .dialog-header {
+    @apply flex items-center justify-between border-b border-slate-200 px-5 py-4;
+  }
+
+  .dialog-footer {
+    @apply flex items-center justify-end gap-2 border-t border-slate-200 px-5 py-3;
+  }
+
+  .field-input {
+    @apply h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-800 placeholder:text-slate-400 outline-none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .field-input:focus {
+    @apply border-antey-primary;
+    box-shadow: 0 0 0 3px rgba(15, 155, 142, 0.12);
+  }
+
+  .field-select {
+    @apply h-10 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .field-select:focus {
+    @apply border-antey-primary;
+    box-shadow: 0 0 0 3px rgba(15, 155, 142, 0.12);
+  }
+
+  .field-textarea {
+    @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .field-textarea:focus {
+    @apply border-antey-primary;
+    box-shadow: 0 0 0 3px rgba(15, 155, 142, 0.12);
+  }
+
+  .semantic-panel {
+    @apply rounded-xl border px-4 py-3;
+  }
+
+  .semantic-panel-info {
+    @apply border-blue-200 bg-blue-50 text-blue-700;
+  }
+
+  .semantic-panel-success {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-700;
+  }
+
+  .semantic-panel-warning {
+    @apply border-amber-200 bg-amber-50 text-amber-700;
+  }
+
+  .semantic-panel-error {
+    @apply border-red-200 bg-red-50 text-red-700;
+  }
+
+  .semantic-panel-soft {
+    @apply rounded-xl p-3;
+  }
+
+  .semantic-panel-soft-info {
+    @apply bg-blue-50;
+  }
+
+  .semantic-panel-soft-success {
+    @apply bg-emerald-50;
+  }
+
+  .segmented-control {
+    @apply flex items-center p-1 rounded-xl border border-slate-300 bg-white;
+  }
+
+  .segmented-control-tab {
+    @apply h-8 px-3 rounded-lg text-sm transition-colors;
+  }
+
+  .segmented-control-tab-solid {
+    @apply bg-slate-900 text-white;
+  }
+
+  .segmented-control-tab-subtle {
+    @apply bg-slate-100 text-slate-900;
+  }
+
+  .segmented-control-tab-inactive {
+    @apply text-slate-600;
   }
 
   .status-badge {

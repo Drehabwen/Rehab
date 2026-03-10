@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Clock, Search, Stethoscope, User, X } from 'lucide-react';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
@@ -58,10 +58,10 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="dialog-backdrop" onClick={onClose} />
 
-      <div className="relative bg-white border border-slate-200 rounded-2xl shadow-[0_20px_40px_rgba(15,23,42,0.18)] w-full max-w-3xl max-h-[86vh] overflow-hidden flex flex-col">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+      <div className="dialog-shell max-w-3xl max-h-[86vh] flex flex-col">
+        <div className="dialog-header">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-antey-primary/10 text-antey-primary flex items-center justify-center">
               <Search size={18} />
@@ -173,7 +173,7 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
         </div>
 
         {selectedPatient ? (
-          <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-end gap-2">
+          <div className="dialog-footer">
             <button onClick={onClose} className="btn-secondary">取消</button>
             <button onClick={handleContinueSession} disabled={isCreatingSession} className={cn('btn-primary', isCreatingSession && 'opacity-50 cursor-not-allowed')}>
               <Stethoscope size={14} />

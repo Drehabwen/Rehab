@@ -1,22 +1,40 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Results } from '@/lib/mediapipe-utils';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { useMediaPipe } from '../useMediaPipe';
 
 // Mock MediaPipe Holistic
-const mockSend = vi.fn().mockResolvedValue(undefined);
-const mockOnResults = vi.fn();
-const mockSetOptions = vi.fn();
-const mockClose = vi.fn();
+const {
+  mockSend,
+  mockOnResults,
+  mockSetOptions,
+  mockClose,
+  MockPose,
+} = vi.hoisted(() => {
+  const mockSend = vi.fn().mockResolvedValue(undefined);
+  const mockOnResults = vi.fn();
+  const mockSetOptions = vi.fn();
+  const mockClose = vi.fn();
+  const MockPose = vi.fn(class {
+    send = mockSend;
+    onResults = mockOnResults;
+    setOptions = mockSetOptions;
+    close = mockClose;
+  });
+
+  return {
+    mockSend,
+    mockOnResults,
+    mockSetOptions,
+    mockClose,
+    MockPose,
+  };
+});
 
 vi.mock('@mediapipe/pose', () => {
   return {
-    Pose: vi.fn().mockImplementation(() => ({
-      send: mockSend,
-      onResults: mockOnResults,
-      setOptions: mockSetOptions,
-      close: mockClose,
-    })),
+    Pose: MockPose,
+    POSE_CONNECTIONS: [],
   };
 });
 
@@ -55,17 +73,11 @@ describe('useMediaPipe', () => {
     const onResults = vi.fn();
     renderHook(() => useMediaPipe(mockVideo, onResults, true));
 
-    // Wait for the async initialization in the effect
     await vi.advanceTimersByTimeAsync(100);
 
-    await waitFor(() => {
-      expect(mockOnResults).toHaveBeenCalled();
-    }, { timeout: 1000 });
-
-    // Verify the send method was called at least once
-    await waitFor(() => {
-      expect(mockSend).toHaveBeenCalled();
-    }, { timeout: 1000 });
+    expect(mockOnResults).toHaveBeenCalledTimes(1);
+    expect(mockSetOptions).toHaveBeenCalledTimes(1);
+    expect(mockSend).toHaveBeenCalled();
   });
 
   it('should not process if disabled', async () => {

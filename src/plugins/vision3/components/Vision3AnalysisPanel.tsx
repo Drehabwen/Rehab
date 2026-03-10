@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { MarkdownReport } from '@/components/shared/MarkdownReport';
 import { Vision3Dashboard } from './Vision3Dashboard';
 import { PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
+import { COLORS } from '@/constants/uiStyles';
 import { AssessmentType } from '../store/usePostureAssessmentStore';
 import { ASSESSMENT_TEXTS, PANEL_TEXTS } from '../constants/uiText';
 import { buildImmediateBasicReport, buildReportInsightCards } from '../report-insights';
@@ -49,7 +50,7 @@ interface Vision3AnalysisPanelProps {
 
 const panelButtonClass = (active: boolean, tone: 'blue' | 'violet') => {
   if (!active) {
-    return 'h-9 rounded-lg px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900';
+    return cn('h-9 rounded-lg px-3 text-sm font-medium transition-colors', COLORS.neutral.slate600, COLORS.neutral.light.hover, COLORS.neutral.light.hoverText);
   }
 
   return tone === 'blue'
@@ -76,7 +77,51 @@ const centerChipClass = (tone: 'slate' | 'cyan' | 'violet' | 'amber' | 'blue') =
     case 'blue':
       return 'border-blue-200 bg-blue-50 text-blue-700';
     default:
-      return 'border-slate-200 bg-slate-50 text-slate-600';
+      return cn(COLORS.neutral.light.border, COLORS.neutral.light.bgSoft, COLORS.neutral.slate600);
+  }
+};
+
+const panelShellClass = cn('flex h-full flex-col gap-4 rounded-[2rem] border p-4 shadow-sm backdrop-blur-sm lg:p-6', COLORS.neutral.light.borderSubtle, COLORS.neutral.whiteBg95);
+const stickyHeaderClass = cn('sticky top-0 z-10 -mx-1 flex flex-col gap-3 rounded-[1.4rem] px-1 pb-1 backdrop-blur-sm xl:flex-row xl:items-center xl:justify-between', COLORS.neutral.whiteBg90);
+const headerToggleClass = cn('flex items-center rounded-xl border p-1 shadow-sm', COLORS.neutral.light.borderStrong, COLORS.neutral.light.bg);
+const sectionShellClass = cn('rounded-[28px] border p-4 shadow-sm', COLORS.neutral.light.border);
+const titleClass = cn('mt-1 text-xl font-semibold', COLORS.neutral.light.text);
+const subtitleClass = cn('mt-1 text-sm', COLORS.neutral.slate500);
+const eyebrowClass = cn('text-[11px] font-semibold uppercase tracking-[0.22em]', COLORS.neutral.light.textLight);
+const insightEyebrowClass = cn(
+  'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1',
+  COLORS.neutral.light.bg,
+  COLORS.neutral.light.textMuted,
+  COLORS.neutral.light.ring,
+);
+const insightCardClass = cn('rounded-[22px] border p-4 shadow-sm', COLORS.neutral.whiteBg92);
+const evidenceChipClass = cn(
+  'inline-flex rounded-full px-2.5 py-1 text-xs ring-1',
+  COLORS.neutral.light.bg,
+  COLORS.neutral.light.textMuted,
+  COLORS.neutral.light.ring,
+);
+const markdownSurfaceClass = cn('min-h-[300px] sm:min-h-[340px]', COLORS.neutral.whiteBg90);
+const emptyStateIconClass = cn('h-10 w-10', COLORS.neutral.light.textLight);
+const reportSyncBadgeClass = (tone: 'cyan' | 'violet') =>
+  cn(
+    'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1',
+    COLORS.neutral.whiteBg80,
+    tone === 'cyan' ? 'text-cyan-700 ring-cyan-100' : 'text-violet-700 ring-violet-100',
+  );
+const quickJumpButtonClass = (tone: 'cyan' | 'violet' | 'blue' | 'amber' | 'slate') => {
+  const base = 'inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium transition-colors';
+  switch (tone) {
+    case 'cyan':
+      return `${base} border-cyan-200 ${COLORS.neutral.light.bg} text-cyan-700 hover:bg-cyan-50`;
+    case 'violet':
+      return `${base} border-violet-200 ${COLORS.neutral.light.bg} text-violet-700 hover:bg-violet-50`;
+    case 'blue':
+      return `${base} border-blue-200 ${COLORS.neutral.light.bg} text-blue-700 hover:bg-blue-50`;
+    case 'amber':
+      return `${base} border-amber-200 ${COLORS.neutral.light.bg} text-amber-700 hover:bg-amber-50`;
+    default:
+      return `${base} ${COLORS.neutral.light.border} ${COLORS.neutral.light.bg} ${COLORS.neutral.slate600} ${COLORS.neutral.light.hover}`;
   }
 };
 
@@ -150,8 +195,8 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
   }, [activePanel, focusTarget]);
 
   return (
-    <div className="flex h-full flex-col gap-4 rounded-[2rem] border border-slate-200/80 bg-white/95 p-4 shadow-sm backdrop-blur-sm lg:p-6">
-      <div className="sticky top-0 z-10 -mx-1 flex flex-col gap-3 rounded-[1.4rem] bg-white/90 px-1 pb-1 backdrop-blur-sm xl:flex-row xl:items-center xl:justify-between">
+    <div className={panelShellClass}>
+      <div className={stickyHeaderClass}>
         <div className="flex flex-wrap items-center gap-2">
           <span className={cn('status-badge h-7 px-3 text-xs', assessmentBadgeClass(assessmentType))}>
             {assessmentType === 'quick' ? <Zap size={14} /> : <Layers size={14} />}
@@ -162,7 +207,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center rounded-xl border border-slate-300 bg-white p-1 shadow-sm">
+        <div className={headerToggleClass}>
           <button type="button" onClick={() => setActivePanel('dashboard')} className={panelButtonClass(activePanel === 'dashboard', 'blue')}>
             {PANEL_TEXTS.dataPanel}
           </button>
@@ -173,12 +218,12 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
       </div>
 
       {activePanel === 'report' ? (
-        <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,rgba(250,250,255,0.98),rgba(255,255,255,1))] p-4 shadow-sm">
+        <section className={cn(sectionShellClass, 'bg-[linear-gradient(135deg,rgba(250,250,255,0.98),rgba(255,255,255,1))]')}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Assessment Report</p>
-              <h3 className="mt-1 text-xl font-semibold text-slate-900">{'\u7ed3\u8bba\u4e0e\u52a8\u4f5c'}</h3>
-              <p className="mt-1 text-sm text-slate-500">{reportIntro}</p>
+              <p className={eyebrowClass}>Assessment Report</p>
+              <h3 className={titleClass}>{'\u7ed3\u8bba\u4e0e\u52a8\u4f5c'}</h3>
+              <p className={subtitleClass}>{reportIntro}</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -210,7 +255,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
             {hasBasicReportContent ? (
               <button
                 type="button"
-                className="inline-flex items-center rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-50"
+                className={quickJumpButtonClass('cyan')}
                 onClick={() => onNavigate?.('report', 'report-basic')}
               >
                 {'\u5b9a\u4f4d\u57fa\u7840\u62a5\u544a'}
@@ -219,7 +264,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
             {hasDeepReport ? (
               <button
                 type="button"
-                className="inline-flex items-center rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-medium text-violet-700 transition-colors hover:bg-violet-50"
+                className={quickJumpButtonClass('violet')}
                 onClick={() => onNavigate?.('report', 'report-deep')}
               >
                 {'\u5b9a\u4f4d\u62a5\u544a\u6269\u5c55'}
@@ -228,12 +273,12 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
           </div>
         </section>
       ) : (
-        <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(255,255,255,1))] p-4 shadow-sm">
+        <section className={cn(sectionShellClass, 'bg-[linear-gradient(135deg,rgba(248,250,252,0.98),rgba(255,255,255,1))]')}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Data Center</p>
-              <h3 className="mt-1 text-xl font-semibold text-slate-900">{'\u8bc1\u636e\u4e0e\u8ffd\u6eaf'}</h3>
-              <p className="mt-1 text-sm text-slate-500">{dataIntro}</p>
+              <p className={eyebrowClass}>Data Center</p>
+              <h3 className={titleClass}>{'\u8bc1\u636e\u4e0e\u8ffd\u6eaf'}</h3>
+              <p className={subtitleClass}>{dataIntro}</p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -272,21 +317,21 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
             </span>
             <button
               type="button"
-              className="inline-flex items-center rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50"
+              className={quickJumpButtonClass('blue')}
               onClick={() => onNavigate?.('dashboard', 'data-metrics')}
             >
               {'\u8df3\u5230\u6307\u6807'}
             </button>
             <button
               type="button"
-              className="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-50"
+              className={quickJumpButtonClass('amber')}
               onClick={() => onNavigate?.('dashboard', 'data-issues')}
             >
               {'\u8df3\u5230\u98ce\u9669'}
             </button>
             <button
               type="button"
-              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              className={quickJumpButtonClass('slate')}
               onClick={() => onNavigate?.('dashboard', 'data-head')}
             >
               {'\u8df3\u5230 3D \u4f4d\u59ff'}
@@ -300,15 +345,15 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
             {hasAnyReport ? (
               <div className="space-y-4">
                 {insightCards.length > 0 ? (
-                  <section className="rounded-[26px] border border-slate-200 bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] p-4 shadow-sm">
+                  <section className={cn('rounded-[26px] p-4 shadow-sm', COLORS.neutral.light.border, 'border', 'bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(255,255,255,1))]')}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
-                        <div className="inline-flex items-center gap-2 rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-700 ring-1 ring-slate-200">
+                        <div className={insightEyebrowClass}>
                           <Sparkles size={12} />
                           {'\u6d1e\u5bdf\u5efa\u8bae\u5361'}
                         </div>
-                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{'\u57fa\u4e8e\u5df2\u63a5\u6536\u62a5\u544a\u4fe1\u606f\u7684\u53ef\u89c6\u5efa\u8bae'}</h3>
-                        <p className="mt-1 text-sm text-slate-500">{'\u8fd9\u91cc\u7684\u5efa\u8bae\u57fa\u4e8e\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u5df2\u63a5\u6536\u7684\u62a5\u544a\u3001\u95ee\u9898\u5217\u8868\u548c\u91cf\u5316\u6307\u6807\u63d0\u70bc\u800c\u6210\uff0c\u4e0d\u7b49\u540c\u4e8e\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7684\u7efc\u5408 LLM \u62a5\u544a\u3002'}</p>
+                        <h3 className={cn('mt-3 text-lg font-semibold', COLORS.neutral.light.text)}>{'\u57fa\u4e8e\u5df2\u63a5\u6536\u62a5\u544a\u4fe1\u606f\u7684\u53ef\u89c6\u5efa\u8bae'}</h3>
+                        <p className={cn('mt-1 text-sm', COLORS.neutral.slate500)}>{'\u8fd9\u91cc\u7684\u5efa\u8bae\u57fa\u4e8e\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u5df2\u63a5\u6536\u7684\u62a5\u544a\u3001\u95ee\u9898\u5217\u8868\u548c\u91cf\u5316\u6307\u6807\u63d0\u70bc\u800c\u6210\uff0c\u4e0d\u7b49\u540c\u4e8e\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7684\u7efc\u5408 LLM \u62a5\u544a\u3002'}</p>
                       </div>
                       <button
                         type="button"
@@ -325,7 +370,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                         <article
                           key={card.id}
                           className={cn(
-                            'rounded-[22px] border bg-white/92 p-4 shadow-sm',
+                            insightCardClass,
                             card.tone === 'violet' && 'border-violet-100',
                             card.tone === 'amber' && 'border-amber-100',
                             card.tone === 'blue' && 'border-blue-100',
@@ -334,23 +379,23 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                           <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]', centerChipClass(card.tone))}>
                             {card.eyebrow}
                           </span>
-                          <h4 className="mt-3 text-base font-semibold text-slate-900">{card.title}</h4>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">{card.summary}</p>
+                          <h4 className={cn('mt-3 text-base font-semibold', COLORS.neutral.light.text)}>{card.title}</h4>
+                          <p className={cn('mt-2 text-sm leading-6', COLORS.neutral.light.textMuted)}>{card.summary}</p>
 
-                          <div className="mt-4 rounded-2xl bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{'\u6839\u636e'}</p>
+                          <div className={cn('mt-4 rounded-2xl p-3', COLORS.neutral.light.bgSoft)}>
+                            <p className={cn('text-[11px] font-semibold uppercase tracking-[0.14em]', COLORS.neutral.light.textLight)}>{'\u6839\u636e'}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               {card.evidence.map((item) => (
-                                <span key={item} className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs text-slate-600 ring-1 ring-slate-200">
+                                <span key={item} className={evidenceChipClass}>
                                   {item}
                                 </span>
                               ))}
                             </div>
                           </div>
 
-                          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{'\u5efa\u8bae\u52a8\u4f5c'}</p>
-                            <p className="mt-2 text-sm leading-6 text-slate-700">{card.action}</p>
+                          <div className={cn('mt-4 rounded-2xl border p-3', COLORS.neutral.light.border, COLORS.neutral.light.bg)}>
+                            <p className={cn('text-[11px] font-semibold uppercase tracking-[0.14em]', COLORS.neutral.light.textLight)}>{'\u5efa\u8bae\u52a8\u4f5c'}</p>
+                            <p className={cn('mt-2 text-sm leading-6', COLORS.neutral.light.textSoft)}>{card.action}</p>
                           </div>
                         </article>
                       ))}
@@ -363,12 +408,12 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                   <section ref={basicReportRef} className="rounded-[26px] border border-cyan-100 bg-gradient-to-b from-cyan-50/70 to-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-700 ring-1 ring-cyan-100">
+                        <div className={reportSyncBadgeClass('cyan')}>
                           <Zap size={12} />
                           {hasAuxiliaryReport ? '\u5feb\u901f\u7ed3\u8bba' : '\u5373\u65f6\u7ed3\u8bba'}
                         </div>
-                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{PANEL_TEXTS.auxiliaryDiagnosis}</h3>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <h3 className={cn('mt-3 text-lg font-semibold', COLORS.neutral.light.text)}>{PANEL_TEXTS.auxiliaryDiagnosis}</h3>
+                        <p className={cn('mt-1 text-sm', COLORS.neutral.slate500)}>
                           {hasAuxiliaryReport
                             ? '\u9762\u5411\u7b5b\u67e5\u548c\u521d\u6b65\u5224\u65ad\u7684\u57fa\u7840\u7ed3\u8bba\uff0c\u53ef\u5148\u7528\u4e8e\u5feb\u901f\u8bfb\u53d6\u5f53\u524d\u98ce\u9669\u3002'
                             : '\u8fd9\u662f\u5b8c\u6210\u8bc4\u4f30\u540e\u7acb\u5373\u751f\u6210\u7684\u672c\u5730\u7ed3\u8bba\uff0c\u7528\u6765\u907f\u514d\u62a5\u544a\u672a\u843d\u4f4d\u65f6\u53f3\u4fa7\u51fa\u73b0\u7a7a\u767d\u3002'}
@@ -392,7 +437,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                         animate={false}
                         showChrome={false}
                         tone="cyan"
-                        className="min-h-[300px] bg-white/90 sm:min-h-[340px]"
+                        className={markdownSurfaceClass}
                       />
                     </div>
                   </section>
@@ -402,12 +447,12 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                     <section ref={deepReportRef} className="rounded-[26px] border border-violet-100 bg-gradient-to-b from-violet-50/70 to-white p-4 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700 ring-1 ring-violet-100">
+                        <div className={reportSyncBadgeClass('violet')}>
                           <Sparkles size={12} />
                           {'Report Sync'}
                         </div>
-                        <h3 className="mt-3 text-lg font-semibold text-slate-900">{'\u62a5\u544a\u6269\u5c55\u5185\u5bb9'}</h3>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <h3 className={cn('mt-3 text-lg font-semibold', COLORS.neutral.light.text)}>{'\u62a5\u544a\u6269\u5c55\u5185\u5bb9'}</h3>
+                        <p className={cn('mt-1 text-sm', COLORS.neutral.slate500)}>
                           {'\u5982\u679c\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u5df2\u540c\u6b65\u56de\u4f20\u62a5\u544a\u6269\u5c55\u5185\u5bb9\uff0c\u4f1a\u5728\u8fd9\u91cc\u4e0e\u672c\u5730\u4f53\u6001\u57fa\u7840\u62a5\u544a\u4e00\u8d77\u9605\u8bfb\u3002'}
                         </p>
                       </div>
@@ -434,7 +479,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                         animate={Boolean(isStreamingReport)}
                         showChrome={false}
                         tone="violet"
-                        className="min-h-[300px] bg-white/90 sm:min-h-[340px]"
+                        className={markdownSurfaceClass}
                         emptyTitle={'\u6682\u65e0\u62a5\u544a\u6269\u5c55\u5185\u5bb9'}
                         emptyDescription={'\u8fd9\u4e00\u533a\u57df\u4f1a\u5728\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u540c\u6b65\u56de\u4f20\u540e\u663e\u793a\u6269\u5c55\u62a5\u544a\u5185\u5bb9\u3002'}
                       />
@@ -445,7 +490,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
               </div>
             ) : (
               <div className="state-panel flex min-h-[360px] flex-col items-center justify-center gap-3">
-                <FileText className="h-10 w-10 text-slate-400" />
+                <FileText className={emptyStateIconClass} />
                 <h3>{'\u6682\u65e0\u62a5\u544a'}</h3>
                 <p>{isCompleted ? '\u5b8c\u6210\u62cd\u6444\u540e\u4f1a\u81ea\u52a8\u751f\u6210\u672c\u6b21\u4f53\u6001\u57fa\u7840\u62a5\u544a\uff0c\u7efc\u5408 LLM \u62a5\u544a\u5219\u7531\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210\u3002' : '\u62cd\u6444\u5b8c\u6210\u540e\u8fd9\u91cc\u4f1a\u627f\u63a5\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u7684\u57fa\u7840\u62a5\u544a\u3002'}</p>
               </div>

@@ -76,11 +76,21 @@ class PostureAgent:
         for i, obs in enumerate(self.observations):
             history_context += f"\n--- 视角 {i+1} 数据 ---\n{obs['narration']}\n"
 
+        observed_views = []
+        for obs in self.observations:
+            narration = obs.get("narration", "")
+            if not isinstance(narration, str):
+                continue
+            match = re.search(r"\b(front|side|back)\b", narration)
+            if match:
+                observed_views.append(match.group(1))
+        quick_view = observed_views[0] if observed_views else "current"
+
         # Adjust prompt based on assessment type
         if assessment_type == "quick":
-            assessment_context = """
+            assessment_context = f"""
             ### 评估类型：快速评估（单视角筛查）
-            - 本评估仅基于单视角（正面）数据
+            - 本评估仅基于单视角（{quick_view}）数据
             - 适合快速筛查和初步检查
             - 建议进行完整评估以获得更准确的诊断
             """

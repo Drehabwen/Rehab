@@ -22,12 +22,12 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    primary: 'bg-antey-primary text-white hover:bg-teal-700',
-    secondary: 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400',
-    tertiary: 'bg-transparent text-slate-700 hover:bg-slate-100',
-    ghost: 'bg-transparent text-slate-700 hover:bg-slate-100',
-    outline: 'bg-transparent border border-slate-300 text-slate-700 hover:border-antey-primary hover:text-antey-primary',
-    danger: 'bg-red-600 text-white hover:bg-red-700',
+    primary: 'btn-primary',
+    secondary: 'btn-secondary',
+    tertiary: 'btn-tertiary',
+    ghost: 'btn-ghost',
+    outline: 'btn-outline',
+    danger: 'btn-danger',
   };
 
   const sizeStyles = {
@@ -39,7 +39,6 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center font-semibold transition-all duration-200',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         variantStyles[variant],
         sizeStyles[size],
@@ -77,10 +76,10 @@ export const IconButton: React.FC<IconButtonProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    default: 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400',
-    primary: 'bg-antey-primary/10 text-antey-primary hover:bg-antey-primary/20',
-    ghost: 'bg-transparent text-slate-500 hover:bg-slate-100',
-    danger: 'bg-red-50 text-red-700 hover:bg-red-100',
+    default: 'btn-icon',
+    primary: 'btn-icon-primary',
+    ghost: 'btn-icon-ghost',
+    danger: 'btn-icon-danger',
   };
 
   const sizeStyles = {
@@ -92,7 +91,6 @@ export const IconButton: React.FC<IconButtonProps> = ({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center transition-all duration-200',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         variantStyles[variant],
         sizeStyles[size],

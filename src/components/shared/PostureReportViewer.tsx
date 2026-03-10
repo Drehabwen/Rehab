@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { MarkdownReport } from './MarkdownReport';
 import { cn } from '@/lib/utils';
+import { COLORS } from '@/constants/uiStyles';
 
 interface PostureReportViewerProps {
   /** 基础报告 - 根据规则得出的结论 */
@@ -69,32 +70,43 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
   const currentContent = reportType === 'deep' ? markdownReport : auxiliaryDiagnosis;
   const hasBothReports = !!auxiliaryDiagnosis && !!markdownReport;
   const isLoading = isAnalyzing && !currentContent;
+  const toggleButtonBaseClass = 'px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all';
+  const toggleContainerClass = 'segmented-control rounded-xl';
+  const toggleButtonClass = (active: boolean, tone: 'blue' | 'violet') =>
+    cn(
+      toggleButtonBaseClass,
+      active ? `bg-white shadow-sm ${tone === 'blue' ? 'text-blue-600' : 'text-purple-600'}` : 'text-slate-400 hover:text-slate-600',
+    );
+  const headerShellClass = 'p-6 sticky top-0 z-10 border-b border-slate-100 bg-white/80 backdrop-blur-md';
+  const headerIconClass = (tone: 'deep' | 'auxiliary') =>
+    cn('w-10 h-10 rounded-2xl flex items-center justify-center', tone === 'deep' ? 'bg-purple-50 text-purple-500' : 'bg-blue-50 text-blue-500');
+  const headerTitleClass = cn('font-black uppercase tracking-tight', COLORS.neutral.light.text);
+  const headerSubtitleClass = cn('text-[10px] font-bold uppercase tracking-widest', COLORS.neutral.light.textLight);
+  const chromeButtonClass = cn('p-3 rounded-2xl transition-all', COLORS.neutral.light.textLight, COLORS.neutral.light.hover, COLORS.neutral.light.hoverText);
+  const emptyStateShellClass = 'p-8 rounded-[3rem] border border-dashed border-slate-200 bg-slate-50/50';
+  const emptyStateTitleClass = cn('mb-3 text-lg font-black uppercase tracking-[0.2em]', COLORS.neutral.light.text);
+  const emptyStateBodyClass = cn('max-w-[240px] text-[11px] font-bold leading-relaxed', COLORS.neutral.light.textLight);
+  const emptyStateIconShellClass = cn('mb-6 flex h-20 w-20 items-center justify-center rounded-3xl', COLORS.neutral.light.selected);
+  const inlineReportShellClass = 'flex-1 overflow-hidden rounded-[2.5rem] border border-slate-200/60 bg-slate-50/80 flex flex-col';
+  const resetButtonClass = cn('flex-1 flex items-center justify-center gap-3 rounded-2xl border py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all', COLORS.neutral.light.border, COLORS.neutral.light.bg, COLORS.neutral.light.text, COLORS.neutral.light.hover);
+  const modalShellClass = 'relative flex flex-col overflow-hidden bg-white shadow-2xl transition-all duration-500 ease-in-out';
+  const modalBodyClass = 'flex-1 overflow-y-auto bg-slate-900 p-0';
 
   // 报告类型切换按钮
   const ReportTypeToggle = () => {
     if (!showToggle || !hasBothReports || !setReportType) return null;
     
     return (
-      <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200">
+      <div className={toggleContainerClass}>
         <button
           onClick={() => setReportType('auxiliary')}
-          className={cn(
-            "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
-            reportType === 'auxiliary' 
-              ? "bg-white text-blue-600 shadow-sm" 
-              : "text-slate-400 hover:text-slate-600"
-          )}
+          className={toggleButtonClass(reportType === 'auxiliary', 'blue')}
         >
           基础报告
         </button>
         <button
           onClick={() => setReportType('deep')}
-          className={cn(
-            "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
-            reportType === 'deep' 
-              ? "bg-white text-purple-600 shadow-sm" 
-              : "text-slate-400 hover:text-slate-600"
-          )}
+          className={toggleButtonClass(reportType === 'deep', 'violet')}
         >
           深度报告
         </button>
@@ -106,20 +118,15 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
   const Header = () => (
     <div className={cn(
       "flex items-center justify-between",
-      inline ? "mb-6" : "p-6 border-b border-slate-100 bg-white/80 backdrop-blur-md sticky top-0 z-10"
+      inline ? "mb-6" : headerShellClass
     )}>
       <div className="flex items-center gap-4">
-        <div className={cn(
-          "rounded-2xl flex items-center justify-center",
-          reportType === 'deep' 
-            ? "w-10 h-10 bg-purple-50 text-purple-500" 
-            : "w-10 h-10 bg-blue-50 text-blue-500"
-        )}>
+        <div className={headerIconClass(reportType === 'deep' ? 'deep' : 'auxiliary')}>
           {reportType === 'deep' ? <BrainCircuit size={20} /> : <Activity size={20} />}
         </div>
         <div>
-          <h3 className="font-black text-slate-900 uppercase tracking-tight">{title}</h3>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{subtitle}</p>
+          <h3 className={headerTitleClass}>{title}</h3>
+          <p className={headerSubtitleClass}>{subtitle}</p>
         </div>
       </div>
       
@@ -131,7 +138,7 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
             {setIsFullscreen && (
               <button 
                 onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all hidden md:block"
+                className={cn(chromeButtonClass, 'hidden md:block')}
                 title={isFullscreen ? "退出全屏" : "全屏预览"}
               >
                 <ArrowUpRight size={20} className={isFullscreen ? "rotate-180" : ""} />
@@ -139,7 +146,7 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
             )}
             <button 
               onClick={onClose}
-              className="p-3 hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"
+              className={chromeButtonClass}
             >
               <ChevronDown size={20} className="rotate-180" />
             </button>
@@ -154,15 +161,15 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
     return (
       <div className={cn(
         "flex flex-col items-center justify-center text-center",
-        inline ? "p-8 bg-slate-50/50 rounded-[3rem] border border-dashed border-slate-200" : "h-full"
+        inline ? emptyStateShellClass : "h-full"
       )}>
         <div className="w-20 h-20 rounded-3xl bg-antey-primary/10 flex items-center justify-center mb-6 animate-pulse">
           <BrainCircuit className="text-antey-primary" size={40} />
         </div>
-        <h4 className="text-lg font-black text-slate-900 uppercase tracking-[0.2em] mb-3">
+        <h4 className={emptyStateTitleClass}>
           正在生成报告
         </h4>
-        <p className="text-[11px] text-slate-400 font-bold max-w-[240px] leading-relaxed">
+        <p className={emptyStateBodyClass}>
           AI 正在分析您的体态数据，请稍候...
         </p>
         <div className="mt-8 flex gap-2">
@@ -183,15 +190,15 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
     return (
       <div className={cn(
         "flex flex-col items-center justify-center text-center",
-        inline ? "p-8 bg-slate-50/50 rounded-[3rem] border border-dashed border-slate-200" : "h-full"
+        inline ? emptyStateShellClass : "h-full"
       )}>
-        <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-6">
-          <Activity className="text-slate-400" size={40} />
+        <div className={emptyStateIconShellClass}>
+          <Activity className={COLORS.neutral.light.textLight} size={40} />
         </div>
-        <h4 className="text-lg font-black text-slate-900 uppercase tracking-[0.2em] mb-3">
+        <h4 className={emptyStateTitleClass}>
           暂无报告
         </h4>
-        <p className="text-[11px] text-slate-400 font-bold max-w-[240px] leading-relaxed">
+        <p className={emptyStateBodyClass}>
           完成体态评估后，报告将在此显示
         </p>
       </div>
@@ -204,7 +211,7 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
       <div className={cn("flex-1 flex flex-col min-h-0", className)}>
         <Header />
         
-        <div className="flex-1 bg-slate-50/80 rounded-[2.5rem] border border-slate-200/60 overflow-hidden flex flex-col">
+        <div className={inlineReportShellClass}>
           <MarkdownReport 
             content={currentContent} 
             animate={true} 
@@ -216,7 +223,7 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
           <div className="mt-6 flex gap-4">
             <button 
               onClick={onReset}
-              className="flex-1 bg-white text-slate-900 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] hover:bg-slate-50 transition-all border border-slate-200 flex items-center justify-center gap-3"
+              className={resetButtonClass}
             >
               <RotateCcw size={16} />
               重新评估
@@ -230,7 +237,7 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
   // 弹窗模式
   return (
     <div className={cn(
-      "relative bg-white shadow-2xl overflow-hidden flex flex-col transition-all duration-500 ease-in-out",
+      modalShellClass,
       isFullscreen 
         ? "w-full h-full rounded-none" 
         : "w-full max-w-5xl h-[90vh] rounded-[2.5rem] animate-in zoom-in-95 duration-300",
@@ -238,7 +245,7 @@ export const PostureReportViewer: React.FC<PostureReportViewerProps> = ({
     )}>
       <Header />
       
-      <div className="flex-1 overflow-y-auto p-0 bg-slate-900">
+      <div className={modalBodyClass}>
         <MarkdownReport 
           content={currentContent} 
           animate={false} 

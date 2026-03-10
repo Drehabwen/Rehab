@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TreatmentPlanStorage } from '../treatmentPlanStorage';
 import { TreatmentPlanVersion } from '../../types/assessment';
+import { APP_CONFIG } from '../../config/appConfig';
+
+const STORAGE_KEY = APP_CONFIG.STORAGE_KEYS.TREATMENT_PLANS;
 
 describe('TreatmentPlanStorage', () => {
   beforeEach(() => {
@@ -31,7 +34,7 @@ describe('TreatmentPlanStorage', () => {
 
       expect(result).toBe(true);
       
-      const savedData = localStorage.getItem('treatment_plan_versions');
+      const savedData = localStorage.getItem(STORAGE_KEY);
       expect(savedData).not.toBeNull();
       
       const parsed = JSON.parse(savedData!);
@@ -45,7 +48,7 @@ describe('TreatmentPlanStorage', () => {
       
       expect(result).toBe(true);
       
-      const savedData = localStorage.getItem('treatment_plan_versions');
+      const savedData = localStorage.getItem(STORAGE_KEY);
       const parsed = JSON.parse(savedData!);
       expect(parsed.versions).toHaveLength(0);
     });
@@ -85,7 +88,7 @@ describe('TreatmentPlanStorage', () => {
         versions: [{ id: 'old' }],
         lastUpdated: '2024-01-01T00:00:00.000Z',
       };
-      localStorage.setItem('treatment_plan_versions', JSON.stringify(data));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
       const loaded = TreatmentPlanStorage.loadVersions();
       expect(loaded).toHaveLength(0);
@@ -109,10 +112,10 @@ describe('TreatmentPlanStorage', () => {
       ];
 
       TreatmentPlanStorage.saveVersions(versions);
-      expect(localStorage.getItem('treatment_plan_versions')).not.toBeNull();
+      expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
 
       TreatmentPlanStorage.clearVersions();
-      expect(localStorage.getItem('treatment_plan_versions')).toBeNull();
+      expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     });
   });
 

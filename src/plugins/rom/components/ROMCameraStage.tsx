@@ -17,6 +17,7 @@ import type { ActiveMeasurement } from '@/store/useMeasurementStore';
 import type { JointType, MovementDirection } from '../types';
 import { ROM_TEXTS } from '../constants/uiText';
 import { PageTitleSection, UnifiedStatusBadge } from '@/components/layout';
+import { COLORS } from '@/constants/uiStyles';
 
 interface ROMCameraStageProps {
   videoContainerRef: React.RefObject<HTMLDivElement>;
@@ -75,6 +76,16 @@ export const ROMCameraStage: React.FC<ROMCameraStageProps> = ({
   const selectedJointLabel = ROM_TEXTS.joints[selectedJoint];
   const selectedDirectionLabel = ROM_TEXTS.directions[selectedDirection];
   const captureProgress = isMeasuring ? Math.min(100, sampleCount * 2) : hasMeasuredData ? 100 : 0;
+  const overlayPanelClass = 'rounded-xl border border-slate-200 bg-white/95';
+  const mutedCardClass = 'rounded-20 border border-slate-200 bg-slate-50 p-4';
+  const whiteCardClass = 'rounded-20 border border-slate-200 bg-white p-4';
+  const metricCardClass = 'rounded-xl border border-slate-200 bg-slate-50 p-3';
+  const sectionTitleClass = 'text-sm font-semibold text-slate-900';
+  const bodyTextClass = 'text-sm text-slate-700';
+  const helperTextClass = 'text-xs text-slate-500';
+  const iconClass = COLORS.neutral.slate600;
+  const progressTrackClass = 'h-2 w-full overflow-hidden rounded-full bg-slate-100';
+  const progressFillClass = isMeasuring ? 'bg-blue-600' : hasMeasuredData ? 'bg-emerald-600' : 'bg-slate-300';
 
   return (
     <div className="rehab-page custom-scrollbar">
@@ -95,17 +106,17 @@ export const ROMCameraStage: React.FC<ROMCameraStageProps> = ({
             />
 
             <div className="absolute left-6 right-6 top-6 pointer-events-none">
-              <div className="rounded-xl border border-slate-200 bg-white/95 px-4 py-3 flex items-center justify-between">
+              <div className={cn(overlayPanelClass, 'flex items-center justify-between px-4 py-3')}>
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">{status.message}</p>
-                  <p className="text-xs text-slate-500 mt-1">实时采样 {sampleCount} 帧 · 持续 {durationSec.toFixed(1)} 秒</p>
+                  <p className={sectionTitleClass}>{status.message}</p>
+                  <p className={cn(helperTextClass, 'mt-1')}>实时采样 {sampleCount} 帧 · 持续 {durationSec.toFixed(1)} 秒</p>
                 </div>
                 <UnifiedStatusBadge status={status.badge} text={status.text} />
               </div>
             </div>
 
             <div className="absolute left-6 right-6 bottom-6">
-              <div className="rounded-xl border border-slate-200 bg-white/95 p-3 flex flex-wrap items-center gap-2 justify-center">
+              <div className={cn(overlayPanelClass, 'flex flex-wrap items-center justify-center gap-2 p-3')}>
                 <button
                   onClick={() => setIsCameraOn(!isCameraOn)}
                   className="btn-secondary"
@@ -140,60 +151,60 @@ export const ROMCameraStage: React.FC<ROMCameraStageProps> = ({
           </div>
 
           <aside className="bento-card p-5 flex flex-col gap-4 min-h-[560px]">
-            <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
+            <div className={mutedCardClass}>
               <div className="flex items-center gap-2 mb-2">
-                <Target size={14} className="text-slate-600" />
-                <p className="text-sm font-semibold text-slate-900">当前测量目标</p>
+                <Target size={14} className={iconClass} />
+                <p className={sectionTitleClass}>当前测量目标</p>
               </div>
-              <p className="text-sm text-slate-700">{selectedJointLabel} · {selectedDirectionLabel} · {selectedSideLabel}</p>
-              <p className="text-xs text-slate-500 mt-1">建议动作稳定保持 3-5 秒，避免快速摆动。</p>
+              <p className={bodyTextClass}>{selectedJointLabel} · {selectedDirectionLabel} · {selectedSideLabel}</p>
+              <p className={cn(helperTextClass, 'mt-1')}>建议动作稳定保持 3-5 秒，避免快速摆动。</p>
             </div>
 
-            <div className="rounded-20 border border-slate-200 bg-white p-4">
+            <div className={whiteCardClass}>
               <div className="flex items-center gap-2 mb-3">
-                <Activity size={14} className="text-slate-600" />
-                <p className="text-sm font-semibold text-slate-900">测量进度</p>
+                <Activity size={14} className={iconClass} />
+                <p className={sectionTitleClass}>测量进度</p>
               </div>
               <div
-                className="h-2 w-full rounded-full bg-slate-100 overflow-hidden"
+                className={progressTrackClass}
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={captureProgress}
               >
-                <div className={cn('h-full transition-all', isMeasuring ? 'bg-blue-600' : hasMeasuredData ? 'bg-emerald-600' : 'bg-slate-300')} style={{ width: `${captureProgress}%` }} />
+                <div className={cn('h-full transition-all', progressFillClass)} style={{ width: `${captureProgress}%` }} />
               </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+              <div className={cn(helperTextClass, 'mt-2 flex items-center justify-between')}>
                 <span>{isMeasuring ? '采集中' : hasMeasuredData ? '已完成' : '待开始'}</span>
                 <span>{captureProgress}%</span>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">当前角度</p>
-                <p className="text-xl font-semibold text-slate-900 mt-1">{formatAngle(currentMeasurement?.currentAngle ?? 0)}°</p>
+              <div className={metricCardClass}>
+                <p className={helperTextClass}>当前角度</p>
+                <p className={cn('mt-1 text-xl font-semibold', COLORS.neutral.light.text)}>{formatAngle(currentMeasurement?.currentAngle ?? 0)}°</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">采样时长</p>
-                <p className="text-xl font-semibold text-slate-900 mt-1">{durationSec.toFixed(1)}s</p>
+              <div className={metricCardClass}>
+                <p className={helperTextClass}>采样时长</p>
+                <p className={cn('mt-1 text-xl font-semibold', COLORS.neutral.light.text)}>{durationSec.toFixed(1)}s</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">最大角度</p>
-                <p className="text-xl font-semibold text-slate-900 mt-1">{formatAngle(currentMeasurement?.maxAngle ?? 0)}°</p>
+              <div className={metricCardClass}>
+                <p className={helperTextClass}>最大角度</p>
+                <p className={cn('mt-1 text-xl font-semibold', COLORS.neutral.light.text)}>{formatAngle(currentMeasurement?.maxAngle ?? 0)}°</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs text-slate-500">最小角度</p>
-                <p className="text-xl font-semibold text-slate-900 mt-1">{formatAngle(currentMeasurement?.minAngle ?? 0)}°</p>
+              <div className={metricCardClass}>
+                <p className={helperTextClass}>最小角度</p>
+                <p className={cn('mt-1 text-xl font-semibold', COLORS.neutral.light.text)}>{formatAngle(currentMeasurement?.minAngle ?? 0)}°</p>
               </div>
             </div>
 
-            <div className="rounded-20 border border-slate-200 bg-slate-50 p-4 mt-auto">
+            <div className={cn(mutedCardClass, 'mt-auto')}>
               <div className="flex items-center gap-2 mb-2">
-                <Clock3 size={14} className="text-slate-600" />
-                <p className="text-sm font-semibold text-slate-900">操作提示</p>
+                <Clock3 size={14} className={iconClass} />
+                <p className={sectionTitleClass}>操作提示</p>
               </div>
-              <ul className="text-xs text-slate-600 space-y-1">
+              <ul className={cn('space-y-1 text-xs', COLORS.neutral.light.textMuted)}>
                 <li>保持受测关节完整出现在镜头中。</li>
                 <li>动作到最大活动范围后短暂停留。</li>
                 <li>如角度波动明显，建议重测一次。</li>

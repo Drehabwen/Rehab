@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { Activity, TrendingUp } from 'lucide-react';
+import { COLORS } from '@/constants/uiStyles';
 import { cn } from '@/lib/utils';
 import { THRESHOLDS, SYSTEM_CONFIG } from '../config';
 import type { PostureMetrics } from '@/hooks/usePostureWS';
@@ -35,7 +36,7 @@ const getMetricState = (value: number, good: number, warn: number): MetricState 
     return {
       label: '正常',
       badgeClass: 'status-success',
-      barClass: 'bg-emerald-500',
+      barClass: COLORS.success.emerald,
     };
   }
 
@@ -43,16 +44,19 @@ const getMetricState = (value: number, good: number, warn: number): MetricState 
     return {
       label: '待关注',
       badgeClass: 'status-warning',
-      barClass: 'bg-amber-500',
+      barClass: COLORS.warning.amber,
     };
   }
 
   return {
     label: '异常',
     badgeClass: 'status-error',
-    barClass: 'bg-rose-500',
+    barClass: COLORS.danger.rose,
   };
 };
+
+const metricCardClass = cn('rounded-20 border p-4', COLORS.neutral.light.border, COLORS.neutral.light.bg);
+const sectionCardClass = cn('rounded-20 border p-4', COLORS.neutral.light.border, COLORS.neutral.light.bgSoft);
 
 const MetricRow: React.FC<MetricRowProps> = ({
   label,
@@ -64,25 +68,25 @@ const MetricRow: React.FC<MetricRowProps> = ({
   progress,
 }) => {
   return (
-    <div className="rounded-20 border border-slate-200 bg-white p-4">
+    <div className={metricCardClass}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-slate-900">{label}</p>
-          <p className="text-xs text-slate-500 mt-1">参考值：{reference}</p>
+          <p className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>{label}</p>
+          <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>参考值：{reference}</p>
         </div>
         <span className={cn('status-badge h-6', state.badgeClass)}>{state.label}</span>
       </div>
 
       <div className="mt-3 flex items-end gap-2">
-        <span className="text-2xl font-semibold tabular-nums text-slate-900">{value.toFixed(1)}</span>
-        <span className="text-xs font-medium text-slate-500 mb-1">{unit}</span>
+        <span className={cn('text-2xl font-semibold tabular-nums', COLORS.neutral.light.text)}>{value.toFixed(1)}</span>
+        <span className={cn('mb-1 text-xs font-medium', COLORS.neutral.slate500)}>{unit}</span>
       </div>
 
-      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+      <div className={cn('mt-3 h-1.5 w-full overflow-hidden rounded-full', COLORS.neutral.light.selected)}>
         <div className={cn('h-full transition-all duration-500', state.barClass)} style={{ width: `${progress}%` }} />
       </div>
 
-      <p className="mt-3 text-xs text-slate-600 leading-relaxed">{meaning}</p>
+      <p className={cn('mt-3 text-xs leading-relaxed', COLORS.neutral.light.textMuted)}>{meaning}</p>
     </div>
   );
 };
@@ -116,12 +120,12 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
     <aside className="absolute right-6 top-[100px] bottom-6 z-30 hidden xl:flex w-[320px] pointer-events-none">
       <div className="bento-card p-4 w-full flex flex-col gap-4 pointer-events-auto">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-cyan-50 text-cyan-700 border border-cyan-100 flex items-center justify-center">
+          <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl border', COLORS.info.cyanBg, COLORS.info.cyanText, COLORS.info.cyanBorder)}>
             <TrendingUp size={18} />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">核心生物力学指标</h3>
-            <p className="text-xs text-slate-500">用于快速判断姿态风险等级</p>
+            <h3 className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>核心生物力学指标</h3>
+            <p className={cn('text-xs', COLORS.neutral.slate500)}>用于快速判断姿态风险等级</p>
           </div>
         </div>
 
@@ -157,17 +161,17 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
           />
         </div>
 
-        <div className="rounded-20 border border-slate-200 bg-slate-50 p-4">
+        <div className={sectionCardClass}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Activity size={14} className="text-slate-600" />
-              <span className="text-sm font-semibold text-slate-900">临床稳定性</span>
+              <Activity size={14} className={COLORS.neutral.light.textMuted} />
+              <span className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>临床稳定性</span>
             </div>
             <span className={cn('status-badge h-6', isStabilityGood ? 'status-success' : 'status-warning')}>
               {isStabilityGood ? '稳定' : '建议复测'}
             </span>
           </div>
-          <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+          <p className={cn('mt-2 text-xs leading-relaxed', COLORS.neutral.light.textMuted)}>
             {isStabilityGood ? DATA_QUALITY_TEXTS.excellent : DATA_QUALITY_TEXTS.suggestion}
           </p>
         </div>

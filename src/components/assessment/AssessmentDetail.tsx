@@ -1,16 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useAssessmentRecordStore } from '../../store/useAssessmentRecordStore';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import { 
-  X,
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
   ZoomIn,
   ZoomOut,
-  Download,
-  ChevronLeft,
-  ChevronRight
 } from 'lucide-react';
+import { useAssessmentRecordStore } from '../../store/useAssessmentRecordStore';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/Card';
 
 export const AssessmentDetail: React.FC = () => {
   const { currentRecord, records, setCurrentRecord } = useAssessmentRecordStore();
@@ -28,10 +27,10 @@ export const AssessmentDetail: React.FC = () => {
       img.onload = () => {
         const scaledWidth = img.width * zoom;
         const scaledHeight = img.height * zoom;
-        
+
         canvas.width = scaledWidth;
         canvas.height = scaledHeight;
-        
+
         ctx.scale(zoom, zoom);
         ctx.drawImage(img, 0, 0);
 
@@ -43,7 +42,12 @@ export const AssessmentDetail: React.FC = () => {
     }
   }, [currentRecord, showLandmarks, zoom]);
 
-  const drawLandmarks = (ctx: CanvasRenderingContext2D, landmarks: Array<{x: number; y: number}> | number[], width: number, height: number) => {
+  const drawLandmarks = (
+    ctx: CanvasRenderingContext2D,
+    landmarks: Array<{ x: number; y: number }> | number[],
+    width: number,
+    height: number,
+  ) => {
     ctx.fillStyle = '#ef4444';
     ctx.strokeStyle = '#ef4444';
     ctx.lineWidth = 2;
@@ -52,7 +56,7 @@ export const AssessmentDetail: React.FC = () => {
 
     if (Array.isArray(landmarks) && landmarks.length > 0) {
       if (typeof landmarks[0] === 'object') {
-        const points = landmarks as Array<{x: number; y: number}>;
+        const points = landmarks as Array<{ x: number; y: number }>;
         points.forEach((point, index) => {
           const x = point.x * width;
           const y = point.y * height;
@@ -94,11 +98,11 @@ export const AssessmentDetail: React.FC = () => {
   };
 
   const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.25, 3));
+    setZoom((prev) => Math.min(prev + 0.25, 3));
   };
 
   const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.25, 0.5));
+    setZoom((prev) => Math.max(prev - 0.25, 0.5));
   };
 
   const handleDownload = () => {
@@ -114,14 +118,14 @@ export const AssessmentDetail: React.FC = () => {
   };
 
   const handlePrevious = () => {
-    const currentIndex = records.findIndex(r => r.id === currentRecord?.id);
+    const currentIndex = records.findIndex((record) => record.id === currentRecord?.id);
     if (currentIndex > 0) {
       setCurrentRecord(records[currentIndex - 1].id);
     }
   };
 
   const handleNext = () => {
-    const currentIndex = records.findIndex(r => r.id === currentRecord?.id);
+    const currentIndex = records.findIndex((record) => record.id === currentRecord?.id);
     if (currentIndex < records.length - 1) {
       setCurrentRecord(records[currentIndex + 1].id);
     }
@@ -151,18 +155,18 @@ export const AssessmentDetail: React.FC = () => {
     return (
       <Card className="w-full">
         <CardContent className="py-12 text-center text-gray-500">
-          <p>请选择一个评估记录查看详情</p>
+          <p>请选择一条评估记录查看详情</p>
         </CardContent>
       </Card>
     );
   }
 
-  const currentIndex = records.findIndex(r => r.id === currentRecord.id);
+  const currentIndex = records.findIndex((record) => record.id === currentRecord.id);
 
   return (
     <Card className="w-full">
       <CardHeader>
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               onClick={handlePrevious}
@@ -174,7 +178,7 @@ export const AssessmentDetail: React.FC = () => {
             </Button>
             <div>
               <CardTitle>评估详情</CardTitle>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="mt-1 text-sm text-gray-600">
                 {currentIndex + 1} / {records.length}
               </p>
             </div>
@@ -209,22 +213,20 @@ export const AssessmentDetail: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Badge variant="info">
-              {getAssessmentTypeLabel(currentRecord.assessmentType)}
-            </Badge>
-            <span className="text-sm text-gray-600">
-              {formatDate(currentRecord.timestamp)}
-            </span>
-            {currentRecord.improvement !== undefined && (
+          <div className="mb-4 flex items-center gap-4">
+            <Badge variant="info">{getAssessmentTypeLabel(currentRecord.assessmentType)}</Badge>
+            <span className="text-sm text-gray-600">{formatDate(currentRecord.timestamp)}</span>
+            {currentRecord.improvement !== undefined ? (
               <Badge variant={currentRecord.improvement > 0 ? 'success' : 'warning'}>
-                {currentRecord.improvement > 0 ? `改善 ${currentRecord.improvement}%` : `下降 ${Math.abs(currentRecord.improvement)}%`}
+                {currentRecord.improvement > 0
+                  ? `改善 ${currentRecord.improvement}%`
+                  : `下降 ${Math.abs(currentRecord.improvement)}%`}
               </Badge>
-            )}
+            ) : null}
           </div>
 
-          <div className="relative bg-gray-100 rounded-lg overflow-hidden">
-            <div className="absolute top-4 right-4 flex gap-2 z-10">
+          <div className="relative overflow-hidden rounded-lg bg-gray-100">
+            <div className="absolute right-4 top-4 z-10 flex gap-2">
               <Button
                 onClick={handleZoomOut}
                 variant="outline"
@@ -233,7 +235,7 @@ export const AssessmentDetail: React.FC = () => {
               >
                 <ZoomOut className="w-4 h-4" />
               </Button>
-              <span className="px-3 py-2 bg-white rounded text-sm font-medium">
+              <span className="rounded bg-white px-3 py-2 text-sm font-medium">
                 {Math.round(zoom * 100)}%
               </span>
               <Button
@@ -245,23 +247,21 @@ export const AssessmentDetail: React.FC = () => {
                 <ZoomIn className="w-4 h-4" />
               </Button>
             </div>
-            <div 
-              className="flex justify-center items-center min-h-[400px] overflow-auto"
-            >
-              <canvas
-                ref={canvasRef}
-                className="max-w-full max-h-[600px]"
-              />
+            <div className="flex min-h-[400px] items-center justify-center overflow-auto">
+              <canvas ref={canvasRef} className="max-h-[600px] max-w-full" />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {currentRecord.angles && Object.keys(currentRecord.angles).length > 0 && (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {currentRecord.angles && Object.keys(currentRecord.angles).length > 0 ? (
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">角度数据</h3>
                 <div className="space-y-2">
                   {Object.entries(currentRecord.angles).map(([key, value]) => (
-                    <div key={key} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div
+                      key={key}
+                      className="flex items-center justify-between rounded bg-gray-50 p-2"
+                    >
                       <span className="text-sm text-gray-700">{key}</span>
                       <span className="font-semibold text-blue-600">
                         {typeof value === 'number' ? value.toFixed(1) : value}°
@@ -270,14 +270,17 @@ export const AssessmentDetail: React.FC = () => {
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {currentRecord.metrics && Object.keys(currentRecord.metrics).length > 0 && (
+            {currentRecord.metrics && Object.keys(currentRecord.metrics).length > 0 ? (
               <div className="space-y-3">
                 <h3 className="text-lg font-semibold">指标数据</h3>
                 <div className="space-y-2">
                   {Object.entries(currentRecord.metrics).map(([key, value]) => (
-                    <div key={key} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                    <div
+                      key={key}
+                      className="flex items-center justify-between rounded bg-gray-50 p-2"
+                    >
                       <span className="text-sm text-gray-700">{key}</span>
                       <span className="font-semibold text-green-600">
                         {typeof value === 'number' ? value.toFixed(2) : value}
@@ -286,24 +289,22 @@ export const AssessmentDetail: React.FC = () => {
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
 
-          {currentRecord.feedback && (
-            <div className="p-4 bg-blue-50 rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">患者反馈</h3>
+          {currentRecord.feedback ? (
+            <div className="semantic-panel-soft semantic-panel-soft-info p-4">
+              <h3 className="mb-2 text-lg font-semibold">患者反馈</h3>
               <p className="text-gray-700">{currentRecord.feedback}</p>
             </div>
-          )}
+          ) : null}
 
-          {currentRecord.treatmentPlanId && (
-            <div className="p-4 bg-green-50 rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">关联治疗计划</h3>
-              <p className="text-sm text-gray-600">
-                计划 ID: {currentRecord.treatmentPlanId}
-              </p>
+          {currentRecord.treatmentPlanId ? (
+            <div className="semantic-panel-soft semantic-panel-soft-success p-4">
+              <h3 className="mb-2 text-lg font-semibold">关联治疗计划</h3>
+              <p className="text-sm text-gray-600">计划 ID: {currentRecord.treatmentPlanId}</p>
             </div>
-          )}
+          ) : null}
         </div>
       </CardContent>
     </Card>

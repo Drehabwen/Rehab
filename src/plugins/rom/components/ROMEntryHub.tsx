@@ -64,16 +64,16 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
           right={
             <div className="flex items-center gap-2">
               <UnifiedStatusBadge status="processing" text={summaryText} className="hidden xl:inline-flex" />
-              <div className="flex items-center rounded-xl border border-slate-300 p-1 bg-white">
+              <div className="segmented-control">
                 <button
                   onClick={() => setSelectedSide('left')}
-                  className={cn('h-8 px-3 rounded-lg text-sm', selectedSide === 'left' ? 'bg-slate-900 text-white' : 'text-slate-600')}
+                  className={cn('segmented-control-tab', selectedSide === 'left' ? 'segmented-control-tab-solid' : 'segmented-control-tab-inactive')}
                 >
                   左侧
                 </button>
                 <button
                   onClick={() => setSelectedSide('right')}
-                  className={cn('h-8 px-3 rounded-lg text-sm', selectedSide === 'right' ? 'bg-slate-900 text-white' : 'text-slate-600')}
+                  className={cn('segmented-control-tab', selectedSide === 'right' ? 'segmented-control-tab-solid' : 'segmented-control-tab-inactive')}
                 >
                   右侧
                 </button>

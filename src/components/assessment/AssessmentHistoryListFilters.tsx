@@ -22,7 +22,7 @@ export const AssessmentHistoryListFilters: React.FC<AssessmentHistoryListFilters
           placeholder="搜索评估记录..."
           value={searchTerm}
           onChange={(e) => onSearchTermChange(e.target.value)}
-          className="w-full px-4 py-2 border rounded-lg"
+          className="field-input"
         />
       </div>
       <div className="flex gap-2">

@@ -13,6 +13,7 @@ import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { TrendChart } from './TrendChart';
 import { cn } from '@/lib/utils';
 import { StatePanel, PageTitleSection, UnifiedStatusBadge } from '@/components/layout';
+import { COLORS } from '@/constants/uiStyles';
 
 interface ProgressComparisonProps {
   patientId: string;
@@ -31,6 +32,20 @@ const metricStatusText: Record<'improved' | 'stable' | 'worsened', string> = {
   stable: '稳定',
   worsened: '恶化',
 };
+
+const selectInputClass = 'w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm';
+const sectionTitleClass = cn('text-base font-semibold', COLORS.neutral.light.text);
+const bodyTextClass = cn('text-sm', COLORS.neutral.slate500);
+const labelTextClass = cn('block mb-1 text-sm', COLORS.neutral.light.textMuted);
+const loadingTextClass = cn('flex items-center gap-2', COLORS.neutral.light.textSoft);
+const tableHeaderClass = 'grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs text-slate-500';
+const tableRowClass = 'grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-4 py-3 items-center hover:bg-slate-50/80';
+const numberTextClass = cn('text-sm tabular-nums', COLORS.neutral.light.textSoft);
+const metricNameClass = cn('text-sm font-medium', COLORS.neutral.light.text);
+const metaTextClass = cn('text-xs', COLORS.neutral.slate500);
+const scoreLabelClass = bodyTextClass;
+const scoreValueClass = (score: number) => cn('mt-1 text-4xl font-semibold', score > 0 ? 'text-emerald-600' : score < 0 ? 'text-red-600' : COLORS.neutral.light.textSoft);
+const deltaTextClass = (value: number) => cn('text-sm tabular-nums', value > 0 ? 'text-emerald-600' : value < 0 ? 'text-red-600' : COLORS.neutral.light.textSoft);
 
 export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
   patientId,
@@ -205,16 +220,16 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
           />
         ) : (
           <section className="bento-card p-6">
-            <h3 className="text-base font-semibold text-slate-900">选择对比记录</h3>
-            <p className="mt-1 text-sm text-slate-500">基线建议选择更早记录，当前建议选择最新记录。</p>
+            <h3 className={sectionTitleClass}>选择对比记录</h3>
+            <p className={cn(bodyTextClass, 'mt-1')}>基线建议选择更早记录，当前建议选择最新记录。</p>
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-slate-600 mb-1">基线记录</label>
+                <label className={labelTextClass}>基线记录</label>
                 <select
                   value={selectedBaseline}
                   onChange={(e) => setSelectedBaseline(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm"
+                  className={selectInputClass}
                 >
                   <option value="">请选择基线评估</option>
                   {completedAssessments.map((a) => (
@@ -226,11 +241,11 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
               </div>
 
               <div>
-                <label className="block text-sm text-slate-600 mb-1">当前记录</label>
+                <label className={labelTextClass}>当前记录</label>
                 <select
                   value={selectedCurrent}
                   onChange={(e) => setSelectedCurrent(e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm"
+                  className={selectInputClass}
                 >
                   <option value="">请选择当前评估</option>
                   {completedAssessments.map((a) => (
@@ -267,7 +282,7 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
 
         {isLoading ? (
           <section className="bento-card p-6">
-            <div className="flex items-center gap-2 text-slate-700">
+            <div className={loadingTextClass}>
               <Loader size={16} className="animate-spin" />
               <span className="text-sm">正在生成对比结果，请稍候...</span>
             </div>
@@ -291,8 +306,8 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
           <>
             <section className="bento-card p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <div className="text-sm text-slate-500">综合改善率</div>
-                <div className={cn('text-4xl font-semibold mt-1', comparison.overallScore > 0 ? 'text-emerald-600' : comparison.overallScore < 0 ? 'text-red-600' : 'text-slate-700')}>
+                <div className={scoreLabelClass}>综合改善率</div>
+                <div className={scoreValueClass(comparison.overallScore)}>
                   {comparison.overallScore > 0 ? '+' : ''}
                   {comparison.overallScore}%
                 </div>
@@ -306,7 +321,7 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
             </section>
 
             <section className="bento-card p-0 overflow-hidden">
-              <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+              <div className={tableHeaderClass}>
                 <span>指标</span>
                 <span>基线</span>
                 <span>当前</span>
@@ -317,17 +332,17 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
 
               <div className="divide-y divide-slate-200">
                 {comparison.metrics.map((metric) => (
-                  <div key={metric.key} className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-4 py-3 items-center hover:bg-slate-50/80">
+                  <div key={metric.key} className={tableRowClass}>
                     <div>
-                      <p className="text-sm font-medium text-slate-900">{metric.label}</p>
-                      <p className="text-xs text-slate-500 mt-1">单位：{metric.unit}</p>
+                      <p className={metricNameClass}>{metric.label}</p>
+                      <p className={cn(metaTextClass, 'mt-1')}>单位：{metric.unit}</p>
                     </div>
-                    <span className="text-sm text-slate-800 tabular-nums">{metric.baseline}{metric.unit}</span>
-                    <span className="text-sm text-slate-800 tabular-nums">{metric.current}{metric.unit}</span>
-                    <span className={cn('text-sm tabular-nums', metric.change > 0 ? 'text-emerald-600' : metric.change < 0 ? 'text-red-600' : 'text-slate-700')}>
+                    <span className={numberTextClass}>{metric.baseline}{metric.unit}</span>
+                    <span className={numberTextClass}>{metric.current}{metric.unit}</span>
+                    <span className={deltaTextClass(metric.change)}>
                       {metric.change > 0 ? '+' : ''}{metric.change}
                     </span>
-                    <span className={cn('text-sm tabular-nums', metric.improvement > 0 ? 'text-emerald-600' : metric.improvement < 0 ? 'text-red-600' : 'text-slate-700')}>
+                    <span className={deltaTextClass(metric.improvement)}>
                       {metric.improvement > 0 ? '+' : ''}{metric.improvement}%
                     </span>
                     <UnifiedStatusBadge status={metricStatusTone[metric.status]} text={metricStatusText[metric.status]} />
@@ -338,7 +353,7 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
 
             {trendData.length > 0 ? (
               <section>
-                <h3 className="text-base font-semibold text-slate-900 mb-3">历史趋势</h3>
+                <h3 className={cn(sectionTitleClass, 'mb-3')}>历史趋势</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {comparison.metrics.slice(0, 4).map((metric) => (
                     <TrendChart

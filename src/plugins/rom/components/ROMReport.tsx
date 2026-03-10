@@ -2,7 +2,7 @@
 import { FileText, Download, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { ROMAssessment } from '../types';
 import { ROMService } from '../services/ROMService';
-import { calculateROMStatus, directionNameMap, jointNameMap } from '../utils/rom-utils';
+import { calculateROMStatus, directionNameMap, getROMReferenceAngle, jointNameMap } from '../utils/rom-utils';
 import { ROM_TEXTS } from '../constants/uiText';
 import { UnifiedStatusBadge } from '@/components/layout';
 
@@ -22,7 +22,7 @@ export const ROMReport: React.FC<ROMReportProps> = ({ assessment, onExport }) =>
 
   const analyzedItems = useMemo(() => {
     return assessment.data.map((item) => {
-      const status = calculateROMStatus(item.joint, item.direction, item.angle);
+      const status = calculateROMStatus(item.joint, item.direction, getROMReferenceAngle(item));
       return {
         ...item,
         status,

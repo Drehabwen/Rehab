@@ -3,12 +3,17 @@ import { ArrowRight, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { MetricComparison } from '@/types/comparison';
 import { STATUS_LABELS } from '@/types/comparison';
 import { cn } from '@/lib/utils';
+import { COLORS } from '@/constants/uiStyles';
 
 interface ComparisonCardProps {
   metric: MetricComparison;
 }
 
 export const ComparisonCard: React.FC<ComparisonCardProps> = ({ metric }) => {
+  const titleClass = cn('text-sm font-black uppercase tracking-wider', COLORS.neutral.light.text);
+  const metaClass = cn('text-[10px] font-black uppercase tracking-widest', COLORS.neutral.light.textLight);
+  const valueClass = cn('text-2xl font-black', COLORS.neutral.light.text);
+  const mutedTextClass = COLORS.neutral.slate500;
   // 获取状态图标
   const getStatusIcon = () => {
     switch (metric.status) {
@@ -37,7 +42,7 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({ metric }) => {
   const getImprovementColor = () => {
     if (metric.status === 'improved') return 'text-emerald-600';
     if (metric.status === 'worsened') return 'text-rose-600';
-    return 'text-slate-500';
+    return COLORS.neutral.slate500;
   };
 
   // 构建无障碍标签
@@ -64,11 +69,11 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({ metric }) => {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             {getStatusIcon()}
-            <h4 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+            <h4 className={titleClass}>
               {metric.label}
             </h4>
           </div>
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+          <span className={metaClass}>
             {metric.unit}
           </span>
         </div>
@@ -77,30 +82,30 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({ metric }) => {
         <div className="flex items-center justify-between">
           {/* 基线值 */}
           <div>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            <div className={cn(metaClass, 'mb-1')}>
               基线
             </div>
-            <div className="text-2xl font-black text-slate-900">
+            <div className={valueClass}>
               {metric.baseline}
             </div>
           </div>
 
           {/* 箭头 */}
-          <ArrowRight className="text-slate-300" size={20} />
+          <ArrowRight className={COLORS.neutral.light.textLight} size={20} />
 
           {/* 当前值 */}
           <div>
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            <div className={cn(metaClass, 'mb-1')}>
               当前
             </div>
-            <div className="text-2xl font-black text-slate-900">
+            <div className={valueClass}>
               {metric.current}
             </div>
           </div>
 
           {/* 改善率 */}
           <div className="text-right">
-            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
+            <div className={cn(metaClass, 'mb-1')}>
               改善率
             </div>
             <div className={cn('text-2xl font-black', getImprovementColor())}>
@@ -112,7 +117,7 @@ export const ComparisonCard: React.FC<ComparisonCardProps> = ({ metric }) => {
         {/* 变化值提示 */}
         <div className="mt-3 pt-3 border-t border-slate-200/50">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-slate-500">
+            <span className={mutedTextClass}>
               变化: {metric.change > 0 ? '+' : ''}{metric.change} {metric.unit}
             </span>
             <span className={cn(

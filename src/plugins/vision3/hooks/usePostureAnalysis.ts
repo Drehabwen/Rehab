@@ -4,12 +4,12 @@ import { usePostureWS } from '@/hooks/usePostureWS';
 import { usePostureAssessmentStore, AssessmentType } from '../store/usePostureAssessmentStore';
 import { globalMonitor } from '../services/GlobalMonitor';
 import { useCaptureStateMachine, CaptureStatus } from './useCaptureStateMachine';
-import { 
-  normalizeHeadAxes, 
-  smoothHeadAxes, 
-  scaleHeadAxes, 
+import {
+  normalizeHeadAxes,
+  smoothHeadAxes,
+  scaleHeadAxes,
   HeadAxes,
-  PoseLandmark
+  PoseLandmark,
 } from '../vision3-utils';
 import { CONFIG } from '@/config';
 
@@ -20,13 +20,16 @@ interface UsePostureAnalysisProps {
   assessmentType: AssessmentType;
 }
 
-export function usePostureAnalysis({ 
-  axesScale, 
+const QUICK_ANALYSIS_ERROR_MESSAGE =
+  '\u5feb\u901f\u8bc4\u4f30\u81ea\u52a8\u5206\u6790\u89e6\u53d1\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u4e00\u6b21\u3002';
+
+export function usePostureAnalysis({
+  axesScale,
   view,
   assessmentMode = 'realtime',
-  assessmentType
+  assessmentType,
 }: UsePostureAnalysisProps) {
-  const { setStep } = usePostureAssessmentStore();
+  const { setStep, setError } = usePostureAssessmentStore();
   const {
     result: wsResult,
     analyze,
@@ -38,124 +41,157 @@ export function usePostureAnalysis({
     isStreamingReport,
     auxiliaryDiagnosis,
     timeSeriesData,
-    analysisAckAt
+    analysisAckAt,
   } = usePostureWS();
 
-  const [steppedResults, setSteppedResults] = useState<Record<string, { timeSeriesLandmarks: PoseLandmark[][]; width: number; height: number; timestamp: number }>>({});
+  const [steppedResults, setSteppedResults] = useState<
+    Record<string, { timeSeriesLandmarks: PoseLandmark[][]; width: number; height: number; timestamp: number }>
+  >({});
   const analysisTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const quickAnalysisTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const captureDispatchRef = useRef<React.Dispatch<{ type: string; payload?: unknown }> | null>(null);
   const ackedRef = useRef(false);
-  
-  // Only use WebSocket report, no fallback
+
   const markdownReport = wsMarkdownReport;
   const hasCompletedReport = Boolean(markdownReport || auxiliaryDiagnosis);
 
-  // Handle Capture Completion
-  const onCapture = useCallback((data: { 
-    timeSeriesLandmarks: PoseLandmark[][]; 
-    width: number; 
-    height: number; 
-    timestamp: number 
+  const failQuickAnalysis = useCallback((error: unknown) => {
+    console.error('[usePostureAnalysis] Quick assessment auto analysis failed:', error);
+    setError(QUICK_ANALYSIS_ERROR_MESSAGE);
+    captureDispatchRef.current?.({ type: 'SET_ERROR', payload: QUICK_ANALYSIS_ERROR_MESSAGE });
+  }, [setError]);
+
+  const onCapture = useCallback((data: {
+    timeSeriesLandmarks: PoseLandmark[][];
+    width: number;
+    height: number;
+    timestamp: number;
   }) => {
-    console.log('[usePostureAnalysis] onCapture called:', { assessmentMode, view, landmarksCount: data.timeSeriesLandmarks.length });
+    console.log('[usePostureAnalysis] onCapture called:', {
+      assessmentMode,
+      view,
+      landmarksCount: data.timeSeriesLandmarks.length,
+    });
+
     if (assessmentMode === 'realtime') {
-      // 实时模式下直接分析全部时序数据
       console.log('[usePostureAnalysis] Calling analyze for realtime mode');
       analyze(view, data.timeSeriesLandmarks, data.width, data.height);
-    } else {
-      // 分步模式下存入结果
-      console.log('[usePostureAnalysis] Storing result for stepped mode');
-      setSteppedResults(prev => {
-        const newResults = {
-          ...prev,
-          [view]: data
-        };
-        
-        // 快速评估模式：采集完立刻触发分析（不管几个视角）
-        if (assessmentType === 'quick') {
-          console.log('[usePostureAnalysis] Quick assessment: auto-triggering analysis after capture');
-          // 延迟一帧，确保状态更新完成
-          setTimeout(() => {
-            // 将当前视角的数据转换为 SteppedFrame 格式并发送分析
-            const frames = Object.entries(newResults).map(([v, result]) => ({
-              view: v as 'front' | 'side' | 'back',
+      return;
+    }
+
+    console.log('[usePostureAnalysis] Storing result for stepped mode');
+    setSteppedResults((prev) => {
+      const newResults = {
+        ...prev,
+        [view]: data,
+      };
+
+      if (assessmentType === 'quick') {
+        console.log('[usePostureAnalysis] Quick assessment: auto-triggering analysis after capture');
+        if (quickAnalysisTimeoutRef.current) {
+          clearTimeout(quickAnalysisTimeoutRef.current);
+        }
+
+        quickAnalysisTimeoutRef.current = setTimeout(() => {
+          try {
+            const frames = Object.entries(newResults).map(([capturedView, result]) => ({
+              view: capturedView as 'front' | 'side' | 'back',
               timeSeriesLandmarks: result.timeSeriesLandmarks,
               width: result.width,
               height: result.height,
-              timestamp: result.timestamp
+              timestamp: result.timestamp,
             }));
+
+            if (frames.length === 0) {
+              throw new Error('No stepped frames available for quick analysis');
+            }
+
             console.log('[usePostureAnalysis] Calling analyzeStepped with frames:', frames.length);
             analyzeStepped(frames, assessmentType);
-          }, 100);
-        }
-        
-        return newResults;
-      });
-    }
-  }, [assessmentMode, assessmentType, analyze, view, analyzeStepped]);
+          } catch (error) {
+            failQuickAnalysis(error);
+          } finally {
+            quickAnalysisTimeoutRef.current = null;
+          }
+        }, 100);
+      }
 
-  // --- Capture Logic (StateMachine) ---
+      return newResults;
+    });
+  }, [assessmentMode, assessmentType, analyze, analyzeStepped, failQuickAnalysis, view]);
+
   const {
     status: captureStatus,
     dispatch: captureDispatch,
     countdown,
     recordingProgress,
     isInPosition,
-    processLandmarks
+    processLandmarks,
   } = useCaptureStateMachine(onCapture);
+
+  captureDispatchRef.current = captureDispatch;
+
+  useEffect(() => () => {
+    if (quickAnalysisTimeoutRef.current) {
+      clearTimeout(quickAnalysisTimeoutRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     console.log('[usePostureAnalysis] report state changed:', {
       markdownReport: markdownReport ? 'exists' : 'null',
-      auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null'
+      auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
     });
     if (hasCompletedReport) {
       console.log('[usePostureAnalysis] Setting step to completed');
       setStep('completed');
     }
-  }, [hasCompletedReport, markdownReport, auxiliaryDiagnosis, setStep]);
+  }, [auxiliaryDiagnosis, hasCompletedReport, markdownReport, setStep]);
 
   useEffect(() => {
     console.log('[usePostureAnalysis] Checking analysis completion:', {
       markdownReport: markdownReport ? 'exists' : 'null',
       auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
-      captureStatus
+      captureStatus,
     });
-    // 所有模式：等待后端返回 markdownReport 后再完成
     if (hasCompletedReport && captureStatus === 'analyzing') {
       console.log('[usePostureAnalysis] Dispatching ANALYSIS_COMPLETE');
       captureDispatch({ type: 'ANALYSIS_COMPLETE' });
     }
-  }, [hasCompletedReport, markdownReport, auxiliaryDiagnosis, captureStatus, captureDispatch]);
+  }, [auxiliaryDiagnosis, captureDispatch, captureStatus, hasCompletedReport, markdownReport]);
 
   useEffect(() => {
     if (captureStatus === 'analyzing') {
       ackedRef.current = false;
-      if (analysisTimeoutRef.current) clearTimeout(analysisTimeoutRef.current);
-      // 不再生成fallback报告，只设置超时
+      if (analysisTimeoutRef.current) {
+        clearTimeout(analysisTimeoutRef.current);
+      }
       analysisTimeoutRef.current = setTimeout(() => {
-        // 超时后直接完成分析，后端会返回API链接失败信息
         captureDispatch({ type: 'ANALYSIS_COMPLETE' });
       }, CONFIG.analysis.timeout);
       return;
     }
+
     if (analysisTimeoutRef.current) {
       clearTimeout(analysisTimeoutRef.current);
       analysisTimeoutRef.current = null;
     }
-  }, [captureStatus, captureDispatch]);
+  }, [captureDispatch, captureStatus]);
 
   useEffect(() => {
-    if (captureStatus !== 'analyzing' || !analysisAckAt || ackedRef.current) return;
+    if (captureStatus !== 'analyzing' || !analysisAckAt || ackedRef.current) {
+      return;
+    }
+
     ackedRef.current = true;
-    if (analysisTimeoutRef.current) clearTimeout(analysisTimeoutRef.current);
-    // 不再生成fallback报告，只设置超时
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+    }
     analysisTimeoutRef.current = setTimeout(() => {
-      // 超时后直接完成分析，后端会返回API链接失败信息
       captureDispatch({ type: 'ANALYSIS_COMPLETE' });
     }, CONFIG.analysis.timeout);
-  }, [analysisAckAt, captureStatus, captureDispatch]);
+  }, [analysisAckAt, captureDispatch, captureStatus]);
 
-  // --- Analysis Visualization Logic ---
   const [headAxes, setHeadAxes] = useState<HeadAxes | null>(null);
   const smoothedAxesRef = useRef<HeadAxes | null>(null);
 
@@ -173,7 +209,7 @@ export function usePostureAnalysis({
     } else {
       setHeadAxes(null);
     }
-  }, [wsResult, axesScale]);
+  }, [axesScale, wsResult]);
 
   useEffect(() => {
     globalMonitor.registerAnalysisCallback((data) => {
@@ -194,10 +230,9 @@ export function usePostureAnalysis({
   const onResults = useCallback((results: Results) => {
     if (results.poseLandmarks) {
       const landmarks = results.poseLandmarks as PoseLandmark[];
-      // 获取当前画面的实际尺寸
       const width = results.image?.width || CONFIG.video.defaultWidth;
       const height = results.image?.height || CONFIG.video.defaultHeight;
-      
+
       processLandmarks(landmarks, width, height);
       globalMonitor.onFrame(landmarks);
     }
@@ -249,23 +284,23 @@ export function usePostureAnalysis({
     simulateMockCapture: () => {
       console.log('[Mock] Starting simulation...');
       const mockFrames: PoseLandmark[][] = [];
-      for (let f = 0; f < 60; f++) {
+      for (let f = 0; f < 60; f += 1) {
         const t = f / 30;
         const landmarks: PoseLandmark[] = Array.from({ length: 33 }, (_, i) => ({
           x: 0.5 + (i === 11 || i === 12 ? 0.02 * Math.sin(Math.PI * t) : 0),
           y: 0.5 + (i * 0.01),
           z: 0,
-          visibility: 0.95
+          visibility: 0.95,
         }));
         mockFrames.push(landmarks);
       }
-      
+
       onCapture({
         timeSeriesLandmarks: mockFrames,
         width: CONFIG.video.defaultWidth,
         height: CONFIG.video.defaultHeight,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-    }
+    },
   };
 }

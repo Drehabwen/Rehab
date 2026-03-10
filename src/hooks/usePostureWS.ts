@@ -470,10 +470,11 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     setStreamingReport('');
     currentRequestIdRef.current = `deep-${Date.now()}`;
     
+    const inferredAssessmentType = rawFramesData.length > 1 ? 'standard' : 'quick';
     const message = {
       type: 'POSTURE_DEEP_ANALYSIS',
       frames: rawFramesData,
-      assessmentType: 'quick',
+      assessmentType: inferredAssessmentType,
       auxiliaryDiagnosis: auxiliaryDiagnosis, // 传递基础报告内容
       requestId: currentRequestIdRef.current
     };

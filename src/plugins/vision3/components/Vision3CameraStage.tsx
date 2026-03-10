@@ -104,6 +104,52 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
     side: '\u4fa7\u9762',
     back: '\u80cc\u9762',
   };
+  const iconControlClass = `w-16 h-16 rounded-[1.5rem] flex flex-col items-center justify-center gap-1.5 transition-all hover:scale-110`;
+  const whiteGlassChipClass = `inline-flex items-center rounded-full border ${COLORS.neutral.whiteBorder} ${COLORS.neutral.whiteBg10} px-2.5 py-1 text-[11px] ${COLORS.neutral.whiteText85}`;
+  const overlayControlBaseClass = cn(
+    'border',
+    COLORS.neutral.whiteBorder,
+    COLORS.neutral.whiteText,
+    COLORS.neutral.whiteBg10,
+    COLORS.neutral.whiteHoverBg20,
+  );
+  const primaryIconControlClass = `${iconControlClass} ${overlayControlBaseClass}`;
+  const fullscreenButtonClass = cn(
+    `absolute ${BACKDROP.sm} ${COLORS.neutral.whiteText60} ${COLORS.neutral.whiteHoverText} ${SIZES.radius.lg} border ${TRANSITIONS.default} z-40 opacity-0 group-hover:opacity-100`,
+    COLORS.neutral.blackBg40,
+    COLORS.neutral.blackHoverBg60,
+    COLORS.neutral.whiteBorder,
+  );
+  const statusPanelClass = cn(
+    `${SIZES.radius.lg} border flex items-center ${SIZES.gap.lg} ${SHADOWS.lg}`,
+    COLORS.neutral.blackBg60,
+    COLORS.neutral.whiteBorder,
+  );
+  const completedSummaryClass = cn(
+    'rounded-[1.75rem] border p-4 shadow-2xl backdrop-blur-xl',
+    COLORS.neutral.whiteBorder15,
+    COLORS.neutral.blackBg55,
+    COLORS.neutral.whiteText,
+  );
+  const cameraToggleClass = (enabled: boolean) =>
+    enabled
+      ? `${primaryIconControlClass} hover:scale-110`
+      : cn('shadow-2xl shadow-rose-500/40 hover:scale-110', 'bg-rose-500/80', COLORS.neutral.whiteText);
+  const posturePrimaryActionClass = (enabled: boolean) =>
+    enabled
+      ? cn(
+          `px-10 h-16 rounded-[1.5rem] flex items-center ${SIZES.gap.lg} font-black text-sm uppercase tracking-[0.2em] ${TRANSITIONS.medium} ${SHADOWS.lg}`,
+          'bg-antey-primary hover:bg-antey-primary/80 hover:scale-105 hover:shadow-antey-primary/40',
+          COLORS.neutral.whiteText,
+        )
+      : `${COLORS.neutral.whiteBg10} ${COLORS.neutral.whiteText40} cursor-not-allowed px-10 h-16 rounded-[1.5rem] flex items-center ${SIZES.gap.lg} font-black text-sm uppercase tracking-[0.2em] ${TRANSITIONS.medium} ${SHADOWS.lg}`;
+  const measureActionClass = (active: boolean) =>
+    cn(
+      `px-10 h-16 rounded-[1.5rem] flex items-center ${SIZES.gap.lg} font-black text-sm uppercase tracking-[0.2em] ${TRANSITIONS.medium} ${SHADOWS.lg}`,
+      active
+        ? `bg-rose-500 ${COLORS.neutral.whiteText} hover:bg-rose-500/80 hover:scale-105`
+        : `bg-antey-accent ${COLORS.neutral.whiteText} hover:bg-antey-accent/80 hover:scale-105 shadow-antey-accent/40`,
+    );
 
   return (
     <div ref={videoContainerRef} className={cn(
@@ -161,7 +207,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       <button 
         onClick={toggleFullscreen}
         className={cn(
-          `absolute bg-black/40 ${BACKDROP.sm} text-white/60 hover:text-white hover:bg-black/60 ${SIZES.radius.lg} border ${COLORS.neutral.whiteBorder} ${TRANSITIONS.default} z-40 opacity-0 group-hover:opacity-100`,
+          fullscreenButtonClass,
           compact ? 'top-4 right-4 p-2.5' : 'top-6 right-6 p-3'
         )}
       >
@@ -185,7 +231,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       {/* Bento Overlay: Status Indicator */}
       <div className={cn(`absolute flex items-center ${SIZES.gap.lg}`, compact ? 'top-4 left-4' : 'top-10 left-10')}>
         <div className={cn(
-          `${SIZES.radius.lg} bg-black/60 border ${COLORS.neutral.whiteBorder} flex items-center ${SIZES.gap.lg} ${SHADOWS.lg}`,
+          statusPanelClass,
           compact ? 'px-3 py-2' : SIZES.padding.lg
         )}>
           <div className="relative">
@@ -193,10 +239,10 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
             {isCameraOn && <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-40" />}
           </div>
           <div className="flex flex-col">
-            <span className={`${compact ? 'text-[8px]' : SIZES.font.sm} font-black text-white/40 uppercase tracking-[0.3em] leading-none mb-1`}>
+            <span className={`${compact ? 'text-[8px]' : SIZES.font.sm} font-black ${COLORS.neutral.whiteText40} uppercase tracking-[0.3em] leading-none mb-1`}>
               Engine Status
             </span>
-            <span className={`${compact ? 'text-[10px]' : SIZES.font.lg} font-black text-white uppercase tracking-[0.2em] leading-none`}>
+            <span className={`${compact ? 'text-[10px]' : SIZES.font.lg} font-black ${COLORS.neutral.whiteText} uppercase tracking-[0.2em] leading-none`}>
               {activeTab === 'posture' ? (compact ? 'Posture Core' : 'Posture AI Core') : 'Joint ROM Engine'} v3.2
             </span>
           </div>
@@ -236,7 +282,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
           'absolute left-4 right-4 bottom-4 z-30',
           compact ? '' : 'md:left-6 md:right-6 md:bottom-6'
         )}>
-          <div className="rounded-[1.75rem] border border-white/15 bg-black/55 p-4 text-white shadow-2xl backdrop-blur-xl">
+          <div className={completedSummaryClass}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
@@ -244,15 +290,15 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
                   {'\u5df2\u5b8c\u6210'}
                 </div>
                 <h3 className="mt-3 text-lg font-semibold">{'\u62cd\u6444\u4e0e\u5206\u6790\u5df2\u7ed3\u675f'}</h3>
-                <p className="mt-1 text-sm text-white/70">{'\u5de6\u4fa7\u4fdd\u7559\u5f53\u524d\u89c6\u56fe\u9884\u89c8\uff0c\u53f3\u4fa7\u53ef\u7ee7\u7eed\u9605\u8bfb\u62a5\u544a\u3002'}</p>
+                <p className={`mt-1 text-sm ${COLORS.neutral.whiteText70}`}>{'\u5de6\u4fa7\u4fdd\u7559\u5f53\u524d\u89c6\u56fe\u9884\u89c8\uff0c\u53f3\u4fa7\u53ef\u7ee7\u7eed\u9605\u8bfb\u62a5\u544a\u3002'}</p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2 justify-end">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] text-white/85">
+                <span className={`${whiteGlassChipClass} gap-1.5`}>
                   {assessmentType === 'quick' ? <Zap size={12} /> : <Layers size={12} />}
                   {assessmentType === 'quick' ? '\u5feb\u901f\u8bc4\u4f30' : '\u6807\u51c6\u8bc4\u4f30'}
                 </span>
-                <span className="inline-flex items-center rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] text-white/85">
+                <span className={whiteGlassChipClass}>
                   {viewLabelMap[view]}
                 </span>
               </div>
@@ -269,7 +315,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
               onClick={() => setIsCameraOn(!isCameraOn)}
               className={cn(
                 `w-16 h-16 rounded-[1.5rem] flex flex-col items-center justify-center gap-1.5 ${TRANSITIONS.medium} relative group/btn`,
-                isCameraOn ? "bg-white/10 text-white hover:bg-white/20 hover:scale-110" : "bg-rose-500/80 text-white shadow-2xl shadow-rose-500/40 hover:scale-110"
+                cameraToggleClass(isCameraOn)
               )}
             >
               {isCameraOn ? <Video size={24} /> : <VideoOff size={24} />}
@@ -278,19 +324,14 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
             </button>
           </div>
           
-          <div className="w-px h-14 bg-white/10" />
+          <div className={`w-px h-14 ${COLORS.neutral.whiteBg10}`} />
           
           {activeTab === 'posture' ? (
             <div className={`flex items-center ${SIZES.gap.xl}`}>
               <button 
                 onClick={() => setCaptureStatus('countdown')}
                 disabled={captureStatus !== 'idle'}
-                className={cn(
-                  `px-10 h-16 rounded-[1.5rem] flex items-center ${SIZES.gap.lg} font-black text-sm uppercase tracking-[0.2em] ${TRANSITIONS.medium} ${SHADOWS.lg}`,
-                  captureStatus === 'idle' 
-                    ? "bg-antey-primary text-white hover:bg-antey-primary/80 hover:scale-105 hover:shadow-antey-primary/40" 
-                    : "bg-white/10 text-white/40 cursor-not-allowed"
-                )}
+                className={posturePrimaryActionClass(captureStatus === 'idle')}
               >
                 <Scan size={24} className={cn(captureStatus === 'scanning' && "animate-spin")} />
                 {captureStatus === 'idle' ? BUTTON_TEXTS.startScan : captureStatus === 'countdown' ? BUTTON_TEXTS.preparing : CAPTURE_STATUS_TEXTS.analyzing}
@@ -298,7 +339,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
               
               <button 
                 onClick={() => setView(view === 'front' ? 'side' : view === 'side' ? 'back' : 'front')}
-                className={`w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110`}
+                className={primaryIconControlClass}
               >
                 <RotateCcw size={20} className="rotate-180" />
                 <span className={`${SIZES.font.xs} font-black uppercase tracking-tighter opacity-60`}>{MEASUREMENT_TEXTS.switchView}</span>
@@ -306,7 +347,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
 
               <button 
                 onClick={handleResetToEntry}
-                className={`w-16 h-16 rounded-[1.5rem] bg-white/5 text-white/40 flex flex-col items-center justify-center gap-1.5 hover:bg-white/10 hover:text-white transition-all hover:scale-110`}
+                className={`${iconControlClass} ${COLORS.neutral.whiteBg} ${COLORS.neutral.whiteText40} ${COLORS.neutral.whiteHoverBg10} ${COLORS.neutral.whiteHoverText}`}
               >
                 <ArrowLeft size={20} />
                 <span className={`${SIZES.font.xs} font-black uppercase tracking-tighter`}>{MEASUREMENT_TEXTS.back}</span>
@@ -316,12 +357,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
             <div className={`flex items-center ${SIZES.gap.xl}`}>
               <button 
                 onClick={() => isMeasuring ? stopMeasurement() : startMeasurement()}
-                className={cn(
-                  `px-10 h-16 rounded-[1.5rem] flex items-center ${SIZES.gap.lg} font-black text-sm uppercase tracking-[0.2em] ${TRANSITIONS.medium} ${SHADOWS.lg}`,
-                  isMeasuring 
-                    ? "bg-rose-500 text-white hover:bg-rose-500/80 hover:scale-105" 
-                    : "bg-antey-accent text-white hover:bg-antey-accent/80 hover:scale-105 shadow-antey-accent/40"
-                )}
+                className={measureActionClass(isMeasuring)}
               >
                 {isMeasuring ? <Square size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" />}
                 {isMeasuring ? MEASUREMENT_TEXTS.stop : MEASUREMENT_TEXTS.start}
@@ -329,7 +365,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
 
               <button 
                 onClick={() => resetMeasurement()}
-                className={`w-16 h-16 rounded-[1.5rem] bg-white/10 text-white flex flex-col items-center justify-center gap-1.5 hover:bg-white/20 transition-all hover:scale-110`}
+                className={primaryIconControlClass}
               >
                 <RefreshCw size={20} />
                 <span className={`${SIZES.font.xs} font-black uppercase tracking-tighter opacity-60`}>{MEASUREMENT_TEXTS.reset}</span>

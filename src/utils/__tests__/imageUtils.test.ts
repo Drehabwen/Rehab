@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   compressImage,
   fileToBase64,
@@ -8,7 +8,84 @@ import {
   createThumbnail,
 } from '../imageUtils';
 
+const VALID_SVG_BASE64 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0icmVkIi8+PC9zdmc+';
+const JPEG_OUTPUT = 'data:image/jpeg;base64,mocked-output';
+
+const originalCreateElement = document.createElement.bind(document);
+
+const parseSvgDimensions = (value: string) => {
+  if (!value.startsWith('data:image/')) {
+    return null;
+  }
+
+  const encoded = value.split(',')[1];
+  if (!encoded) {
+    return { width: 100, height: 100 };
+  }
+
+  const decoded = atob(encoded);
+  const widthMatch = decoded.match(/width="(\d+)"/);
+  const heightMatch = decoded.match(/height="(\d+)"/);
+
+  return {
+    width: widthMatch ? Number(widthMatch[1]) : 100,
+    height: heightMatch ? Number(heightMatch[1]) : 100,
+  };
+};
+
+class MockImage {
+  onload: null | (() => void) = null;
+  onerror: null | (() => void) = null;
+  width = 0;
+  height = 0;
+  private _src = '';
+
+  set src(value: string) {
+    this._src = value;
+
+    setTimeout(() => {
+      const dimensions = parseSvgDimensions(value);
+      if (!dimensions) {
+        this.onerror?.();
+        return;
+      }
+
+      this.width = dimensions.width;
+      this.height = dimensions.height;
+      this.onload?.();
+    }, 0);
+  }
+
+  get src() {
+    return this._src;
+  }
+}
+
 describe('imageUtils', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.stubGlobal('Image', MockImage as unknown as typeof Image);
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      if (tagName === 'canvas') {
+        return {
+          width: 0,
+          height: 0,
+          getContext: vi.fn(() => ({
+            drawImage: vi.fn(),
+          })),
+          toDataURL: vi.fn(() => JPEG_OUTPUT),
+        } as unknown as HTMLCanvasElement;
+      }
+
+      return originalCreateElement(tagName);
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   describe('validateImageSize', () => {
     it('应该验证小图像', () => {
       const smallBase64 = 'data:image/jpeg;base64,' + 'a'.repeat(100);
@@ -29,14 +106,14 @@ describe('imageUtils', () => {
   describe('fileToBase64', () => {
     it('应该将文件转换为Base64', async () => {
       const file = new File(['test content'], 'test.txt', { type: 'text/plain' });
-      
+
       const base64 = await fileToBase64(file);
       expect(base64).toContain('data:text/plain;base64,');
     });
 
     it('应该处理空文件', async () => {
       const file = new File([''], 'empty.txt', { type: 'text/plain' });
-      
+
       const base64 = await fileToBase64(file);
       expect(base64).toContain('data:text/plain;base64,');
     });
@@ -44,49 +121,41 @@ describe('imageUtils', () => {
 
   describe('getImageDimensions', () => {
     it('应该获取图像尺寸', async () => {
-      const base64 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48L3N2Zz4=';
-      
-      const dimensions = await getImageDimensions(base64);
+      const dimensions = await getImageDimensions(VALID_SVG_BASE64);
       expect(dimensions.width).toBe(100);
       expect(dimensions.height).toBe(200);
-    }, 10000);
+    });
 
     it('应该处理无效图像', async () => {
       await expect(getImageDimensions('invalid')).rejects.toThrow();
-    }, 10000);
+    });
   });
 
   describe('cropImageToBase64', () => {
     it('应该裁剪图像', async () => {
-      const base64 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0icmVkIi8+PC9zdmc+';
-      
-      const cropped = await cropImageToBase64(base64, 0, 0, 50, 50);
+      const cropped = await cropImageToBase64(VALID_SVG_BASE64, 0, 0, 50, 50);
       expect(cropped).toContain('data:image/jpeg');
-    }, 10000);
+    });
 
     it('应该处理无效参数', async () => {
       await expect(cropImageToBase64('invalid', 0, 0, 50, 50)).rejects.toThrow();
-    }, 10000);
+    });
   });
 
   describe('createThumbnail', () => {
     it('应该创建缩略图', async () => {
-      const base64 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0icmVkIi8+PC9zdmc+';
-      
-      const thumbnail = await createThumbnail(base64, 50);
+      const thumbnail = await createThumbnail(VALID_SVG_BASE64, 50);
       expect(thumbnail).toContain('data:image/jpeg');
-    }, 10000);
+    });
 
     it('应该使用默认大小', async () => {
-      const base64 = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0icmVkIi8+PC9zdmc+';
-      
-      const thumbnail = await createThumbnail(base64);
+      const thumbnail = await createThumbnail(VALID_SVG_BASE64);
       expect(thumbnail).toContain('data:image/jpeg');
-    }, 10000);
+    });
 
     it('应该处理无效图像', async () => {
       await expect(createThumbnail('invalid')).rejects.toThrow();
-    }, 10000);
+    });
   });
 
   describe('compressImage', () => {
@@ -96,10 +165,10 @@ describe('imageUtils', () => {
         { type: 'image/svg+xml' }
       );
       const file = new File([svgData], 'test.svg', { type: 'image/svg+xml' });
-      
+
       const compressed = await compressImage(file, 500);
       expect(compressed).toContain('data:image/jpeg');
-    }, 10000);
+    });
 
     it('应该使用默认最大宽度', async () => {
       const svgData = new Blob(
@@ -107,15 +176,15 @@ describe('imageUtils', () => {
         { type: 'image/svg+xml' }
       );
       const file = new File([svgData], 'test.svg', { type: 'image/svg+xml' });
-      
+
       const compressed = await compressImage(file);
       expect(compressed).toContain('data:image/jpeg');
-    }, 10000);
+    });
 
     it('应该处理无效文件', async () => {
       const file = new File(['invalid'], 'test.txt', { type: 'text/plain' });
-      
+
       await expect(compressImage(file)).rejects.toThrow();
-    }, 10000);
+    });
   });
 });

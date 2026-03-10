@@ -1,34 +1,265 @@
-# Vision3 API 接口规范文档
+# Rehab API Specification
 
-本文档定义了 Vision3 前端（React）与后端（Python FastAPI）之间的通信协议，包括 WebSocket 实时分析和 RESTful API 接口。
+本文档描述当前代码中的实际接口，而不是历史版本设想。
 
-## 1. 通信架构概述
-*   **实时分析 (WebSocket)**：用于传输高频关键点坐标流，获取实时体态评估结果。
-*   **业务逻辑 (HTTP)**：用于处理病历生成、历史数据查询、MedVoice AI 语音结构化等低频交互。
+当前后端入口见 [backend/main.py](C:/Users/DORAT/Desktop/Rehab-main/backend/main.py)，协议模型见 [backend/models.py](C:/Users/DORAT/Desktop/Rehab-main/backend/models.py)。
 
----
+## 1. Base Addresses
 
-## 2. WebSocket 实时分析协议
+- HTTP base: `http://localhost:8002`
+- WebSocket: `ws://localhost:8002/ws/analyze`
 
-### 2.1 连接地址
-`ws://localhost:8000/ws/analyze`
+前端默认配置来源：
 
-### 2.2 前端发送：关键点数据流
-每帧检测到 Landmarks 后发送。
+- [src/config/index.ts](C:/Users/DORAT/Desktop/Rehab-main/src/config/index.ts)
+
+## 2. HTTP Endpoints
+
+### 2.1 Health
+
+- Method: `GET`
+- Path: `/health`
+- Purpose: health check and integration flags
+
+Example response:
+
+```json
+{
+  "status": "healthy",
+  "services": {
+    "llm_key_configured": true,
+    "medvoice_integrated": true
+  }
+}
+```
+
+### 2.2 Camera Stream
+
+- Method: `GET`
+- Path: `/video_feed`
+- Purpose: MJPEG camera stream
+
+### 2.3 Camera Control
+
+- Method: `POST`
+- Path: `/camera/start`
+- Purpose: start backend camera manager
+
+- Method: `POST`
+- Path: `/camera/stop`
+- Purpose: stop backend camera manager
+
+### 2.4 Treatment Plan
+
+#### Generate
+
+- Method: `POST`
+- Path: `/api/treatment-plan/generate`
+
+Request body:
+
+```json
+{
+  "patientId": "patient_001",
+  "assessmentId": "assessment_001",
+  "createdBy": "system"
+}
+```
+
+Response shape:
+
+```json
+{
+  "id": 1,
+  "patientId": "patient_001",
+  "assessmentId": "assessment_001",
+  "sessionId": null,
+  "sessionReportId": null,
+  "version": 1,
+  "content": "treatment plan markdown or plain text",
+  "isCurrent": true,
+  "createdAt": "2026-03-10T10:00:00",
+  "updatedAt": "2026-03-10T10:00:00",
+  "createdBy": "system"
+}
+```
+
+#### Generate Stream
+
+- Method: `POST`
+- Path: `/api/treatment-plan/generate/stream`
+- Response: `text/plain` streaming chunks
+
+#### Generate From Session Report
+
+- Method: `POST`
+- Path: `/api/treatment-plan/generate-from-session-report`
+
+Request body:
+
+```json
+{
+  "patientId": "patient_001",
+  "sessionId": "session_001",
+  "sessionReportId": "report_001",
+  "sessionReportMarkdown": "# Session Report",
+  "insights": ["insight 1"],
+  "recommendations": ["recommendation 1"],
+  "createdBy": "system"
+}
+```
+
+#### Generate From Session Report Stream
+
+- Method: `POST`
+- Path: `/api/treatment-plan/generate-from-session-report/stream`
+- Response: `text/plain` streaming chunks
+
+### 2.5 Session Report
+
+- Method: `POST`
+- Path: `/api/session-report/generate`
+
+Request body:
+
+```json
+{
+  "sessionId": "session_001",
+  "patientId": "patient_001",
+  "patientName": "Test Patient",
+  "sourceAssessmentIds": ["a1", "a2"],
+  "readiness": {
+    "readyCount": 2,
+    "partialCount": 0,
+    "missingTypes": [],
+    "availableTypes": ["posture", "rom"]
+  },
+  "posture": {
+    "title": "Posture",
+    "status": "ready",
+    "preview": "preview text",
+    "evidenceCount": 3
+  },
+  "rom": {
+    "title": "ROM",
+    "status": "ready",
+    "preview": "preview text",
+    "evidenceCount": 2
+  },
+  "medvoice": null
+}
+```
+
+Response shape:
+
+```json
+{
+  "id": "session-report-001",
+  "sessionId": "session_001",
+  "patientId": "patient_001",
+  "markdown": "# Session Report",
+  "insights": ["insight 1"],
+  "recommendations": ["recommendation 1"],
+  "createdAt": 1773111556699,
+  "sourceAssessmentIds": ["a1", "a2"]
+}
+```
+
+## 3. WebSocket Endpoint
+
+- Path: `/ws/analyze`
+- Purpose: real-time posture analysis, joint analysis, batch report generation, stepped analysis, deep analysis streaming
+
+## 4. WebSocket Messages
+
+### 4.1 Frontend to Backend
+
+#### `POSTURE_SYNC`
+
+Used for real-time posture analysis.
+
 ```json
 {
   "type": "POSTURE_SYNC",
-  "view": "side", // front, back, side
+  "view": "front",
   "width": 1280,
   "height": 720,
-  "landmarks": [
-    {"x": 0.5, "y": 0.2, "z": -0.1, "visibility": 0.99},
-    ... // 33个 Mediapipe 关键点
+  "timeSeriesLandmarks": [
+    [
+      { "x": 0.5, "y": 0.2, "z": -0.1, "visibility": 0.99 }
+    ]
+  ],
+  "requestId": "optional-id"
+}
+```
+
+#### `JOINT_ANALYSIS`
+
+Used for ROM / joint angle measurement.
+
+```json
+{
+  "type": "JOINT_ANALYSIS",
+  "width": 1280,
+  "height": 720,
+  "landmarks": [],
+  "worldLandmarks": [],
+  "measurements": [
+    {
+      "id": "m1",
+      "jointType": "shoulder",
+      "direction": "flexion",
+      "side": "left"
+    }
   ]
 }
 ```
 
-### 2.3 后端返回：实时评估结果
+#### `POSTURE_BATCH_ANALYSIS`
+
+Used for batch posture report generation from temporal data.
+
+#### `POSTURE_STEPPED_ANALYSIS`
+
+Used for multi-view stepped posture capture.
+
+```json
+{
+  "type": "POSTURE_STEPPED_ANALYSIS",
+  "assessmentType": "standard",
+  "frames": [
+    {
+      "view": "front",
+      "width": 1280,
+      "height": 720,
+      "timeSeriesLandmarks": [],
+      "timestamp": 1773111556699
+    }
+  ],
+  "requestId": "optional-id"
+}
+```
+
+#### `POSTURE_DEEP_ANALYSIS`
+
+Used to request streamed deep-report output from LLM logic.
+
+```json
+{
+  "type": "POSTURE_DEEP_ANALYSIS",
+  "assessmentType": "quick",
+  "frames": [],
+  "auxiliaryDiagnosis": "basic report text",
+  "requestId": "deep-optional-id"
+}
+```
+
+### 4.2 Backend to Frontend
+
+#### `ANALYSIS_RESULT`
+
+Real-time posture result.
+
 ```json
 {
   "type": "ANALYSIS_RESULT",
@@ -37,62 +268,90 @@
     "shoulderAngle": 3.5,
     "hipAngle": 1.2
   },
-  "issues": [
-    {
-      "id": "head-forward",
-      "severity": "moderate",
-      "title": "头前倾",
-      "description": "耳垂位于肩峰前方...",
-      "recommendation": "建议进行收下巴训练..."
-    }
-  ],
-  "timestamp": 1707293400000
+  "issues": [],
+  "annotations": [],
+  "timestamp": 1773111556699
 }
 ```
 
----
+#### `JOINT_RESULT`
 
-## 3. RESTful API 接口
+Joint measurement result.
 
-### 3.1 基础信息
-*   **Base URL**: `http://localhost:8000/api`
-*   **Content-Type**: `application/json`
-
-### 3.2 静态分析 (Snapshot Analysis)
-将单张图片的分析请求发送至后端。
-*   **Endpoint**: `POST /analyze/static`
-*   **Request**:
-    ```json
-    {
-      "view": "front",
-      "landmarks": [...],
-      "image_metadata": { "width": 1920, "height": 1080 }
-    }
-    ```
-*   **Response**: 同 WebSocket 返回的 `ANALYSIS_RESULT`。
-
-### 3.3 MedVoice AI 集成接口
-调用 MedVoice 模块处理语音或结构化病历。
-*   **Endpoint**: `POST /medvoice/structure`
-*   **Description**: 将体态分析结果与语音转录文本结合，生成结构化医疗报告。
-*   **Request**:
-    ```json
-    {
-      "transcript": "患者主诉颈部酸痛...",
-      "analysis_data": { ... }
-    }
-    ```
-
----
-
-## 4. 错误处理规范
-所有接口出错时应返回标准错误格式：
 ```json
 {
-  "error": {
-    "code": "MODEL_LOADING_FAILED",
-    "message": "AI 模型初始化失败，请检查资源路径",
-    "detail": "..."
-  }
+  "type": "JOINT_RESULT",
+  "results": [
+    { "id": "m1", "angle": 135.2 }
+  ],
+  "timestamp": 1773111556699
 }
 ```
+
+#### `POSTURE_ACK`
+
+Acknowledges a deep-analysis request has started.
+
+```json
+{
+  "type": "POSTURE_ACK",
+  "status": "processing",
+  "requestId": "deep-optional-id"
+}
+```
+
+#### `DEEP_REPORT_STREAM`
+
+Chunked LLM report output.
+
+```json
+{
+  "type": "DEEP_REPORT_STREAM",
+  "content": "partial markdown chunk"
+}
+```
+
+#### `POSTURE_REPORT`
+
+Returned for stepped/batch/deep report flows.
+
+```json
+{
+  "type": "POSTURE_REPORT",
+  "markdown": "# Report",
+  "reportId": "uuid",
+  "timeSeries": [],
+  "metrics": {},
+  "auxiliaryDiagnosis": "basic report",
+  "issues": [],
+  "timestamp": 1773111556699,
+  "assessmentType": "standard",
+  "isDeepReport": false
+}
+```
+
+## 5. Frontend Client Mapping
+
+Current frontend API clients:
+
+- [src/api/treatmentPlanApi.ts](C:/Users/DORAT/Desktop/Rehab-main/src/api/treatmentPlanApi.ts)
+- [src/api/sessionReportApi.ts](C:/Users/DORAT/Desktop/Rehab-main/src/api/sessionReportApi.ts)
+- [src/hooks/usePostureWS.ts](C:/Users/DORAT/Desktop/Rehab-main/src/hooks/usePostureWS.ts)
+
+## 6. Error Handling
+
+HTTP routes use FastAPI `HTTPException`. Typical cases:
+
+- `503`: config unavailable, such as treatment-plan config missing
+- `501`: upstream assessment/session data unavailable
+- `500`: unexpected internal failure
+
+WebSocket failures are not normalized into one global envelope yet; callers should treat malformed payloads, disconnects, or missing acks as transport failures and handle retry/reconnect on the frontend.
+
+## 7. Drift Warning
+
+If this document conflicts with older notes or screenshots, trust the following first:
+
+1. [backend/main.py](C:/Users/DORAT/Desktop/Rehab-main/backend/main.py)
+2. [backend/models.py](C:/Users/DORAT/Desktop/Rehab-main/backend/models.py)
+3. [src/config/index.ts](C:/Users/DORAT/Desktop/Rehab-main/src/config/index.ts)

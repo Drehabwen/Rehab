@@ -359,13 +359,13 @@ export const MedVoicePlugin: React.FC = () => {
                 <p className="text-xs text-slate-500 mt-1">状态：{caseStatus.text}</p>
               </div>
 
-              <div className="flex items-center p-1 rounded-xl border border-slate-300 bg-white">
+              <div className="segmented-control">
                 <button
                   onClick={() => {
                     setViewMode('standard');
                     setActiveSection('主诉');
                   }}
-                  className={cn('h-8 px-3 rounded-lg text-sm', viewMode === 'standard' ? 'bg-slate-900 text-white' : 'text-slate-600')}
+                  className={cn('segmented-control-tab', viewMode === 'standard' ? 'segmented-control-tab-solid' : 'segmented-control-tab-inactive')}
                 >
                   标准
                 </button>
@@ -374,7 +374,7 @@ export const MedVoicePlugin: React.FC = () => {
                     setViewMode('soap');
                     setActiveSection('S');
                   }}
-                  className={cn('h-8 px-3 rounded-lg text-sm', viewMode === 'soap' ? 'bg-slate-900 text-white' : 'text-slate-600')}
+                  className={cn('segmented-control-tab', viewMode === 'soap' ? 'segmented-control-tab-solid' : 'segmented-control-tab-inactive')}
                 >
                   SOAP
                 </button>

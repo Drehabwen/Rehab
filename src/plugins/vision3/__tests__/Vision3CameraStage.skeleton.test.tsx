@@ -44,14 +44,7 @@ describe('Vision3CameraStage - Skeleton Rendering', () => {
   });
 
   describe('Skeleton Visibility', () => {
-    it('should render skeleton overlay when camera is on and landmarks are available', async () => {
-      const mockLandmarks = Array.from({ length: 33 }, (_, i) => ({
-        x: 0.5,
-        y: 0.5,
-        z: 0,
-        visibility: 0.95
-      }));
-
+    it('should render skeleton overlay when camera is on', async () => {
       render(
         <Vision3CameraStage 
           {...defaultProps}
@@ -59,7 +52,7 @@ describe('Vision3CameraStage - Skeleton Rendering', () => {
       );
 
       await waitFor(() => {
-        const canvas = screen.getByRole('img', { hidden: true });
+        const canvas = screen.getByRole('img', { name: /pose skeleton overlay/i });
         expect(canvas).toBeInTheDocument();
       });
     });
@@ -73,7 +66,7 @@ describe('Vision3CameraStage - Skeleton Rendering', () => {
       );
 
       await waitFor(() => {
-        const canvas = screen.getByRole('img', { hidden: true });
+        const canvas = screen.getByRole('img', { name: /pose skeleton overlay/i });
         expect(canvas).toBeInTheDocument();
       });
 
@@ -85,7 +78,7 @@ describe('Vision3CameraStage - Skeleton Rendering', () => {
       );
 
       await waitFor(() => {
-        const canvas = screen.getByRole('img', { hidden: true });
+        const canvas = screen.getByRole('img', { name: /pose skeleton overlay/i });
         expect(canvas).toBeInTheDocument();
       });
     });
@@ -99,7 +92,7 @@ describe('Vision3CameraStage - Skeleton Rendering', () => {
       );
 
       await waitFor(() => {
-        const canvas = screen.getByRole('img', { hidden: true });
+        const canvas = screen.getByRole('img', { name: /pose skeleton overlay/i });
         expect(canvas).toBeInTheDocument();
       });
 
@@ -126,19 +119,12 @@ describe('Vision3CameraStage - Skeleton Rendering', () => {
       );
 
       await waitFor(() => {
-        const canvas = screen.getByRole('img', { hidden: true });
+        const canvas = screen.getByRole('img', { name: /pose skeleton overlay/i });
         expect(canvas).toBeInTheDocument();
       });
     });
 
     it('should handle low visibility landmarks', async () => {
-      const lowVisibilityLandmarks = Array.from({ length: 33 }, (_, i) => ({
-        x: 0.5,
-        y: 0.5,
-        z: 0,
-        visibility: 0.3
-      }));
-
       render(
         <Vision3CameraStage 
           {...defaultProps}
@@ -146,7 +132,7 @@ describe('Vision3CameraStage - Skeleton Rendering', () => {
       );
 
       await waitFor(() => {
-        const canvas = screen.getByRole('img', { hidden: true });
+        const canvas = screen.getByRole('img', { name: /pose skeleton overlay/i });
         expect(canvas).toBeInTheDocument();
       });
     });

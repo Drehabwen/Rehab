@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { COLORS } from '@/constants/uiStyles';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionReportStore } from '@/store/useSessionReportStore';
@@ -104,6 +105,58 @@ const readinessBadgeMap: Record<SessionReportInputStatus, { tone: 'success' | 'p
   partial: { tone: 'processing', text: '部分到位' },
   missing: { tone: 'warning', text: '缺失' },
 };
+
+const sessionScopeButtonBaseClass = 'rounded-2xl border px-4 py-3 text-left transition-colors';
+const sessionScopeButtonClass = (active: boolean) =>
+  cn(
+    sessionScopeButtonBaseClass,
+    active ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+  );
+const sessionCardClass = (active: boolean) =>
+  cn(
+    'min-w-[260px] rounded-2xl border px-4 py-3 text-left transition-colors',
+    active ? 'border-antey-primary bg-antey-primary/10' : 'border-slate-200 bg-white hover:bg-slate-50',
+  );
+const mutedSurfaceCardClass = 'rounded-xl border border-slate-200 bg-slate-50 p-3';
+const whiteSurfaceCardClass = 'rounded-xl border border-slate-200 bg-white p-3';
+const elevatedSurfaceCardClass = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm';
+const neutralSurfaceCardClass = 'rounded-2xl border border-slate-200 bg-slate-50 p-4';
+const dashedEmptyStateClass = 'rounded-xl border border-dashed border-slate-300 bg-white px-3 py-4 text-sm text-slate-500';
+const selectInputClass = 'w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm';
+const searchInputClass = 'w-full h-10 pl-9 pr-3 rounded-xl border border-slate-300 bg-white text-sm';
+const filterToggleClass = (active: boolean) =>
+  cn(
+    'h-8 rounded-lg text-xs border',
+    active ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50',
+  );
+const patientFilterButtonClass = (active: boolean) =>
+  cn(
+    'w-full px-3 py-2 rounded-xl text-left text-sm border',
+    active ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-200 hover:bg-slate-50 text-slate-700',
+  );
+const reportListHeaderClass = 'px-4 py-3 border-b border-slate-200 text-xs text-slate-500';
+const reportListRowClass = 'px-4 py-3 items-center hover:bg-slate-50';
+const modalOverlayClass = 'fixed inset-0 flex items-center justify-center p-4 backdrop-blur-[2px] md:p-8';
+const modalDialogClass = 'dialog-shell max-h-[85vh]';
+const modalHeaderClass = 'dialog-header';
+const modalFooterClass = 'dialog-footer';
+const titleTextClass = cn('text-sm font-semibold', COLORS.neutral.light.text);
+const titleTextLgClass = cn('text-base font-semibold', COLORS.neutral.light.text);
+const metricValueClass = cn('text-2xl font-semibold', COLORS.neutral.light.text);
+const bodyTextClass = cn('text-sm', COLORS.neutral.light.textMuted);
+const bodyTextSoftClass = cn('text-sm', COLORS.neutral.light.textSoft);
+const previewTextClass = cn('text-sm', COLORS.neutral.light.textMuted);
+const metaTextClass = cn('text-xs', COLORS.neutral.slate500);
+const subtleTextClass = cn('text-[11px]', COLORS.neutral.light.textLight);
+const emptyMutedTextClass = COLORS.neutral.light.textLight;
+const evidenceChipClass = cn('inline-flex rounded-full px-2.5 py-1 text-xs', COLORS.neutral.light.selected, COLORS.neutral.light.textMuted);
+const sessionInsightToneClass = (tone: 'blue' | 'amber' | 'violet') =>
+  cn(
+    'inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]',
+    tone === 'blue' && 'border-blue-200 bg-blue-50 text-blue-700',
+    tone === 'amber' && 'border-amber-200 bg-amber-50 text-amber-700',
+    tone === 'violet' && 'border-violet-200 bg-violet-50 text-violet-700',
+  );
 
 export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'datacenter' }) => {
   const { assessments, loadAssessments, deleteAssessment } = useAssessmentStore();
@@ -388,8 +441,8 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
           {stats.map((item) => (
             <div key={item.label} className="bento-card p-5 flex items-center justify-between">
               <div>
-                <div className="text-2xl font-semibold text-slate-900">{item.value}</div>
-                <div className="text-sm text-slate-500 mt-1">{item.label}</div>
+                <div className={metricValueClass}>{item.value}</div>
+                <div className={cn(metaTextClass, 'mt-1')}>{item.label}</div>
               </div>
               <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', item.tone)}>
                 <item.icon size={18} />
@@ -402,23 +455,20 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
           <section className="bento-card p-4">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <div className="text-sm font-semibold text-slate-900">接诊输入概览</div>
-                <div className="text-xs text-slate-500 mt-1">按接诊汇总体态、ROM、语音病历输入，明确综合报告可用上下文。</div>
+                <div className={titleTextClass}>接诊输入概览</div>
+                <div className={cn(metaTextClass, 'mt-1')}>按接诊汇总体态、ROM、语音病历输入，明确综合报告可用上下文。</div>
               </div>
-              <span className="text-xs text-slate-500">{selectedSessionId ? `已筛选接诊 ${selectedSessionId}` : `共 ${sessionInputs.length} 个接诊`}</span>
+              <span className={metaTextClass}>{selectedSessionId ? `已筛选接诊 ${selectedSessionId}` : `共 ${sessionInputs.length} 个接诊`}</span>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => setSelectedSessionId(null)}
-                className={cn(
-                  'rounded-2xl border px-4 py-3 text-left transition-colors',
-                  !selectedSessionId ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                )}
+                className={sessionScopeButtonClass(!selectedSessionId)}
               >
                 <div className="text-sm font-semibold">全部接诊</div>
-                <div className="text-xs text-slate-500 mt-1">查看当前筛选范围内所有报告输入</div>
+                <div className={cn(metaTextClass, 'mt-1')}>查看当前筛选范围内所有报告输入</div>
               </button>
 
               {sessionInputs.map((sessionInput) => (
@@ -426,17 +476,12 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                   key={sessionInput.sessionId}
                   type="button"
                   onClick={() => setSelectedSessionId(sessionInput.sessionId)}
-                  className={cn(
-                    'min-w-[260px] rounded-2xl border px-4 py-3 text-left transition-colors',
-                    selectedSessionId === sessionInput.sessionId
-                      ? 'border-antey-primary bg-antey-primary/10'
-                      : 'border-slate-200 bg-white hover:bg-slate-50',
-                  )}
+                  className={sessionCardClass(selectedSessionId === sessionInput.sessionId)}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-900 truncate">{sessionInput.patientName || sessionInput.patientId}</div>
-                      <div className="text-xs text-slate-500 truncate">{sessionInput.sessionId}</div>
+                      <div className={cn(titleTextClass, 'truncate')}>{sessionInput.patientName || sessionInput.patientId}</div>
+                      <div className={cn(metaTextClass, 'truncate')}>{sessionInput.sessionId}</div>
                     </div>
                     <UnifiedStatusBadge
                       status={sessionInput.readiness.readyCount >= 2 ? 'success' : sessionInput.readiness.readyCount >= 1 ? 'processing' : 'warning'}
@@ -451,8 +496,8 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                       const label = type === 'posture' ? '体态' : type === 'rom' ? 'ROM' : '语音';
 
                       return (
-                        <div key={type} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                          <div className="text-xs text-slate-500">{label}</div>
+                        <div key={type} className={cn(mutedSurfaceCardClass, 'px-3 py-2')}>
+                          <div className={metaTextClass}>{label}</div>
                           <div className="mt-1">
                             <UnifiedStatusBadge status={readiness.tone} text={readiness.text} />
                           </div>
@@ -470,11 +515,11 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
           <section className="bento-card p-5">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <div className="text-sm font-semibold text-slate-900">综合报告编排区</div>
-                <div className="text-xs text-slate-500 mt-1">
+                <div className={titleTextClass}>综合报告编排区</div>
+                <div className={cn(metaTextClass, 'mt-1')}>
                   {`${activeSessionInput.patientName || activeSessionInput.patientId} · ${activeSessionInput.sessionId}`}
                 </div>
-                <div className="text-sm text-slate-600 mt-3">
+                <div className={cn(bodyTextClass, 'mt-3')}>
                   综合 LLM 报告将只在这里基于当前接诊输入统一生成。当前阶段先完成 posture、ROM、语音病历的输入归集与可视化。
                 </div>
                 {sessionReportError ? (
@@ -505,22 +550,22 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                   const label = type === 'posture' ? '体态评估输入' : type === 'rom' ? 'ROM 输入' : '语音病历输入';
 
                   return (
-                    <article key={type} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <article key={type} className={neutralSurfaceCardClass}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-slate-900">{label}</div>
-                          <div className="text-xs text-slate-500 mt-1">
+                          <div className={titleTextClass}>{label}</div>
+                          <div className={cn(metaTextClass, 'mt-1')}>
                             {output ? `最近更新 ${new Date(output.createdAt).toLocaleString('zh-CN')}` : '当前接诊尚未提供该输入'}
                           </div>
                         </div>
                         <UnifiedStatusBadge status={readiness.tone} text={readiness.text} />
                       </div>
 
-                      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600 min-h-[120px]">
+                      <div className={cn(whiteSurfaceCardClass, 'mt-3 min-h-[120px]', previewTextClass)}>
                         {output?.preview ? (
                           <div className="line-clamp-5 whitespace-pre-wrap">{output.preview}</div>
                         ) : (
-                          <div className="text-slate-400">暂无可用于综合报告的输入摘要。</div>
+                          <div className={emptyMutedTextClass}>暂无可用于综合报告的输入摘要。</div>
                         )}
                       </div>
 
@@ -542,8 +587,8 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
               <article className="rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">综合报告入口</div>
-                    <div className="text-xs text-slate-500 mt-1">综合报告只在这里发起并落库，下面同时显示当前编排预览和最近一次已生成结果。</div>
+                    <div className={titleTextClass}>综合报告入口</div>
+                    <div className={cn(metaTextClass, 'mt-1')}>综合报告只在这里发起并落库，下面同时显示当前编排预览和最近一次已生成结果。</div>
                   </div>
                   <UnifiedStatusBadge
                     status={generatedSessionReport ? 'success' : activeSessionInput.readiness.readyCount >= 2 ? 'processing' : 'warning'}
@@ -551,7 +596,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                   />
                 </div>
 
-                <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-600 min-h-[176px] whitespace-pre-wrap">
+                <div className={cn(whiteSurfaceCardClass, 'mt-3 min-h-[176px] whitespace-pre-wrap', previewTextClass)}>
                   {generatedSessionReport?.markdown || sessionDraftReport}
                 </div>
 
@@ -616,27 +661,22 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
 
             <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
               {sessionInsightCards.map((card) => (
-                <article key={card.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <article key={card.id} className={elevatedSurfaceCardClass}>
                   <div className="flex items-center gap-2">
-                    <span className={cn(
-                      'inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]',
-                      card.tone === 'blue' && 'border-blue-200 bg-blue-50 text-blue-700',
-                      card.tone === 'amber' && 'border-amber-200 bg-amber-50 text-amber-700',
-                      card.tone === 'violet' && 'border-violet-200 bg-violet-50 text-violet-700',
-                    )}>
+                    <span className={sessionInsightToneClass(card.tone)}>
                       {card.tone === 'blue' ? 'Cross Input' : card.tone === 'amber' ? 'Gap Alert' : 'Clinical Link'}
                     </span>
                   </div>
-                  <div className="mt-3 text-base font-semibold text-slate-900">{card.title}</div>
-                  <div className="mt-2 text-sm leading-6 text-slate-600">{card.summary}</div>
+                  <div className={cn(titleTextLgClass, 'mt-3')}>{card.title}</div>
+                  <div className={cn(bodyTextClass, 'mt-2 leading-6')}>{card.summary}</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {card.evidence.map((item) => (
-                      <span key={item} className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600">
+                      <span key={item} className={evidenceChipClass}>
                         {item}
                       </span>
                     ))}
                   </div>
-                  <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  <div className={cn(mutedSurfaceCardClass, 'mt-3', bodyTextSoftClass)}>
                     {card.action}
                   </div>
                 </article>
@@ -644,11 +684,11 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <article className={elevatedSurfaceCardClass}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">综合治疗计划</div>
-                    <div className="text-xs text-slate-500 mt-1">治疗计划只消费综合 session report，不再直接依赖单次 assessment。</div>
+                    <div className={titleTextClass}>综合治疗计划</div>
+                    <div className={cn(metaTextClass, 'mt-1')}>治疗计划只消费综合 session report，不再直接依赖单次 assessment。</div>
                   </div>
                   <UnifiedStatusBadge
                     status={hasVisibleTreatmentPlan ? 'success' : isGeneratingTreatmentPlan ? 'processing' : 'warning'}
@@ -662,7 +702,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                   </div>
                 ) : null}
 
-                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 min-h-[220px] whitespace-pre-wrap">
+                <div className={cn(mutedSurfaceCardClass, 'mt-3 min-h-[220px] whitespace-pre-wrap', bodyTextSoftClass)}>
                   {hasVisibleTreatmentPlan
                     ? currentTreatmentPlanContent
                     : generatedSessionReport
@@ -671,29 +711,29 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                 </div>
               </article>
 
-              <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-semibold text-slate-900">综合报告归档</div>
-                <div className="text-xs text-slate-500 mt-1">这里单独归档 session 级综合报告，与下方 assessment 级局部报告列表分开。</div>
+              <article className={neutralSurfaceCardClass}>
+                <div className={titleTextClass}>综合报告归档</div>
+                <div className={cn(metaTextClass, 'mt-1')}>这里单独归档 session 级综合报告，与下方 assessment 级局部报告列表分开。</div>
 
                 <div className="mt-3 space-y-3 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
                   {sessionScopedReports.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-4 text-sm text-slate-500">
+                    <div className={dashedEmptyStateClass}>
                       当前筛选范围内还没有综合报告归档。
                     </div>
                   ) : (
                     sessionScopedReports.map((report) => (
-                      <div key={report.id} className="rounded-xl border border-slate-200 bg-white p-3">
+                      <div key={report.id} className={whiteSurfaceCardClass}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold text-slate-900 truncate">{report.sessionId}</div>
-                            <div className="text-xs text-slate-500 truncate">
+                            <div className={cn(titleTextClass, 'truncate')}>{report.sessionId}</div>
+                            <div className={cn(metaTextClass, 'truncate')}>
                               {patientMap.get(report.patientId) || report.patientId} · {new Date(report.createdAt).toLocaleString('zh-CN')}
                             </div>
                           </div>
                           <UnifiedStatusBadge status="success" text="综合报告" />
                         </div>
 
-                        <div className="mt-2 text-sm text-slate-600 line-clamp-3 whitespace-pre-wrap">
+                        <div className={cn('mt-2 line-clamp-3 whitespace-pre-wrap', bodyTextClass)}>
                           {report.markdown}
                         </div>
 
@@ -722,20 +762,20 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
 
         <section className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
           <aside className="bento-card p-4">
-            <div className="text-sm font-semibold text-slate-900 mb-3">筛选条件</div>
+            <div className={cn(titleTextClass, 'mb-3')}>筛选条件</div>
 
             <label className="relative block mb-3">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={15} className={cn('absolute left-3 top-1/2 -translate-y-1/2', COLORS.neutral.light.textLight)} />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="搜索患者或记录"
-                className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-300 bg-white text-sm"
+                className={searchInputClass}
               />
             </label>
 
             <div className="space-y-2 mb-3">
-              <div className="text-xs text-slate-500">记录状态</div>
+              <div className={metaTextClass}>记录状态</div>
               <div className="grid grid-cols-2 gap-2">
                 {([
                   { id: 'all', label: '全部' },
@@ -746,12 +786,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                   <button
                     key={item.id}
                     onClick={() => setStatusFilter(item.id)}
-                    className={cn(
-                      'h-8 rounded-lg text-xs border',
-                      statusFilter === item.id
-                        ? 'border-antey-primary bg-antey-primary/10 text-antey-primary'
-                        : 'border-slate-300 text-slate-600 hover:bg-slate-50',
-                    )}
+                    className={filterToggleClass(statusFilter === item.id)}
                   >
                     {item.label}
                   </button>
@@ -760,11 +795,11 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
             </div>
 
             <div className="mb-3">
-              <div className="text-xs text-slate-500 mb-1">记录类型</div>
+              <div className={cn(metaTextClass, 'mb-1')}>记录类型</div>
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
-                className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm"
+                className={selectInputClass}
               >
                 <option value="all">全部类型</option>
                 <option value="posture">体态评估</option>
@@ -776,11 +811,11 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
 
             {mode === 'reports' ? (
               <div className="mb-3">
-                <div className="text-xs text-slate-500 mb-1">接诊筛选</div>
+                <div className={cn(metaTextClass, 'mb-1')}>接诊筛选</div>
                 <select
                   value={selectedSessionId ?? 'all'}
                   onChange={(e) => setSelectedSessionId(e.target.value === 'all' ? null : e.target.value)}
-                  className="w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm"
+                  className={selectInputClass}
                 >
                   <option value="all">全部接诊</option>
                   {sessionInputs.map((sessionInput) => (
@@ -795,12 +830,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
             <div className="space-y-2 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
               <button
                 onClick={() => setSelectedPatientId(null)}
-                className={cn(
-                  'w-full px-3 py-2 rounded-xl text-left text-sm border',
-                  !selectedPatientId
-                    ? 'border-antey-primary bg-antey-primary/10 text-antey-primary'
-                    : 'border-slate-200 hover:bg-slate-50 text-slate-700',
-                )}
+                className={patientFilterButtonClass(!selectedPatientId)}
               >
                 全部患者
               </button>
@@ -809,15 +839,10 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                 <button
                   key={patient.id}
                   onClick={() => setSelectedPatientId(patient.id)}
-                  className={cn(
-                    'w-full px-3 py-2 rounded-xl text-left text-sm border',
-                    selectedPatientId === patient.id
-                      ? 'border-antey-primary bg-antey-primary/10 text-antey-primary'
-                      : 'border-slate-200 hover:bg-slate-50 text-slate-700',
-                  )}
+                  className={patientFilterButtonClass(selectedPatientId === patient.id)}
                 >
                   <div className="font-medium truncate">{patient.name || `患者 ${patient.id}`}</div>
-                  <div className="text-xs text-slate-500 truncate">{patient.id}</div>
+                  <div className={cn(metaTextClass, 'truncate')}>{patient.id}</div>
                 </button>
               ))}
             </div>
@@ -826,7 +851,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
           <div className="bento-card p-0 overflow-hidden">
             {mode === 'reports' ? (
               <>
-                <div className="px-4 py-3 border-b border-slate-200 text-xs text-slate-500 grid grid-cols-[1.6fr_1fr_0.9fr_1fr_auto] gap-3">
+                <div className={cn(reportListHeaderClass, 'grid grid-cols-[1.6fr_1fr_0.9fr_1fr_auto] gap-3')}>
                   <span>报告主信息</span>
                   <span>生成时间</span>
                   <span>报告状态</span>
@@ -848,14 +873,14 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                       const reportText = getAssessmentPreview(assessment);
 
                       return (
-                        <div key={assessment.id} className="px-4 py-3 grid grid-cols-[1.6fr_1fr_0.9fr_1fr_auto] gap-3 items-center hover:bg-slate-50">
+                        <div key={assessment.id} className={cn(reportListRowClass, 'grid grid-cols-[1.6fr_1fr_0.9fr_1fr_auto] gap-3')}>
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold text-slate-900 truncate">{typeLabelMap[assessment.type]}</div>
-                            <div className="text-xs text-slate-500 truncate">{patientMap.get(assessment.patientId) || assessment.patientId}</div>
-                            <div className="text-[11px] text-slate-400 truncate mt-1">{assessment.sessionId}</div>
+                            <div className={cn(titleTextClass, 'truncate')}>{typeLabelMap[assessment.type]}</div>
+                            <div className={cn(metaTextClass, 'truncate')}>{patientMap.get(assessment.patientId) || assessment.patientId}</div>
+                            <div className={cn(subtleTextClass, 'truncate mt-1')}>{assessment.sessionId}</div>
                           </div>
 
-                          <div className="text-sm text-slate-600">
+                          <div className={bodyTextClass}>
                             {new Date(assessment.createdAt).toLocaleString('zh-CN', {
                               month: '2-digit',
                               day: '2-digit',
@@ -865,7 +890,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                           </div>
 
                           <UnifiedStatusBadge status={reportStatus.tone} text={reportStatus.text} />
-                          <span className="text-xs text-slate-500">{getReportExportLabel(assessment)}</span>
+                          <span className={metaTextClass}>{getReportExportLabel(assessment)}</span>
 
                           <div className="flex items-center gap-1 justify-end">
                             <button
@@ -906,7 +931,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
               </>
             ) : (
               <>
-                <div className="px-4 py-3 border-b border-slate-200 text-xs text-slate-500 grid grid-cols-[1.8fr_1fr_1fr_1fr_auto] gap-3">
+                <div className={cn(reportListHeaderClass, 'grid grid-cols-[1.8fr_1fr_1fr_1fr_auto] gap-3')}>
                   <span>主信息</span>
                   <span>患者</span>
                   <span>时间</span>
@@ -924,14 +949,14 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
                 ) : (
                   <div className="divide-y divide-slate-200">
                     {filteredAssessments.map((assessment) => (
-                      <div key={assessment.id} className="px-4 py-3 grid grid-cols-[1.8fr_1fr_1fr_1fr_auto] gap-3 items-center hover:bg-slate-50">
+                      <div key={assessment.id} className={cn(reportListRowClass, 'grid grid-cols-[1.8fr_1fr_1fr_1fr_auto] gap-3')}>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold text-slate-900 truncate">{typeLabelMap[assessment.type]}</div>
-                          <div className="text-xs text-slate-500 truncate">{assessment.id}</div>
+                          <div className={cn(titleTextClass, 'truncate')}>{typeLabelMap[assessment.type]}</div>
+                          <div className={cn(metaTextClass, 'truncate')}>{assessment.id}</div>
                         </div>
 
-                        <div className="text-sm text-slate-700 truncate">{patientMap.get(assessment.patientId) || assessment.patientId}</div>
-                        <div className="text-sm text-slate-500">
+                        <div className={cn(bodyTextSoftClass, 'truncate')}>{patientMap.get(assessment.patientId) || assessment.patientId}</div>
+                        <div className={bodyTextClass}>
                           {new Date(assessment.createdAt).toLocaleString('zh-CN', {
                             month: '2-digit',
                             day: '2-digit',
@@ -942,7 +967,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
 
                         <div className="flex items-center gap-2">
                           <UnifiedStatusBadge status={statusToneMap[assessment.status]} text={statusTextMap[assessment.status]} />
-                          <span className="text-xs text-slate-500">{modeLabelMap[assessment.mode]}</span>
+                          <span className={metaTextClass}>{modeLabelMap[assessment.mode]}</span>
                         </div>
 
                         <div className="flex items-center gap-1 justify-end">
@@ -962,12 +987,12 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
       </div>
 
       {selectedAssessment ? (
-        <div className="fixed inset-0 z-[90] bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center p-4 md:p-8">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_20px_40px_rgba(15,23,42,0.18)] w-full max-w-4xl max-h-[85vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className={cn(modalOverlayClass, 'z-[90] bg-slate-900/45')}>
+          <div className={cn(modalDialogClass, 'max-w-4xl')}>
+            <div className={modalHeaderClass}>
               <div>
-                <div className="text-base font-semibold text-slate-900">{typeLabelMap[selectedAssessment.type]} 详情</div>
-                <div className="text-xs text-slate-500 mt-1 inline-flex items-center gap-3">
+                <div className={titleTextLgClass}>{typeLabelMap[selectedAssessment.type]} 详情</div>
+                <div className={cn(metaTextClass, 'mt-1 inline-flex items-center gap-3')}>
                   <span className="inline-flex items-center gap-1"><Calendar size={12} />{new Date(selectedAssessment.createdAt).toLocaleString('zh-CN')}</span>
                   <span className="inline-flex items-center gap-1"><User size={12} />{patientMap.get(selectedAssessment.patientId) || selectedAssessment.patientId}</span>
                 </div>
@@ -978,11 +1003,11 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
             <div className="p-5 overflow-y-auto custom-scrollbar max-h-[calc(85vh-146px)] space-y-4">
               {selectedAssessment.data.posture ? (
                 <section className="bento-card p-4">
-                  <div className="text-sm font-semibold text-slate-900 mb-2">体态评估数据</div>
+                  <div className={cn(titleTextClass, 'mb-2')}>体态评估数据</div>
                   {selectedAssessment.data.posture.issues?.length ? (
-                    <div className="text-sm text-slate-600">检出问题 {selectedAssessment.data.posture.issues.length} 项</div>
+                    <div className={bodyTextClass}>检出问题 {selectedAssessment.data.posture.issues.length} 项</div>
                   ) : (
-                    <div className="text-sm text-slate-500">暂无问题列表</div>
+                    <div className={bodyTextClass}>暂无问题列表</div>
                   )}
 
                   {(selectedAssessment.data.posture.markdownReport || selectedAssessment.data.posture.auxiliaryDiagnosis) ? (
@@ -999,22 +1024,22 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
 
               {selectedAssessment.data.rom ? (
                 <section className="bento-card p-4">
-                  <div className="text-sm font-semibold text-slate-900 mb-2">关节活动度数据</div>
-                  <div className="text-sm text-slate-600">记录项：{selectedAssessment.data.rom.items.length}</div>
-                  {selectedAssessment.data.rom.summary ? <div className="text-sm text-slate-500 mt-2">{selectedAssessment.data.rom.summary}</div> : null}
+                  <div className={cn(titleTextClass, 'mb-2')}>关节活动度数据</div>
+                  <div className={bodyTextClass}>记录项：{selectedAssessment.data.rom.items.length}</div>
+                  {selectedAssessment.data.rom.summary ? <div className={cn(bodyTextClass, 'mt-2')}>{selectedAssessment.data.rom.summary}</div> : null}
                 </section>
               ) : null}
 
               {selectedAssessment.data.medvoice ? (
                 <section className="bento-card p-4">
-                  <div className="text-sm font-semibold text-slate-900 mb-2">语音接诊数据</div>
-                  <div className="text-sm text-slate-600">模式：{selectedAssessment.data.medvoice.viewMode}</div>
-                  <div className="text-sm text-slate-500 mt-2 line-clamp-4">{selectedAssessment.data.medvoice.transcript || '暂无转写文本'}</div>
+                  <div className={cn(titleTextClass, 'mb-2')}>语音接诊数据</div>
+                  <div className={bodyTextClass}>模式：{selectedAssessment.data.medvoice.viewMode}</div>
+                  <div className={cn(bodyTextClass, 'mt-2 line-clamp-4')}>{selectedAssessment.data.medvoice.transcript || '暂无转写文本'}</div>
                 </section>
               ) : null}
             </div>
 
-            <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-end gap-2">
+            <div className={modalFooterClass}>
               <button className="btn-secondary" onClick={() => exportToJson(selectedAssessment)}><FileJson size={14} /> JSON</button>
               <button className="btn-secondary" onClick={() => exportToCsv(selectedAssessment)}><FileSpreadsheet size={14} /> CSV</button>
               <button className="btn-primary" onClick={() => setSelectedAssessment(null)}>关闭</button>
@@ -1024,13 +1049,13 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
       ) : null}
 
       {selectedReportMarkdown ? (
-        <div className="fixed inset-0 z-[95] bg-slate-900/55 backdrop-blur-[2px] flex items-center justify-center p-4 md:p-8">
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-[0_20px_40px_rgba(15,23,42,0.18)] w-full max-w-4xl max-h-[85vh] overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
-              <div className="text-base font-semibold text-slate-900">报告内容</div>
+        <div className={cn(modalOverlayClass, 'z-[95] bg-slate-900/55')}>
+          <div className={cn(modalDialogClass, 'max-w-4xl')}>
+            <div className={modalHeaderClass}>
+              <div className={titleTextLgClass}>报告内容</div>
               <button className="btn-icon" onClick={() => setSelectedReportMarkdown(null)}><X size={14} /></button>
             </div>
-            <pre className="p-5 overflow-auto custom-scrollbar text-sm text-slate-700 whitespace-pre-wrap max-h-[calc(85vh-76px)]">{selectedReportMarkdown}</pre>
+            <pre className={cn('max-h-[calc(85vh-76px)] overflow-auto whitespace-pre-wrap p-5 text-sm custom-scrollbar', bodyTextSoftClass)}>{selectedReportMarkdown}</pre>
           </div>
         </div>
       ) : null}

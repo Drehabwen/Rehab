@@ -1,5 +1,5 @@
+import type { ROMData } from '../types';
 import { JointType, MovementDirection } from '../types';
-import { ROM_TEXTS } from '../constants/uiText';
 
 export const jointNameMap: Record<string, string> = {
   cervical: '颈椎',
@@ -79,22 +79,34 @@ export const normalROMRanges: Record<JointType, Record<MovementDirection, { min:
   },
 };
 
-export const calculateROMStatus = (joint: JointType, direction: MovementDirection, angle: number): 'normal' | 'limited' | 'excessive' => {
+export const calculateROMStatus = (
+  joint: JointType,
+  direction: MovementDirection,
+  angle: number,
+): 'normal' | 'limited' | 'excessive' => {
   const range = normalROMRanges[joint]?.[direction];
   if (!range) return 'normal';
-  
+
   if (angle < range.min) return 'limited';
   if (angle > range.max) return 'excessive';
   return 'normal';
 };
 
-export const calculateROMScore = (romData: any[]): number => {
+export const getROMReferenceAngle = (item: Pick<ROMData, 'angle' | 'maxAngle' | 'minAngle'>): number => {
+  const candidates = [item.angle, item.maxAngle, item.minAngle]
+    .filter((value) => Number.isFinite(value))
+    .map((value) => Math.abs(value));
+
+  return candidates.length > 0 ? Math.max(...candidates) : 0;
+};
+
+export const calculateROMScore = (romData: ROMData[]): number => {
   const total = romData.length;
   if (total === 0) return 0;
-  
-  const normalCount = romData.filter(data => 
-    calculateROMStatus(data.joint, data.direction, data.angle) === 'normal'
+
+  const normalCount = romData.filter((item) =>
+    calculateROMStatus(item.joint, item.direction, getROMReferenceAngle(item)) === 'normal'
   ).length;
-  
+
   return Math.round((normalCount / total) * 100);
 };

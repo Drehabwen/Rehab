@@ -55,10 +55,10 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/45 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="dialog-backdrop" onClick={onClose} />
 
-      <div className="relative bg-white border border-slate-200 rounded-2xl shadow-[0_20px_40px_rgba(15,23,42,0.18)] w-full max-w-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+      <div className="dialog-shell max-w-xl">
+        <div className="dialog-header">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-antey-primary/10 text-antey-primary flex items-center justify-center">
               <Stethoscope size={18} />
@@ -105,7 +105,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
           </div>
         </div>
 
-        <div className="px-5 py-4 border-t border-slate-200 flex items-center justify-end gap-2">
+        <div className="dialog-footer">
           <button onClick={onClose} className="btn-secondary">取消</button>
           <button onClick={handleConfirm} disabled={isCreating || isGenerating} className={cn('btn-primary', (isCreating || isGenerating) && 'opacity-50 cursor-not-allowed')}>
             {isCreating ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}

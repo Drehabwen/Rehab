@@ -14,6 +14,11 @@ from datetime import datetime
 import logging
 import uvicorn
 
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
 # 瀵煎叆鏍稿績妯″潡
 try:
     from core.voice import VoiceRecorder, VoiceRecognizer
@@ -54,50 +59,95 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def load_runtime_env():
+    if load_dotenv is None:
+        return
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(current_dir)
+    repo_root = os.path.dirname(project_root)
+
+    possible_env_paths = [
+        os.path.join(repo_root, "backend", ".env"),
+        os.path.join(project_root, ".env"),
+        os.path.join(current_dir, ".env"),
+    ]
+
+    for env_path in possible_env_paths:
+        if os.path.exists(env_path):
+            load_dotenv(env_path, override=False)
+
+
+def env_first(*keys: str) -> str:
+    for key in keys:
+        value = os.getenv(key)
+        if value and value.strip():
+            return value.strip()
+    return ""
+
+
+load_runtime_env()
+
 # 鍔犺浇閰嶇疆
 def load_config():
-    # 灏濊瘯澶氫釜鍙兘鐨勮矾寰?    current_dir = os.path.dirname(os.path.abspath(__file__))
+    current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
-    
-    possible_paths = [
-        os.path.join(os.getcwd(), "config.json"),
-        os.path.join(current_dir, "config.json"),
-        os.path.join(project_root, "config.json"),
-        os.path.join(os.path.dirname(project_root), "config.json")
-    ]
-    
-    for config_path in possible_paths:
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    logger.info(f"姝ｅ湪鍔犺浇閰嶇疆鏂囦欢: {config_path}")
-                    return json.load(f)
-            except Exception as e:
-                logger.error(f"瑙ｆ瀽閰嶇疆鏂囦欢澶辫触 {config_path}: {e}")
-    
-    logger.warning("鏈壘鍒伴厤缃枃浠?config.json锛屽皢浣跨敤榛樿閰嶇疆")
-    return {
-        "hospital_name": "XX绀惧尯鍗敓鏈嶅姟涓績",
-        "doctor_name": "鐜嬪尰鐢?,
+
+    config = {
+        "hospital_name": "XX社区卫生服务中心",
+        "doctor_name": "王医生",
         "audio_sample_rate": 16000,
         "audio_channels": 1,
         "cases_dir": "./cases",
         "exports_dir": "./exports",
         "asr_appid": "",
         "asr_api_key": "",
-        "asr_api_secret": ""
+        "asr_api_secret": "",
     }
+
+    possible_paths = [
+        os.path.join(os.getcwd(), "config.json"),
+        os.path.join(current_dir, "config.json"),
+        os.path.join(project_root, "config.json"),
+        os.path.join(os.path.dirname(project_root), "config.json"),
+    ]
+
+    for config_path in possible_paths:
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as file:
+                    logger.info(f"正在加载配置文件: {config_path}")
+                    config.update(json.load(file))
+                    break
+            except Exception as exc:
+                logger.error(f"解析配置文件失败 {config_path}: {exc}")
+
+    config["asr_appid"] = env_first("XFYUN_ASR_APPID", "XFYUN_APPID", "APPID") or str(
+        config.get("asr_appid") or ""
+    ).strip()
+    config["asr_api_key"] = env_first("XFYUN_ASR_API_KEY", "XFYUN_API_KEY", "APIKey") or str(
+        config.get("asr_api_key") or ""
+    ).strip()
+    config["asr_api_secret"] = env_first(
+        "XFYUN_ASR_API_SECRET",
+        "XFYUN_API_SECRET",
+        "APISecret",
+    ) or str(config.get("asr_api_secret") or "").strip()
+    return config
 
 config = load_config()
 
-# 鍒濆鍖栫粍浠?print(f"DEBUG: api_server initializing components with config keys: {list(config.keys()) if config else 'None'}")
+# 鍒濆鍖栫粍浠?
+print(f"DEBUG: api_server initializing components with config keys: {list(config.keys()) if config else 'None'}")
 recorder = VoiceRecorder(config)
 nlp_processor = NLPProcessor(config)
 case_structurer = CaseStructurer(nlp_processor)
 doc_generator = DocumentGenerator(config)
 case_manager = CaseManager(config)
 
-# 鎸傝浇 Web 鍓嶇闈欐€佹枃浠?# 鍋囪 api_server.py 鍦?src/ 鐩綍涓嬶紝web 鍦?src/web/ 鐩綍涓?current_dir = os.path.dirname(os.path.abspath(__file__))
+# 鎸傝浇 Web 鍓嶇闈欐€佹枃浠?
+current_dir = os.path.dirname(os.path.abspath(__file__))
 web_dir = os.path.join(current_dir, "web")
 
 if os.path.exists(web_dir):
@@ -248,10 +298,12 @@ async def export_document(request: ExportRequest):
     try:
         case_data = request.case_data
         
-        # 缁熶竴鏄犲皠瀛楁锛岀‘淇濆鍑烘ā鍧楄兘鎷垮埌姝ｇ‘鐨勬暟鎹?        if not case_data.get("patient_name") and case_data.get("name"):
+        # 缁熶竴鏄犲皠瀛楁锛岀‘淇濆鍑烘ā鍧楄兘鎷垮埌姝ｇ‘鐨勬暟鎹?
+        if not case_data.get("patient_name") and case_data.get("name"):
             case_data["patient_name"] = case_data["name"]
         
-        # 纭繚 case_id 瀛樺湪锛堢敤浜庢枃浠跺悕鐢熸垚锛?        if "case_id" not in case_data:
+        # 纭繚 case_id 瀛樺湪锛堢敤浜庢枃浠跺悕鐢熸垚锛?
+        if "case_id" not in case_data:
             case_data["case_id"] = "EXPORT_" + datetime.now().strftime("%H%M%S")
 
         logger.info(f"姝ｅ湪瀵煎嚭 {request.export_format} 鏍煎紡锛屾偅鑰? {case_data.get('patient_name')}")
@@ -288,10 +340,12 @@ async def save_case_data(request: SaveRequest):
         if "diagnosis" not in case_data and "璇婃柇" in case_data:
             case_data["diagnosis"] = case_data["璇婃柇"]
             
-        # 鏄犲皠涓昏瘔瀛楁浠ラ€氳繃 CaseManager 鐨勯獙璇?        if "chief_complaint" not in case_data and "涓昏瘔" in case_data:
+        # 鏄犲皠涓昏瘔瀛楁浠ラ€氳繃 CaseManager 鐨勯獙璇?
+        if "chief_complaint" not in case_data and "涓昏瘔" in case_data:
             case_data["chief_complaint"] = case_data["涓昏瘔"]
 
-        # 纭繚鏈夊氨璇婃棩鏈?        if "visit_date" not in case_data:
+        # 纭繚鏈夊氨璇婃棩鏈?
+        if "visit_date" not in case_data:
             case_data["visit_date"] = datetime.now().strftime("%Y-%m-%d")
 
         success, result = case_manager.save_case(case_data)
@@ -369,12 +423,13 @@ async def websocket_stream_transcribe(websocket: WebSocket):
                         total_bytes += len(audio_chunk)
                         asr.push_audio(audio_chunk)
                         
-                        # 濡傛灉闊抽噺澶皬锛岃褰曡鍛?                        if peak < 500: # 缁忛獙鍊硷細澶皬鍙兘瀵艰嚧杞啓閿欒
-                             if asyncio.get_event_loop().time() - last_log_time >= 5.0:
-                                 logger.warning(f"闊抽淇″彿寰急 (Peak: {peak})锛屽彲鑳藉鑷磋浆鍐欎笉鍑嗘垨鍑虹幇鑻辨枃")
+                        # 濡傛灉闊抽噺澶皬锛岃褰曡鍛?
+                        if peak < 500:  # 缁忛獙鍊硷細澶皬鍙兘瀵艰嚧杞啓閿欒
+                            if asyncio.get_event_loop().time() - last_log_time >= 5.0:
+                                logger.warning(f"闊抽淇″彿寰急 (Peak: {peak})锛屽彲鑳藉鑷磋浆鍐欎笉鍑嗘垨鍑虹幇鑻辨枃")
                     else:
                         if asyncio.get_event_loop().time() - last_log_time >= 5.0:
-                             logger.warning("鎺ユ敹鍒扮函闈欓煶鏁版嵁锛岃妫€鏌ラ害鍏嬮鏉冮檺鎴栬澶?)
+                            logger.warning("鎺ユ敹鍒扮函闈欓煶鏁版嵁锛岃妫€鏌ラ害鍏嬮鏉冮檺鎴栬澶?")
             elif "text" in message:
                 data = json.loads(message["text"])
                 if data.get("command") == "stop":
@@ -472,7 +527,7 @@ async def websocket_record(websocket: WebSocket):
             
             if command == "start":
                 if recorder.is_recording:
-                    await websocket.send_json({"status": "error", "message": "褰曢煶宸插湪杩愯涓?})
+                    await websocket.send_json({"status": "error", "message": "录音已在运行中"})
                     continue
                 
                 logger.info("鍚姩鍚庣鏈湴楹﹀厠椋庡綍闊?..")
@@ -494,11 +549,11 @@ async def websocket_record(websocket: WebSocket):
                 
             elif command == "stop":
                 if recorder.is_recording:
-                    logger.info("鍋滄鍚庣鏈湴楹﹀厠椋庡綍闊?)
+                    logger.info("停止后端本地麦克风录音")
                     final_text = recorder.stop_recording()
                     # stop_recording 浼氳Е鍙?on_complete锛屼笉闇€瑕佹墜鍔ㄥ彂瀹屾垚娑堟伅
                 else:
-                    await websocket.send_json({"status": "error", "message": "鏈湪褰曢煶鐘舵€?})
+                    await websocket.send_json({"status": "error", "message": "当前未处于录音状态"})
                     
     except WebSocketDisconnect:
         logger.info("鍓嶇 WebSocket 宸叉柇寮€")

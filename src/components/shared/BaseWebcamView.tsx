@@ -123,6 +123,8 @@ export default function BaseWebcamView({
           {/* Video Layer */}
           <video
             ref={videoRef}
+            data-testid="webcam-video"
+            aria-label="Camera preview"
             className={cn(
               "absolute inset-0 w-full h-full object-contain bg-gray-950 transition-opacity duration-500",
               isVideoReady ? "opacity-100" : "opacity-0",
@@ -137,6 +139,9 @@ export default function BaseWebcamView({
           {/* AI/Skeleton Layer */}
           <canvas
             ref={canvasRef}
+            data-testid="skeleton-overlay"
+            role="img"
+            aria-label="Pose skeleton overlay"
             className="absolute inset-0 w-full h-full pointer-events-none z-20"
           />
 

@@ -1,7 +1,13 @@
 import { nanoid } from 'nanoid';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import type { ROMAssessment, ROMData } from '../types';
-import { calculateROMScore, calculateROMStatus, jointNameMap, directionNameMap } from '../utils/rom-utils';
+import {
+  calculateROMScore,
+  calculateROMStatus,
+  directionNameMap,
+  getROMReferenceAngle,
+  jointNameMap,
+} from '../utils/rom-utils';
 import { ROM_TEXTS } from '../constants/uiText';
 
 export const ROMService = {
@@ -65,9 +71,10 @@ export const ROMService = {
     ];
 
     assessment.data.forEach((item) => {
-      const status = calculateROMStatus(item.joint, item.direction, item.angle);
+      const referenceAngle = getROMReferenceAngle(item);
+      const status = calculateROMStatus(item.joint, item.direction, referenceAngle);
       sections.push(
-        `- ${jointNameMap[item.joint]} ${directionNameMap[item.direction]}: ${item.angle.toFixed(1)}° (${ROM_TEXTS.status[status]})`
+        `- ${jointNameMap[item.joint]} ${directionNameMap[item.direction]}: ${referenceAngle.toFixed(1)}° (${ROM_TEXTS.status[status]})`,
       );
     });
 
@@ -78,15 +85,17 @@ export const ROMService = {
     const recommendations: string[] = [];
 
     data.forEach((item) => {
-      const status = calculateROMStatus(item.joint, item.direction, item.angle);
+      const status = calculateROMStatus(item.joint, item.direction, getROMReferenceAngle(item));
       if (status === 'limited') {
         recommendations.push(
-          `${jointNameMap[item.joint]}${item.side === 'left' ? '左' : '右'}侧${directionNameMap[item.direction]}活动受限，建议进行针对性康复训练`
+          `${jointNameMap[item.joint]}${item.side === 'left' ? '左' : '右'}侧${directionNameMap[item.direction]}活动受限，建议进行针对性康复训练`,
         );
       }
     });
 
-    return recommendations.length > 0 ? recommendations : ['关节活动度正常，建议保持适当运动'];
+    return recommendations.length > 0
+      ? recommendations
+      : ['关节活动度正常，建议保持适当运动'];
   },
 
   exportAssessment(assessment: ROMAssessment): string {

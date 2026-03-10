@@ -11,6 +11,14 @@ import time
 from datetime import datetime
 from urllib.parse import urlencode, urlparse
 
+
+def _env_first(*keys):
+    for key in keys:
+        value = os.getenv(key)
+        if value and str(value).strip():
+            return str(value).strip()
+    return ""
+
 # 尝试导入 pyaudio，如果失败则禁用本地录音功能
 try:
     import pyaudio
@@ -47,9 +55,15 @@ class VoiceRecognizer:
 
         self.config = config
         print(f"DEBUG: VoiceRecognizer initializing with config keys: {list(config.keys()) if config else 'None'}")
-        self.APPID = str(config.get("asr_appid") or config.get("spark_appid") or "").strip()
-        self.API_KEY = str(config.get("asr_api_key") or config.get("spark_api_key") or "").strip()
-        self.API_SECRET = str(config.get("asr_api_secret") or config.get("spark_api_secret") or "").strip()
+        self.APPID = _env_first("XFYUN_ASR_APPID", "XFYUN_APPID", "APPID") or str(
+            config.get("asr_appid") or config.get("spark_appid") or ""
+        ).strip()
+        self.API_KEY = _env_first("XFYUN_ASR_API_KEY", "XFYUN_API_KEY", "APIKey") or str(
+            config.get("asr_api_key") or config.get("spark_api_key") or ""
+        ).strip()
+        self.API_SECRET = _env_first("XFYUN_ASR_API_SECRET", "XFYUN_API_SECRET", "APISecret") or str(
+            config.get("asr_api_secret") or config.get("spark_api_secret") or ""
+        ).strip()
         print(f"DEBUG: APPID='{self.APPID}', API_KEY_LEN={len(self.API_KEY)}, API_SECRET_LEN={len(self.API_SECRET)}")
         self.URL = "wss://iat-api.xfyun.cn/v2/iat"
         
