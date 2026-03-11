@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+﻿import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Vision3EntryHub } from '../components/Vision3EntryHub';
 
@@ -42,10 +42,24 @@ describe('Vision3EntryHub - Assessment Mode Selection', () => {
 
       expect(screen.getByRole('heading', { name: '快速评估' })).toBeInTheDocument();
       expect(screen.getByText('单视角快速筛查')).toBeInTheDocument();
-      expect(screen.getByText('选择一个视角并立即开始评估。')).toBeInTheDocument();
+      expect(screen.getByText('默认正面视角，进入后可立即拍摄')).toBeInTheDocument();
     });
 
-    it('should display clear quick-start buttons', () => {
+    it('should display a clear primary quick-start button', () => {
+      render(<Vision3EntryHub onSelectMode={mockOnSelectMode} />);
+
+      expect(screen.getByRole('button', { name: '开始快速评估' })).toBeInTheDocument();
+    });
+
+    it('should start quick mode with front view from the primary button', () => {
+      render(<Vision3EntryHub onSelectMode={mockOnSelectMode} />);
+
+      fireEvent.click(screen.getByRole('button', { name: '开始快速评估' }));
+
+      expect(mockOnSelectMode).toHaveBeenCalledWith('stepped', 'front', 'quick');
+    });
+
+    it('should display clear quick-start view buttons', () => {
       render(<Vision3EntryHub onSelectMode={mockOnSelectMode} />);
 
       expect(screen.getByRole('button', { name: '快速评估：正面' })).toBeInTheDocument();
@@ -91,7 +105,14 @@ describe('Vision3EntryHub - Assessment Mode Selection', () => {
   });
 
   describe('Accessibility', () => {
-    it('should have proper ARIA labels for action buttons', () => {
+    it('should keep both start buttons visible on the entry page', () => {
+      render(<Vision3EntryHub onSelectMode={mockOnSelectMode} />);
+
+      expect(screen.getByRole('button', { name: '开始标准评估' })).toBeVisible();
+      expect(screen.getByRole('button', { name: '开始快速评估' })).toBeVisible();
+    });
+
+    it('should have proper button types for all actions', () => {
       render(<Vision3EntryHub onSelectMode={mockOnSelectMode} />);
 
       screen.getAllByRole('button').forEach((button) => {

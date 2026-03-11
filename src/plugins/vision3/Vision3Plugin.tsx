@@ -149,13 +149,17 @@ export const Vision3Plugin: React.FC = () => {
     console.log('[Vision3Plugin] current view:', view);
   }, [postureReports, currentReport, reportSource, view]);
 
-  const displayResult = wsResult ?? (shouldUseCachedReport && currentReport?.metrics
+  const cachedDisplayResult = shouldUseCachedReport && currentReport?.metrics
     ? {
         metrics: currentReport.metrics,
         issues: currentReport.issues || [],
         timestamp: currentReport.date,
       }
-    : null);
+    : null;
+
+  // Once an assessment is completed, prefer the persisted snapshot so the data panel
+  // no longer flickers with any residual live websocket updates.
+  const displayResult = cachedDisplayResult ?? wsResult;
 
   const liveBasicReport = normalizeReportContent(auxiliaryDiagnosis);
   const cachedBasicReport = normalizeReportContent(currentReport?.auxiliaryDiagnosis);
@@ -174,7 +178,9 @@ export const Vision3Plugin: React.FC = () => {
 
     return null;
   })();
-  const displayAuxiliaryDiagnosis = auxiliaryDiagnosis || (shouldUseCachedReport ? currentReport?.auxiliaryDiagnosis || null : null);
+  const displayAuxiliaryDiagnosis = shouldUseCachedReport
+    ? currentReport?.auxiliaryDiagnosis || auxiliaryDiagnosis || null
+    : auxiliaryDiagnosis || null;
   const completedMetricCount = displayResult
     ? Object.values(displayResult.metrics).filter((value) => typeof value === 'number' && Number.isFinite(value)).length
     : 0;
@@ -223,7 +229,7 @@ export const Vision3Plugin: React.FC = () => {
     if (hasLiveExpandedReport || hasLiveBasicReport) {
       console.log('Report received, switching to report panel');
       setActivePanel('report');
-      setFocusTarget(hasLiveExpandedReport ? 'report-deep' : 'report-basic');
+      setFocusTarget('report-basic');
       setCaptureStatus('completed');
     }
   }, [hasLiveExpandedReport, hasLiveBasicReport, setActivePanel, setCaptureStatus]);
@@ -343,23 +349,21 @@ export const Vision3Plugin: React.FC = () => {
               />
             ) : (
               <div
-                className={`flex-1 min-h-0 overflow-hidden ${
-                  isCompletedView ? 'p-1 sm:p-2' : 'animate-in fade-in slide-in-from-bottom-4 duration-700 grid grid-cols-12 grid-rows-6 gap-4 md:gap-6 lg:gap-8'
+                className={`flex-1 min-h-0 ${
+                  isCompletedView ? 'overflow-y-auto p-1 sm:p-2' : 'overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700 grid grid-cols-12 grid-rows-6 gap-4 md:gap-6 lg:gap-8'
                 }`}
               >
                 {isCompletedView ? (
-                  <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-[2rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.06),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-3 shadow-[0_24px_64px_rgba(15,23,42,0.07)] sm:p-4">
+                  <section className="flex min-h-full flex-col rounded-[2rem] border border-slate-200/80 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.06),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-3 shadow-[0_24px_64px_rgba(15,23,42,0.07)] sm:p-4">
                     <div className="rounded-[1.5rem] border border-white/70 bg-white/90 px-4 py-4 shadow-sm backdrop-blur-sm sm:px-5">
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Posture Workspace</p>
+                          <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">体态评估工作区</p>
                           <h2 className="mt-1 text-xl font-semibold text-slate-900 sm:text-2xl">{'\u4f53\u6001\u8bc4\u4f30\u5de5\u4f5c\u53f0'}</h2>
                           <p className="mt-1 max-w-3xl text-sm text-slate-500">
-                            {displayMarkdownReport
-                              ? '\u5f53\u524d\u5df2\u8fdb\u5165\u8bc4\u4f30\u7ed3\u679c\u5de5\u4f5c\u53f0\uff0c\u53ef\u76f4\u63a5\u67e5\u770b\u672c\u6b21\u4f53\u6001\u57fa\u7840\u62a5\u544a\u4e0e\u5df2\u540c\u6b65\u7684\u62a5\u544a\u5185\u5bb9\u3002'
-                              : displayAuxiliaryDiagnosis
-                                ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u53ef\u76f4\u63a5\u5728\u53f3\u4fa7\u9605\u8bfb\u672c\u6b21\u4f53\u6001\u7ed3\u8bba\uff1b\u7efc\u5408 LLM \u62a5\u544a\u5c06\u5728\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210\u3002'
-                                : '\u62cd\u6444\u4e0e\u5206\u6790\u5df2\u7ed3\u675f\uff0c\u53f3\u4fa7\u4f1a\u4f18\u5148\u627f\u63a5\u672c\u6b21\u4f53\u6001\u57fa\u7840\u62a5\u544a\u4e0e\u6570\u636e\u8bc1\u636e\u3002'}
+                            {displayAuxiliaryDiagnosis
+                              ? '\u5f53\u524d\u5df2\u8fdb\u5165\u8bc4\u4f30\u7ed3\u679c\u5de5\u4f5c\u53f0\uff0c\u53f3\u4fa7\u4f18\u5148\u9605\u8bfb\u672c\u6b21\u57fa\u7840\u62a5\u544a\uff1b\u5982\u9700\u6df1\u5ea6\u62a5\u544a\uff0c\u8bf7\u524d\u5f80\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210\u3002'
+                              : '\u62cd\u6444\u4e0e\u5206\u6790\u5df2\u7ed3\u675f\uff0c\u53f3\u4fa7\u4f1a\u4f18\u5148\u627f\u63a5\u672c\u6b21\u57fa\u7840\u62a5\u544a\u4e0e\u6307\u6807\u4fe1\u606f\u3002'}
                           </p>
                         </div>
                       </div>
@@ -405,19 +409,7 @@ export const Vision3Plugin: React.FC = () => {
                             onClick={() => handleNavigateWorkspace('report', displayMarkdownReport ? 'report-deep' : 'report-basic')}
                           >
                             <FileText size={14} className="mr-2 inline-flex" />
-                            {`\u8bc4\u4f30\u62a5\u544a`}
-                          </button>
-                          <button
-                            type="button"
-                            className={`h-9 rounded-xl border px-3 text-sm font-medium transition-colors ${
-                              activePanel === 'dashboard'
-                                ? 'border-blue-200 bg-blue-50 text-blue-700 shadow-sm'
-                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                            }`}
-                            onClick={() => handleNavigateWorkspace('dashboard', 'data-overview')}
-                          >
-                            <Activity size={14} className="mr-2 inline-flex" />
-                            {`\u6570\u636e\u4e2d\u5fc3`}
+                            {`\u57fa\u7840\u62a5\u544a`}
                           </button>
                         </div>
                       </div>
@@ -432,7 +424,7 @@ export const Vision3Plugin: React.FC = () => {
                         <section className="bento-card space-y-3 border border-slate-200/80 bg-white/94 p-4 shadow-sm">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">Session Snapshot</p>
+                              <p className="text-[11px] font-semibold tracking-[0.18em] text-slate-400">本次评估摘要</p>
                               <h3 className="mt-1 text-base font-semibold text-slate-900">{'\u672c\u6b21\u8bc4\u4f30\u6458\u8981'}</h3>
                               <p className="mt-1 text-sm text-slate-500">{'\u538b\u7f29\u4fdd\u7559\u672c\u6b21\u89c6\u56fe\u3001\u98ce\u9669\u548c\u6307\u6807\u6458\u8981\uff0c\u51cf\u5c11\u53f3\u4fa7\u9605\u8bfb\u65f6\u7684\u89c6\u89c9\u6253\u6270\u3002'}</p>
                             </div>
@@ -478,7 +470,7 @@ export const Vision3Plugin: React.FC = () => {
                                   <Activity size={14} className="text-blue-600" />
                                 </div>
                                 <p className="mt-2 text-2xl font-semibold text-slate-900">{completedMetricCount}</p>
-                                <p className="mt-1 text-xs text-slate-500">{'\u5df2\u8fdb\u5165\u6570\u636e\u8bc1\u636e\u533a'}</p>
+                                <p className="mt-1 text-xs text-slate-500">{'\u53ef\u5728\u91cf\u5316\u6307\u6807\u4e2d\u67e5\u770b'}</p>
                               </div>
                             </div>
 
@@ -487,14 +479,14 @@ export const Vision3Plugin: React.FC = () => {
                               <p className="mt-1 text-xs leading-6 text-slate-600">
                                 {displayAuxiliaryDiagnosis
                                   ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u53ef\u5728\u53f3\u4fa7\u76f4\u63a5\u9605\u8bfb\u5f53\u524d\u4f53\u6001\u7ed3\u8bba\u3002'
-                                  : '\u62a5\u544a\u533a\u6b63\u5728\u627f\u63a5\u672c\u6b21\u4f53\u6001\u7ed3\u679c\uff0c\u6570\u636e\u8bc1\u636e\u53ef\u968f\u65f6\u5bf9\u7167\u67e5\u770b\u3002'}
+                                  : '\u62a5\u544a\u533a\u6b63\u5728\u627f\u63a5\u672c\u6b21\u4f53\u6001\u7ed3\u679c\uff0c\u9700\u8981\u65f6\u53ef\u5207\u6362\u5230\u91cf\u5316\u6307\u6807\u67e5\u770b\u5bf9\u7167\u4fe1\u606f\u3002'}
                               </p>
                             </div>
                           </div>
                         </section>
                       </div>
 
-                      <div className="order-1 min-h-0 w-full overflow-hidden xl:order-2 xl:flex-1">
+                      <div className="order-1 min-h-0 w-full xl:order-2 xl:flex-1">
                         {analysisPanel}
                       </div>
                     </div>

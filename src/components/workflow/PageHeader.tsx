@@ -9,6 +9,7 @@ interface PageHeaderProps {
   summary?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
+  compact?: boolean;
 }
 
 export const PageHeader: React.FC<PageHeaderProps> = ({
@@ -18,19 +19,26 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   summary,
   actions,
   className,
+  compact = false,
 }) => {
   return (
-    <Card variant="outlined" padding="lg" className={cn('border-slate-200 bg-white/85', className)}>
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <Card
+      variant="outlined"
+      padding={compact ? 'md' : 'lg'}
+      className={cn('border-slate-200 bg-white/85', className)}
+    >
+      <div className={cn('flex flex-col gap-4 xl:flex-row xl:justify-between', compact ? 'xl:items-center' : 'xl:items-end')}>
         <div className="min-w-0">
           {eyebrow ? (
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">{eyebrow}</div>
+            <div className={cn('font-semibold text-slate-400', compact ? 'text-[11px] tracking-[0.14em]' : 'text-[11px] uppercase tracking-[0.18em]')}>
+              {eyebrow}
+            </div>
           ) : null}
-          <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-slate-900">{title}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{description}</p>
-          {summary ? <div className="mt-4 flex flex-wrap items-center gap-2">{summary}</div> : null}
+          <h1 className={cn('font-semibold tracking-tight text-slate-900', compact ? 'mt-1 text-[24px]' : 'mt-2 text-[28px]')}>{title}</h1>
+          <p className={cn('max-w-3xl text-sm leading-6 text-slate-500', compact ? 'mt-1.5' : 'mt-2')}>{description}</p>
+          {summary ? <div className={cn('flex flex-wrap items-center gap-2', compact ? 'mt-3' : 'mt-4')}>{summary}</div> : null}
         </div>
-        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+        {actions ? <div className={cn('flex flex-wrap items-center gap-2', compact && 'xl:justify-end')}>{actions}</div> : null}
       </div>
     </Card>
   );

@@ -30,6 +30,8 @@ export const useVision3AutoSave = ({
 }: UseVision3AutoSaveProps) => {
   const hasSavedAuxiliaryRef = useRef(false);
   const hasSavedDeepRef = useRef(false);
+  const isSavingAuxiliaryRef = useRef(false);
+  const isSavingDeepRef = useRef(false);
   const { currentPatient, patients } = usePatientStore();
   const { currentSession, sessions, startSession } = useSessionStore();
   const { addAssessment, updateAssessment } = useAssessmentStore();
@@ -44,12 +46,17 @@ export const useVision3AutoSave = ({
   useEffect(() => {
     const saveAssessment = async () => {
       const hasReport = Boolean(auxiliaryDiagnosis || markdownReport);
-      if (step === 'completed' && hasReport && !hasSavedAuxiliaryRef.current) {
-        hasSavedAuxiliaryRef.current = true;
-        
+      if (
+        step === 'completed'
+        && hasReport
+        && !hasSavedAuxiliaryRef.current
+        && !isSavingAuxiliaryRef.current
+      ) {
         try {
           const patientId = currentPatient?.id;
           if (!patientId) return;
+
+          isSavingAuxiliaryRef.current = true;
           
           let sessionId =
             (currentSession?.patientId === patientId ? currentSession.id : undefined)
@@ -96,6 +103,7 @@ export const useVision3AutoSave = ({
               }
             }
           });
+          hasSavedAuxiliaryRef.current = true;
           currentAssessmentIdRef.current = assessment.id;
           if (markdownReport) {
             hasSavedDeepRef.current = true;
@@ -103,11 +111,18 @@ export const useVision3AutoSave = ({
           console.log('Auxiliary assessment saved', assessment.id);
         } catch (error) {
           console.error('Failed to save auxiliary assessment:', error);
+        } finally {
+          isSavingAuxiliaryRef.current = false;
         }
       }
 
-      if (markdownReport && !hasSavedDeepRef.current && currentAssessmentIdRef.current) {
-        hasSavedDeepRef.current = true;
+      if (
+        markdownReport
+        && !hasSavedDeepRef.current
+        && currentAssessmentIdRef.current
+        && !isSavingDeepRef.current
+      ) {
+        isSavingDeepRef.current = true;
         try {
           const latestReport = pickLatestReport();
           
@@ -132,9 +147,12 @@ export const useVision3AutoSave = ({
               }
             }
           });
+          hasSavedDeepRef.current = true;
           console.log('Assessment updated with deep report');
         } catch (error) {
           console.error('Failed to update assessment with deep report:', error);
+        } finally {
+          isSavingDeepRef.current = false;
         }
       }
     };
@@ -146,6 +164,8 @@ export const useVision3AutoSave = ({
     if (step !== 'completed') {
       hasSavedAuxiliaryRef.current = false;
       hasSavedDeepRef.current = false;
+      isSavingAuxiliaryRef.current = false;
+      isSavingDeepRef.current = false;
       currentAssessmentIdRef.current = null;
     }
   }, [step]);

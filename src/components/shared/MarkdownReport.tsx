@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { FileText, Loader2, AlertCircle } from 'lucide-react';
-import { COLORS, SIZES } from '@/constants/uiStyles';
+import { COLORS } from '@/constants/uiStyles';
 
 interface MarkdownReportProps {
   content: string | null;
@@ -42,6 +42,52 @@ const toneClassMap = {
   },
 } as const;
 
+const mojibakePattern = /锟|鏂|鍩|鎶|璇|瀹|缁|鍗|閲|鍐|鍚|鎵|姹囨€|寮傚父|�/u;
+const suspiciousPhoneticPattern = /[\u3100-\u312F]/u;
+const viewLabelMap = {
+  front: '正面',
+  side: '侧面',
+  back: '背面',
+} as const;
+
+const normalizeMarkdownLine = (line: string) => {
+  const withoutControlChars = line.replace(/[\uFEFF\u200B-\u200D\u2060]/g, '').trimEnd();
+  const withHeadingSpace = withoutControlChars.replace(/^(#{1,6})([^\s#].*)$/, '$1 $2');
+
+  return withHeadingSpace
+    .replace(/^(#{1,6})\s*(front|side|back)\b.*$/i, (_, hashes: string, view: keyof typeof viewLabelMap) => `${hashes} ${viewLabelMap[view]}评估`)
+    .replace(/^评估视角[:：]\s*(front|side|back)\b.*$/i, (_, view: keyof typeof viewLabelMap) => `评估视角：${viewLabelMap[view]}`);
+};
+
+const shouldDropMarkdownLine = (line: string) => {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  return mojibakePattern.test(trimmed) || suspiciousPhoneticPattern.test(trimmed);
+};
+
+export const sanitizeMarkdownContent = (content?: string | null) => {
+  if (typeof content !== 'string') {
+    return '';
+  }
+
+  const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const cleanedLines = normalized
+    .split('\n')
+    .map(normalizeMarkdownLine)
+    .filter((line) => !shouldDropMarkdownLine(line));
+
+  return cleanedLines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+export const sanitizeReadableText = (content?: string | null) =>
+  sanitizeMarkdownContent(content).replace(/\n{2,}/g, '\n\n').trim();
+
 export const MarkdownReport: React.FC<MarkdownReportProps> = ({
   content,
   loading = false,
@@ -56,7 +102,9 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
   emptyDescription = '完成评估后，报告会显示在这里。',
 }) => {
   const [displayedContent, setDisplayedContent] = useState('');
-  const normalizedContent = typeof content === 'string' ? content.trim() : '';
+  const rawContent = typeof content === 'string' ? content.trim() : '';
+  const normalizedContent = sanitizeMarkdownContent(content);
+  const contentFiltered = Boolean(rawContent) && !normalizedContent;
   const toneClasses = toneClassMap[tone];
 
   useEffect(() => {
@@ -98,13 +146,15 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
       <div className={`flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-10 text-center ${className}`}>
         <FileText className="mb-4 h-10 w-10 text-slate-300" />
         <p className="text-sm font-semibold text-slate-900">{emptyTitle}</p>
-        <p className="mt-2 max-w-md text-sm text-slate-500">{emptyDescription}</p>
+        <p className="mt-2 max-w-md text-sm text-slate-500">
+          {contentFiltered ? '报告内容存在异常字符，已自动过滤；请稍后查看清洗后的内容。' : emptyDescription}
+        </p>
       </div>
     );
   }
 
   const contentBody = (
-    <div className="flex-1 overflow-y-auto p-5 lg:p-6 custom-scrollbar">
+    <div className={showChrome ? 'flex-1 overflow-y-auto p-5 lg:p-6 custom-scrollbar' : 'p-5 lg:p-6'}>
       <div className={`max-w-none leading-relaxed ${COLORS.neutral.light.text}`}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
@@ -137,7 +187,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
 
   if (!showChrome) {
     return (
-      <div className={`flex h-full min-h-[220px] flex-col rounded-2xl border border-slate-200 bg-white ${className}`}>
+      <div className={`min-h-[220px] rounded-2xl border border-slate-200 bg-white ${className}`}>
         {contentBody}
       </div>
     );

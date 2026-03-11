@@ -1,4 +1,4 @@
-import { PostureIssue, PostureMetrics } from '@/types/posture';
+﻿import { PostureIssue, PostureMetrics } from '@/types/posture';
 
 export interface ReportInsightCard {
   id: string;
@@ -123,8 +123,11 @@ export const buildImmediateBasicReport = ({
   const safeIssues = issues || [];
   const metricSignals = buildMetricSignals(metrics);
   const dominantIssue = safeIssues.length > 0 ? chooseDominantIssue(safeIssues) : null;
+  const hasMetricPayload = Boolean(
+    metrics && Object.values(metrics).some((value) => typeof value === 'number' && Number.isFinite(value)),
+  );
 
-  if (!dominantIssue && metricSignals.length === 0) {
+  if (!dominantIssue && metricSignals.length === 0 && !hasMetricPayload) {
     return null;
   }
 
@@ -145,9 +148,18 @@ export const buildImmediateBasicReport = ({
     lines.push(`- 联动信号：${metricSignals.slice(0, 3).map((signal) => signal.evidence).join('；')}`);
   }
 
+  if (!dominantIssue && metricSignals.length === 0) {
+    lines.push('- 当前未见需要优先警示的高风险姿态异常。');
+    lines.push('- 本次评估已完成基础量化采集，可结合现场症状和复测需求继续随访。');
+  }
+
   lines.push('');
   lines.push('### 建议动作');
-  lines.push(dominantIssue?.recommendation || metricSignals[0]?.action || '建议结合数据证据区继续复核本次评估结果。');
+  lines.push(
+    dominantIssue?.recommendation
+      || metricSignals[0]?.action
+      || '建议保持当前训练与日常姿势管理；如后续症状变化，可前往报告中心继续查看汇总报告或安排复测。',
+  );
 
   return lines.join('\n');
 };
@@ -264,3 +276,4 @@ export const buildReportInsightCards = ({
 
   return cards.slice(0, 3);
 };
+

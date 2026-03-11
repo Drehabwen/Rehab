@@ -87,7 +87,7 @@ const compactCardClass = cn('rounded-xl border p-3', COLORS.neutral.light.border
 const nestedCardClass = cn('rounded-lg border p-2', COLORS.neutral.light.border, COLORS.neutral.light.bg);
 const titleClass = cn('text-lg font-semibold', COLORS.neutral.light.text);
 const bodyClass = cn('text-sm', COLORS.neutral.slate500);
-const eyebrowClass = cn('text-[11px] font-semibold uppercase tracking-[0.2em]', COLORS.neutral.light.textLight);
+const eyebrowClass = cn('text-[11px] font-semibold tracking-[0.18em]', COLORS.neutral.light.textLight);
 const cardLabelClass = cn('text-xs', COLORS.neutral.slate500);
 const cardValueClass = cn('text-3xl font-semibold tabular-nums', COLORS.neutral.light.text);
 const neutralChipClass = cn(
@@ -161,7 +161,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
           <div className="mb-3 flex items-center justify-between">
             <h3 className={cn('flex items-center gap-2 text-sm font-semibold', COLORS.neutral.light.text)}>
               <Settings2 size={14} className={COLORS.neutral.light.textMuted} />
-              ROM 配置
+              ROM 评估配置
             </h3>
             <span className="status-badge status-processing h-6">ROM</span>
           </div>
@@ -179,13 +179,13 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
     <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1 custom-scrollbar">
       <div className="sticky top-0 z-10 -mx-1 rounded-[1.25rem] bg-white/95 px-1 pb-1 backdrop-blur-sm">
         <div className={cn('flex flex-wrap items-center gap-2 rounded-[1.1rem] border px-3 py-2', COLORS.neutral.light.border, 'bg-slate-50/90')}>
-          <span className={cn('text-[11px] font-semibold uppercase tracking-[0.18em]', COLORS.neutral.light.textLight)}>Data Sections</span>
+          <span className={eyebrowClass}>量化分区</span>
           <button
             type="button"
             className={sectionJumpButtonClass('blue')}
             onClick={() => overviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
-            概览
+            总览
           </button>
           <button
             type="button"
@@ -199,7 +199,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
             className={sectionJumpButtonClass('slate')}
             onClick={() => headRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
           >
-            3D 位姿
+            头部姿态
           </button>
           <button
             type="button"
@@ -215,17 +215,17 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
         <div className="state-panel flex min-h-[340px] flex-1 flex-col items-center justify-center gap-3">
           <Activity size={40} className={COLORS.neutral.light.textLight} />
           <h3>等待评估数据</h3>
-          <p>完成拍摄后，这里会展示量化指标、风险证据和可追溯的数据支撑。</p>
+          <p>完成拍摄后，这里会展示量化指标、风险提示和可追溯的姿态数据。</p>
         </div>
       ) : (
         <>
           <section ref={overviewRef} className={sectionClass}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className={eyebrowClass}>Data Evidence</p>
-                <h3 className={cn('mt-1', titleClass)}>数据证据概览</h3>
+                <p className={eyebrowClass}>量化总览</p>
+                <h3 className={cn('mt-1', titleClass)}>量化指标概览</h3>
                 <p className={cn('mt-1', bodyClass)}>
-                  这里不重复报告文案，只展示支撑结论的核心指标、异常证据和位姿观察。
+                  这里只展示支撑结论的关键指标、风险提示和姿态观察，不再重复报告正文。
                 </p>
               </div>
 
@@ -236,7 +236,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                   onClick={() => onNavigateToReport?.('report-basic')}
                 >
                   <FileText size={14} />
-                  基础报告
+                  查看基础报告
                 </button>
                 <button
                   type="button"
@@ -244,14 +244,14 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                   onClick={() => onNavigateToReport?.('report-deep')}
                 >
                   <TrendingUp size={14} />
-                  报告扩展
+                  查看深度报告
                 </button>
               </div>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className={subCardClass}>
-                <p className={cardLabelClass}>健康指数</p>
+                <p className={cardLabelClass}>健康分数</p>
                 <div className="mt-2 flex items-center gap-2">
                   <span className={cardValueClass}>{healthScore}</span>
                   {healthScore !== null ? (
@@ -268,13 +268,13 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                 <p className={cn('mt-2', cardValueClass)}>
                   {Object.values(result.metrics).filter((value) => typeof value === 'number' && Number.isFinite(value)).length}
                 </p>
-                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>已回传的量化指标数量，可用于证据复核。</p>
+                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>当前已回传的量化指标数量，可用于结果复核。</p>
               </div>
 
               <div className={subCardClass}>
                 <p className={cardLabelClass}>阅读路径</p>
                 <p className={cn('mt-2 text-sm font-medium', COLORS.neutral.light.text)}>先看指标，再看风险，最后回到报告。</p>
-                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>这样能更快定位问题来源和对应结论。</p>
+                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>这样更容易定位问题来源和对应结论。</p>
               </div>
             </div>
           </section>
@@ -282,7 +282,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
           <section ref={metricsRef} className={sectionClass}>
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h3 className={titleClass}>指标证据</h3>
+                <h3 className={titleClass}>核心指标</h3>
                 <p className={cn('mt-1', bodyClass)}>优先展示最常用的体态偏移指标，便于快速复核。</p>
               </div>
               <button
@@ -352,8 +352,8 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
             <section ref={headRef} className={sectionClass}>
               <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <h3 className={titleClass}>3D 头部位姿证据</h3>
-                  <p className={cn('mt-1', bodyClass)}>这里用于查看头部偏航、俯仰和翻滚的定量结果。</p>
+                  <h3 className={titleClass}>头部姿态</h3>
+                  <p className={cn('mt-1', bodyClass)}>查看头部偏航、俯仰和翻滚的量化结果。</p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
@@ -367,11 +367,11 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                         : cn(COLORS.neutral.light.border, COLORS.neutral.light.bg, COLORS.neutral.slate600, COLORS.neutral.light.hover),
                     )}
                   >
-                    {showHeadAxes ? '3D 轴已开启' : '3D 轴已关闭'}
+                    {showHeadAxes ? '头部坐标已开启' : '头部坐标已关闭'}
                   </button>
 
                   <label className={cn('flex items-center gap-2 text-xs', COLORS.neutral.light.textMuted)}>
-                    轴长
+                    坐标长度
                     <input
                       type="range"
                       min={0.6}
@@ -387,15 +387,15 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className={compactCardClass}>
-                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>Yaw 偏航</p>
+                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>偏航</p>
                   <MetricValue value={result.metrics.headYaw} unit="deg" className={COLORS.neutral.light.text} />
                 </div>
                 <div className={compactCardClass}>
-                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>Pitch 俯仰</p>
+                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>俯仰</p>
                   <MetricValue value={result.metrics.headPitch || 0} unit="deg" className={COLORS.neutral.light.text} />
                 </div>
                 <div className={compactCardClass}>
-                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>Roll 翻滚</p>
+                  <p className={cn('mb-1 text-xs', COLORS.neutral.slate500)}>翻滚</p>
                   <MetricValue value={result.metrics.headRoll || 0} unit="deg" className={COLORS.neutral.light.text} />
                 </div>
               </div>
@@ -405,8 +405,8 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
           <section ref={issuesRef} className={cn('flex min-h-0 flex-col', sectionClass)}>
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h3 className={titleClass}>风险证据列表</h3>
-                <p className={cn('mt-1', bodyClass)}>按影响程度查看问题描述、建议动作和回跳路径。</p>
+                <h3 className={titleClass}>风险列表</h3>
+                <p className={cn('mt-1', bodyClass)}>按影响程度查看问题描述、建议动作和报告跳转入口。</p>
               </div>
               <button
                 type="button"
@@ -414,7 +414,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                 onClick={() => onNavigateToReport?.('report-deep')}
               >
                 <FileText size={14} />
-                对照报告扩展
+                查看深度报告
               </button>
             </div>
 
@@ -449,7 +449,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                         onClick={() => onNavigateToReport?.('report-deep')}
                       >
                         <FileText size={14} />
-                        返回报告
+                        查看报告
                       </button>
                     </div>
                   </div>

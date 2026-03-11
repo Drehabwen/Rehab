@@ -6,6 +6,7 @@ import type {
   SessionReportInputStatus,
   SessionReportInputType,
 } from '@/types/report-center';
+import { sanitizeReadableText } from '@/components/shared/MarkdownReport';
 
 const structuredCaseToMarkdown = (structuredCase: Record<string, string | undefined> | undefined): string | null => {
   if (!structuredCase) {
@@ -56,25 +57,30 @@ const getMedVoiceStatus = (assessment: Assessment): SessionReportInputStatus => 
 };
 
 export function getAssessmentPreview(assessment: Assessment): string | null {
+  const sanitizePreview = (value?: string | null) => {
+    const cleaned = sanitizeReadableText(value);
+    return cleaned || null;
+  };
+
   if (assessment.data.posture?.markdownReport) {
-    return assessment.data.posture.markdownReport;
+    return sanitizePreview(assessment.data.posture.markdownReport);
   }
 
   if (assessment.data.posture?.auxiliaryDiagnosis) {
-    return assessment.data.posture.auxiliaryDiagnosis;
+    return sanitizePreview(assessment.data.posture.auxiliaryDiagnosis);
   }
 
   if (assessment.data.rom?.summary) {
-    return assessment.data.rom.summary;
+    return sanitizePreview(assessment.data.rom.summary);
   }
 
   const structuredCaseMarkdown = structuredCaseToMarkdown(assessment.data.medvoice?.structuredCase);
   if (structuredCaseMarkdown) {
-    return structuredCaseMarkdown;
+    return sanitizePreview(structuredCaseMarkdown);
   }
 
   if (assessment.data.medvoice?.transcript) {
-    return assessment.data.medvoice.transcript;
+    return sanitizePreview(assessment.data.medvoice.transcript);
   }
 
   return null;

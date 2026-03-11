@@ -1,5 +1,5 @@
 ﻿import React from 'react';
-import { ClipboardList, FileText, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ClipboardList, FileText, Settings, ChevronLeft, ChevronRight, Activity, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -12,7 +12,9 @@ interface SidebarProps {
 
 const navItems = [
   { id: 'dashboard', icon: ClipboardList, label: '接诊中心' },
+  { id: 'assessment', icon: Activity, label: '评估中心' },
   { id: 'reports', icon: FileText, label: '报告中心' },
+  { id: 'datacenter', icon: Database, label: '数据中心' },
 ];
 
 export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isCollapsed, onToggle, onSettingsClick }) => {
@@ -30,7 +32,6 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
         {!isCollapsed ? (
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold tracking-tight">Medical AI Workspace</div>
-            <div className="truncate text-[11px] text-slate-400">围绕接诊流程组织的康复 AI 工作台</div>
           </div>
         ) : null}
       </div>
@@ -56,7 +57,11 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
         })}
       </nav>
 
-      <div className="space-y-2 border-t border-slate-700/40 p-3">
+      <div className="px-3">
+        <div className="h-px bg-slate-700/40" />
+      </div>
+
+      <div className="space-y-2 p-3">
         <button
           onClick={onSettingsClick || (() => {})}
           className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-slate-300 transition-colors hover:bg-white/5"

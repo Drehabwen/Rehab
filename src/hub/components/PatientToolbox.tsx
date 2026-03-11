@@ -74,7 +74,7 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
           }
           actions={
             <>
-              <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>返回接诊中心</Button>
+              <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>返回评估中心</Button>
               <Button variant="secondary" icon={<BarChart3 size={16} />} onClick={onOpenComparison} disabled={!comparisonEnabled}>进度对比</Button>
               <Button variant="primary" icon={<FileText size={16} />} onClick={onOpenReports}>进入报告中心</Button>
             </>
@@ -93,7 +93,7 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
                   <span className="text-sm text-slate-400">ID {patient.id}</span>
                 </div>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  当前围绕本次接诊完成体态评估、ROM 评估和语音问诊。页面只保留必要任务信息，让下一步操作一眼可见。
+                  当前围绕本次接诊完成体态评估、ROM 评估和语音问诊。页面只负责完成评估任务，报告查看与导出统一在报告中心完成。
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                   <span>接诊编号 {visitTask.visitId}</span>
