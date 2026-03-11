@@ -1,12 +1,14 @@
 node_modules
 dist
 .vscode
+.worktrees
 .trae
 __pycache__
 *.pyc
 .env
 *.log
 .DS_Store
+temp-utf8-test.txt
 
 # Medical Config (Crucial for privacy)
 Deeprehab-MedVoice-AI--/config.json
