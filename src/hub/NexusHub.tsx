@@ -1,4 +1,4 @@
-﻿﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Database, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { HubSidebar } from './components/HubSidebar';
@@ -16,6 +16,7 @@ import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 import { DashboardView } from './views/DashboardView';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
+import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { usePatientList } from './hooks/usePatientList';
 import type { Patient } from '@/types/patient';
 import type { ViewMode } from './types';
@@ -31,16 +32,19 @@ export const NexusHub: React.FC = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showDataSettings, setShowDataSettings] = useState(false);
 
-  const { patients, loadPatients, setCurrentPatient } = usePatientStore();
+  const { patients, loadPatients, setCurrentPatient, getPatientById } = usePatientStore();
   const { loadSessions, getPatientSessions } = useSessionStore();
+  const { assessments, loadAssessments } = useAssessmentStore();
 
   useEffect(() => {
     loadPatients();
     loadSessions();
-  }, [loadPatients, loadSessions]);
+    loadAssessments();
+  }, [loadPatients, loadSessions, loadAssessments]);
 
-  const { patientsWithStatus, stats, getPatientLabel } = usePatientList({
+  const { stats, visitTasks, getVisitTaskByPatientId } = usePatientList({
     patients,
+    assessments,
     getPatientSessions,
   });
 
@@ -67,9 +71,11 @@ export const NexusHub: React.FC = () => {
 
   const handleSelectTool = (tool: 'vision3' | 'medvoice' | 'reports' | 'datacenter' | 'comparison' | 'rom') => {
     setActivePlugin(tool);
-    if (!selectedPatient && tool !== 'datacenter' && tool !== 'reports') {
+    if (!selectedPatient && tool !== 'reports') {
       setView('dashboard');
+      return;
     }
+    setView('workspace');
   };
 
   const handleBackToDashboard = () => {
@@ -80,13 +86,23 @@ export const NexusHub: React.FC = () => {
 
   const handleStartNewPatient = async (patientId: string) => {
     await loadPatients();
-    const newPatient = usePatientStore.getState().getPatientById(patientId);
+    const newPatient = getPatientById(patientId);
     if (newPatient) {
       setSelectedPatient(newPatient);
       setCurrentPatient(newPatient);
       setView('toolbox');
     }
     setShowNewSessionModal(false);
+  };
+
+  const handleOpenReports = () => {
+    setActivePlugin('reports');
+    setView('workspace');
+  };
+
+  const handleOpenComparison = () => {
+    setActivePlugin('comparison');
+    setView('workspace');
   };
 
   const renderWorkspaceContent = () => {
@@ -129,23 +145,24 @@ export const NexusHub: React.FC = () => {
     }
   };
 
-  const showSidebar = view === 'dashboard' || (!selectedPatient && view === 'workspace');
+  const showSidebar = view === 'dashboard' || (!selectedPatient && view === 'workspace' && activePlugin === 'reports');
   const showPatientHeader = (view === 'workspace' || view === 'toolbox') && !!selectedPatient;
-  const showCenterHeader = view === 'workspace' && !selectedPatient && (activePlugin === 'datacenter' || activePlugin === 'reports');
+  const showCenterHeader = view === 'workspace' && !selectedPatient && activePlugin === 'reports';
 
   return (
-    <div className="flex h-screen mesh-gradient text-slate-900 overflow-hidden">
+    <div className="mesh-gradient flex h-screen overflow-hidden text-slate-900">
       {showSidebar ? (
         <HubSidebar
-          activeId={view === 'dashboard' ? 'dashboard' : 'datacenter'}
+          activeId={view === 'dashboard' ? 'dashboard' : 'reports'}
           onSelect={(id) => {
             if (id === 'dashboard') {
               handleBackToDashboard();
             }
-            if (id === 'datacenter') {
+            if (id === 'reports') {
               setView('workspace');
-              setActivePlugin('datacenter');
+              setActivePlugin('reports');
               setSelectedPatient(null);
+              setCurrentPatient(null);
             }
           }}
           isCollapsed={isCollapsed}
@@ -154,20 +171,20 @@ export const NexusHub: React.FC = () => {
         />
       ) : null}
 
-      <main className={cn('flex-1 min-w-0 flex flex-col relative')}>
+      <main className={cn('relative flex min-w-0 flex-1 flex-col')}>
         {showPatientHeader && selectedPatient ? (
           <PatientHeaderBar
             name={getPatientDisplayName(selectedPatient)}
             avatar={getPatientAvatar(selectedPatient)}
-            meta={`第 ${getPatientSessions(selectedPatient.id).length + 1} 次接诊 · 最近更新 ${new Date(selectedPatient.updatedAt).toLocaleDateString('zh-CN')}`}
+            meta={`第 ${Math.max(getPatientSessions(selectedPatient.id).length, 1)} 次接诊 · 最近更新 ${new Date(selectedPatient.updatedAt).toLocaleDateString('zh-CN')}`}
             onBack={view === 'workspace' ? handleBackFromWorkspace : handleBackFromToolbox}
             onSettings={() => setShowDataSettings(true)}
           />
         ) : null}
 
         {view === 'dashboard' ? (
-          <header className="h-14 px-4 md:px-8 border-b border-slate-200 bg-white/90 flex items-center justify-between">
-            <div className="text-sm text-slate-500">康复评估系统</div>
+          <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white/90 px-4 md:px-8">
+            <div className="text-sm text-slate-500">康复 AI 工作台</div>
             <button onClick={() => setIsCollapsed((v) => !v)} className="btn-icon md:hidden" aria-label="menu">
               <Menu size={18} />
             </button>
@@ -176,14 +193,10 @@ export const NexusHub: React.FC = () => {
 
         {showCenterHeader ? (
           <div className="patient-header-bar px-6 md:px-8">
-            <div className="h-full max-w-[1600px] mx-auto flex items-center justify-between gap-4">
+            <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between gap-4">
               <div className="min-w-0">
-                <div className="text-base font-semibold text-slate-900">
-                  {activePlugin === 'reports' ? '报告中心' : '数据中心'}
-                </div>
-                <div className="text-xs text-slate-500 truncate">
-                  {activePlugin === 'reports' ? '查看报告状态与导出入口' : '高密度列表查看评估记录'}
-                </div>
+                <div className="text-base font-semibold text-slate-900">报告中心</div>
+                <div className="truncate text-xs text-slate-500">查看报告状态、结构化结论与导出入口</div>
               </div>
               <button className="btn-icon" onClick={() => setShowDataSettings(true)}>
                 <Database size={16} />
@@ -196,13 +209,11 @@ export const NexusHub: React.FC = () => {
           {view === 'dashboard' ? (
             <DashboardView
               patients={patients}
-              patientsWithStatus={patientsWithStatus}
+              visitTasks={visitTasks}
               stats={stats}
               onSelectPatient={handleSelectPatient}
               onNewPatient={() => setShowNewSessionModal(true)}
               onSearchPatient={() => setShowSearchModal(true)}
-              getPatientLabel={getPatientLabel}
-              getPatientSessions={getPatientSessions}
             />
           ) : null}
 
@@ -210,7 +221,10 @@ export const NexusHub: React.FC = () => {
             view === 'toolbox' ? (
               <PatientToolbox
                 patient={selectedPatient}
+                visitTask={getVisitTaskByPatientId(selectedPatient.id) || null}
                 onSelectTool={handleToolSelectFromToolbox}
+                onOpenReports={handleOpenReports}
+                onOpenComparison={handleOpenComparison}
                 onBack={handleBackFromToolbox}
                 sessionCount={getPatientSessions(selectedPatient.id).length}
               />
@@ -219,7 +233,7 @@ export const NexusHub: React.FC = () => {
             )
           ) : null}
 
-          {view === 'workspace' && !selectedPatient && (activePlugin === 'datacenter' || activePlugin === 'reports') ? (
+          {view === 'workspace' && !selectedPatient && activePlugin === 'reports' ? (
             <div className="h-full">{renderWorkspaceContent()}</div>
           ) : null}
         </div>

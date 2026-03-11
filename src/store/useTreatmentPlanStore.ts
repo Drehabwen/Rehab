@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { TreatmentPlanApi } from '../api/treatmentPlanApi';
 import type { SessionTreatmentPlanRequest } from '../api/treatmentPlanApi';
 import type { AssessmentRecord, TreatmentPlanVersion } from '../types/assessment';
@@ -106,7 +106,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
         TreatmentPlanStorage.saveVersions(get().versions);
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : '鐢熸垚娌荤枟璁″垝澶辫触',
+          error: error instanceof Error ? error.message : '生成康复建议失败',
         });
       } finally {
         set({ isGenerating: false });
@@ -152,7 +152,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
         TreatmentPlanStorage.saveVersions(get().versions);
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : '鐢熸垚娌荤枟璁″垝澶辫触',
+          error: error instanceof Error ? error.message : '生成康复建议失败',
         });
       } finally {
         set({ isGenerating: false });

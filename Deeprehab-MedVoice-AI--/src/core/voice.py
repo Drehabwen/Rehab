@@ -24,7 +24,11 @@ try:
     import pyaudio
     HAS_PYAUDIO = True
 except ImportError:
-    HAS_PYAUDIO = False
+    try:
+        import pyaudiowpatch as pyaudio
+        HAS_PYAUDIO = True
+    except ImportError:
+        HAS_PYAUDIO = False
 
 class VoiceRecognizer:
     def __init__(self, config=None):
@@ -362,6 +366,11 @@ class VoiceRecorder:
     def start_recording(self, on_update=None, on_complete=None, on_error=None, on_power=None):
         if self.is_recording:
             return
+
+        if not HAS_PYAUDIO:
+            raise RuntimeError(
+                "PyAudio is not installed; backend local microphone recording is unavailable."
+            )
         
         self.is_recording = True
         self.last_result = ""

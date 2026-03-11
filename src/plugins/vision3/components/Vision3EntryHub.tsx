@@ -122,9 +122,9 @@ export const Vision3EntryHub: React.FC<EntryHubProps> = ({ onSelectMode }) => {
                       <p className={cn('text-xs font-medium uppercase tracking-[0.18em]', COLORS.neutral.light.textLight)}>
                         快速视角
                       </p>
-                      <p className={cn('mt-1 text-sm', COLORS.neutral.slate500)}>选择一个视角直接开始。</p>
+                      <p className={cn('mt-1 text-sm', COLORS.neutral.slate500)}>选择一个视角并立即开始评估。</p>
                     </div>
-                    <span className={cn('text-xs font-medium', COLORS.neutral.light.textMuted)}>单击即进入</span>
+                    <span className={cn('text-xs font-medium', COLORS.neutral.light.textMuted)}>选择后直接进入拍摄</span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
@@ -136,7 +136,7 @@ export const Vision3EntryHub: React.FC<EntryHubProps> = ({ onSelectMode }) => {
                         onClick={() => onSelectMode('stepped', option.value, 'quick')}
                         className={cn(actionButtonClass, 'justify-center')}
                       >
-                        {option.label}
+                        {`${option.label}开始`}
                       </button>
                     ))}
                   </div>

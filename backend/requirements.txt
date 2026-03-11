@@ -12,3 +12,4 @@ jinja2
 openai
 python-dotenv
 requests
+websocket-client

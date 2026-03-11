@@ -1,165 +1,84 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   Activity,
+  Brain,
   Calendar,
-  Database,
   ExternalLink,
   FileJson,
   FileSpreadsheet,
   FileText,
-  Search,
-  Trash2,
+  Layers,
+  Mic,
+  Sparkles,
   User,
+  Wand2,
   X,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { COLORS } from '@/constants/uiStyles';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionReportStore } from '@/store/useSessionReportStore';
 import { useTreatmentPlanStore } from '@/store/useTreatmentPlanStore';
 import type { Assessment } from '@/types/assessment';
-import type { SessionReportInputStatus, SessionReportOutput } from '@/types/report-center';
-import { PageTitleSection, StatePanel, UnifiedStatusBadge } from '@/components/layout';
+import type { SessionReportInput, SessionReportOutput } from '@/types/report-center';
+import { AssessmentCard, PageHeader, ProgressBar, StatusTag } from '@/components/workflow';
+import { Button, Card } from '@/components/ui';
+import { StatePanel } from '@/components/layout';
 import {
   buildAssessmentOutputSummary,
   buildSessionReportGenerationRequest,
   buildSessionReportInputs,
   getAssessmentPreview,
-  hasAssessmentReportPayload,
 } from '../report-center-utils';
 import { buildSessionDraftReport, buildSessionInsightCards } from '../report-center-insights';
+import { cn } from '@/lib/utils';
 
 interface NexusReportCenterProps {
   mode?: 'datacenter' | 'reports';
+  patientId?: string | null;
+  sessionId?: string | null;
 }
 
-type StatusFilter = 'all' | Assessment['status'];
-type TypeFilter = 'all' | Assessment['type'];
+const modulePresentation = {
+  posture: {
+    title: '体态评估',
+    description: '查看当前接诊中的体态异常证据和结构化结论。',
+    icon: Activity,
+    accentClassName: 'bg-blue-600 text-white',
+  },
+  rom: {
+    title: 'ROM 评估',
+    description: '查看关节活动范围、受限方向和左右差异。',
+    icon: Layers,
+    accentClassName: 'bg-emerald-600 text-white',
+  },
+  medvoice: {
+    title: '语音问诊',
+    description: '查看转写结果、结构化病史和问诊重点。',
+    icon: Mic,
+    accentClassName: 'bg-violet-600 text-white',
+  },
+} as const;
 
-const typeLabelMap: Record<Assessment['type'], string> = {
-  posture: '体态评估',
-  rom: '关节活动度',
-  medvoice: '语音接诊',
-  combined: '综合评估',
+const trimText = (value: string | null | undefined, maxLength = 120) => {
+  if (!value) return '当前模块尚未生成结构化摘要。';
+  const compact = value.replace(/\s+/g, ' ').trim();
+  if (compact.length <= maxLength) return compact;
+  return `${compact.slice(0, maxLength)}...`;
 };
 
-const modeLabelMap: Record<Assessment['mode'], string> = {
-  realtime: '实时',
-  stepped: '分步',
-  voice: '语音',
+const extractRecommendationCards = (content: string | null | undefined): string[] => {
+  if (!content) return [];
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*#\d.\s]+/, '').trim())
+    .filter((line) => line.length > 0)
+    .slice(0, 4);
 };
 
-const statusToneMap: Record<Assessment['status'], 'success' | 'processing' | 'warning'> = {
-  completed: 'success',
-  reviewed: 'processing',
-  pending: 'warning',
-};
+const outputStatusToWorkflowStatus = (status: 'ready' | 'partial' | 'missing') => status === 'ready' ? 'completed' : 'pending';
 
-const statusTextMap: Record<Assessment['status'], string> = {
-  completed: '已完成',
-  reviewed: '已复核',
-  pending: '待处理',
-};
-
-function getReportStatus(assessment: Assessment): { tone: 'success' | 'processing' | 'warning'; text: string } {
-  const summary = buildAssessmentOutputSummary(assessment);
-  if (!summary) {
-    return { tone: 'warning', text: '待生成' };
-  }
-
-  if (summary.type === 'posture') {
-    if (assessment.data.posture?.markdownReport) return { tone: 'success', text: '体态报告扩展' };
-    if (assessment.data.posture?.auxiliaryDiagnosis) return { tone: 'processing', text: '体态基础报告' };
-    return { tone: 'warning', text: '待生成' };
-  }
-
-  if (summary.type === 'rom') {
-    return summary.status === 'ready'
-      ? { tone: 'success', text: 'ROM摘要' }
-      : summary.status === 'partial'
-        ? { tone: 'processing', text: 'ROM原始数据' }
-        : { tone: 'warning', text: '待生成' };
-  }
-
-  if (summary.type === 'medvoice') {
-    return summary.status === 'ready'
-      ? { tone: 'success', text: '病历已结构化' }
-      : summary.status === 'partial'
-        ? { tone: 'processing', text: '仅转写' }
-        : { tone: 'warning', text: '待生成' };
-  }
-
-  return { tone: 'processing', text: '可查看' };
-}
-
-function getReportExportLabel(assessment: Assessment): string {
-  if (assessment.type === 'posture') return 'JSON / CSV / 报告文本';
-  if (assessment.type === 'medvoice') return 'JSON / CSV / 病历文本';
-  if (assessment.type === 'rom') return 'JSON / CSV / 摘要文本';
-  return 'JSON / CSV';
-}
-
-const readinessBadgeMap: Record<SessionReportInputStatus, { tone: 'success' | 'processing' | 'warning'; text: string }> = {
-  ready: { tone: 'success', text: '已就绪' },
-  partial: { tone: 'processing', text: '部分到位' },
-  missing: { tone: 'warning', text: '缺失' },
-};
-
-const sessionScopeButtonBaseClass = 'rounded-2xl border px-4 py-3 text-left transition-colors';
-const sessionScopeButtonClass = (active: boolean) =>
-  cn(
-    sessionScopeButtonBaseClass,
-    active ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-  );
-const sessionCardClass = (active: boolean) =>
-  cn(
-    'min-w-[260px] rounded-2xl border px-4 py-3 text-left transition-colors',
-    active ? 'border-antey-primary bg-antey-primary/10' : 'border-slate-200 bg-white hover:bg-slate-50',
-  );
-const mutedSurfaceCardClass = 'rounded-xl border border-slate-200 bg-slate-50 p-3';
-const whiteSurfaceCardClass = 'rounded-xl border border-slate-200 bg-white p-3';
-const elevatedSurfaceCardClass = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm';
-const neutralSurfaceCardClass = 'rounded-2xl border border-slate-200 bg-slate-50 p-4';
-const dashedEmptyStateClass = 'rounded-xl border border-dashed border-slate-300 bg-white px-3 py-4 text-sm text-slate-500';
-const selectInputClass = 'w-full h-10 px-3 rounded-xl border border-slate-300 bg-white text-sm';
-const searchInputClass = 'w-full h-10 pl-9 pr-3 rounded-xl border border-slate-300 bg-white text-sm';
-const filterToggleClass = (active: boolean) =>
-  cn(
-    'h-8 rounded-lg text-xs border',
-    active ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50',
-  );
-const patientFilterButtonClass = (active: boolean) =>
-  cn(
-    'w-full px-3 py-2 rounded-xl text-left text-sm border',
-    active ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-200 hover:bg-slate-50 text-slate-700',
-  );
-const reportListHeaderClass = 'px-4 py-3 border-b border-slate-200 text-xs text-slate-500';
-const reportListRowClass = 'px-4 py-3 items-center hover:bg-slate-50';
-const modalOverlayClass = 'fixed inset-0 flex items-center justify-center p-4 backdrop-blur-[2px] md:p-8';
-const modalDialogClass = 'dialog-shell max-h-[85vh]';
-const modalHeaderClass = 'dialog-header';
-const modalFooterClass = 'dialog-footer';
-const titleTextClass = cn('text-sm font-semibold', COLORS.neutral.light.text);
-const titleTextLgClass = cn('text-base font-semibold', COLORS.neutral.light.text);
-const metricValueClass = cn('text-2xl font-semibold', COLORS.neutral.light.text);
-const bodyTextClass = cn('text-sm', COLORS.neutral.light.textMuted);
-const bodyTextSoftClass = cn('text-sm', COLORS.neutral.light.textSoft);
-const previewTextClass = cn('text-sm', COLORS.neutral.light.textMuted);
-const metaTextClass = cn('text-xs', COLORS.neutral.slate500);
-const subtleTextClass = cn('text-[11px]', COLORS.neutral.light.textLight);
-const emptyMutedTextClass = COLORS.neutral.light.textLight;
-const evidenceChipClass = cn('inline-flex rounded-full px-2.5 py-1 text-xs', COLORS.neutral.light.selected, COLORS.neutral.light.textMuted);
-const sessionInsightToneClass = (tone: 'blue' | 'amber' | 'violet') =>
-  cn(
-    'inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]',
-    tone === 'blue' && 'border-blue-200 bg-blue-50 text-blue-700',
-    tone === 'amber' && 'border-amber-200 bg-amber-50 text-amber-700',
-    tone === 'violet' && 'border-violet-200 bg-violet-50 text-violet-700',
-  );
-
-export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'datacenter' }) => {
-  const { assessments, loadAssessments, deleteAssessment } = useAssessmentStore();
+export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId = null, sessionId = null }) => {
+  const { assessments, loadAssessments } = useAssessmentStore();
   const { patients, loadPatients } = usePatientStore();
   const {
     reports: sessionReports,
@@ -178,11 +97,8 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
     linkedSessionReportId,
   } = useTreatmentPlanStore();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(patientId);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(sessionId);
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [selectedReportMarkdown, setSelectedReportMarkdown] = useState<string | null>(null);
 
@@ -192,117 +108,111 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
     loadSessionReports();
   }, [loadPatients, loadAssessments, loadSessionReports]);
 
+  useEffect(() => {
+    setSelectedPatientId(patientId);
+  }, [patientId]);
+
+  useEffect(() => {
+    setSelectedSessionId(sessionId);
+  }, [sessionId]);
+
   const patientMap = useMemo(() => {
     const map = new Map<string, string>();
-    patients.forEach((p) => map.set(p.id, p.name || `患者 ${p.id}`));
+    patients.forEach((patient) => map.set(patient.id, patient.name || `患者 ${patient.id}`));
     return map;
   }, [patients]);
 
-  const searchLower = searchQuery.toLowerCase();
+  const availablePatients = useMemo(() => {
+    const patientIds = new Set<string>();
+    assessments.forEach((assessment) => patientIds.add(assessment.patientId));
+    sessionReports.forEach((report) => patientIds.add(report.patientId));
+    return patients.filter((patient) => patientIds.has(patient.id));
+  }, [assessments, patients, sessionReports]);
 
-  const filteredPatients = useMemo(() => {
-    return patients.filter((p) =>
-      (p.name || '').toLowerCase().includes(searchLower) ||
-      p.id.toLowerCase().includes(searchLower)
-    );
-  }, [patients, searchLower]);
-
-  const scopedAssessments = useMemo(() => {
-    let list = selectedPatientId
-      ? assessments.filter((a) => a.patientId === selectedPatientId)
+  const patientScopedAssessments = useMemo(() => {
+    return selectedPatientId
+      ? assessments.filter((assessment) => assessment.patientId === selectedPatientId)
       : assessments;
+  }, [assessments, selectedPatientId]);
 
-    if (mode === 'reports') {
-      list = list.filter(hasAssessmentReportPayload);
-    }
-
-    if (statusFilter !== 'all') {
-      list = list.filter((item) => item.status === statusFilter);
-    }
-
-    if (typeFilter !== 'all') {
-      list = list.filter((item) => item.type === typeFilter);
-    }
-
-    return list;
-  }, [assessments, selectedPatientId, mode, statusFilter, typeFilter]);
-
-  const sessionInputs = useMemo(() => buildSessionReportInputs(scopedAssessments, patientMap), [scopedAssessments, patientMap]);
-
-  const filteredAssessments = useMemo(() => {
-    const sessionScoped = selectedSessionId
-      ? scopedAssessments.filter((assessment) => assessment.sessionId === selectedSessionId)
-      : scopedAssessments;
-
-    if (!searchLower) return sessionScoped;
-
-    return sessionScoped.filter((assessment) => {
-      const patientName = (patientMap.get(assessment.patientId) || '').toLowerCase();
-      return (
-        assessment.id.toLowerCase().includes(searchLower) ||
-        assessment.sessionId.toLowerCase().includes(searchLower) ||
-        assessment.patientId.toLowerCase().includes(searchLower) ||
-        patientName.includes(searchLower)
-      );
-    });
-  }, [scopedAssessments, selectedSessionId, searchLower, patientMap]);
-
-  const stats = useMemo(() => {
-    const weeklyCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const weeklyCount = scopedAssessments.filter((a) => a.createdAt > weeklyCutoff).length;
-    const reportReadyCount = scopedAssessments.filter((a) => getReportStatus(a).tone === 'success').length;
-
-    return [
-      {
-        label: mode === 'reports' ? '可查看报告' : '评估记录',
-        value: scopedAssessments.length,
-        icon: Database,
-        tone: 'text-blue-600 bg-blue-50',
-      },
-      { label: '患者人数', value: patients.length, icon: User, tone: 'text-emerald-600 bg-emerald-50' },
-      {
-        label: mode === 'reports' ? '报告就绪' : '近7天新增',
-        value: mode === 'reports' ? reportReadyCount : weeklyCount,
-        icon: Activity,
-        tone: 'text-amber-600 bg-amber-50',
-      },
-    ];
-  }, [scopedAssessments, patients.length, mode]);
+  const sessionInputs = useMemo(
+    () => buildSessionReportInputs(patientScopedAssessments, patientMap),
+    [patientScopedAssessments, patientMap],
+  );
 
   useEffect(() => {
-    setSelectedSessionId(null);
-  }, [selectedPatientId]);
-
-  const activeSessionInput = useMemo(() => {
-    if (sessionInputs.length === 0) {
-      return null;
+    if (selectedSessionId && sessionInputs.some((input) => input.sessionId === selectedSessionId)) {
+      return;
     }
+    setSelectedSessionId(sessionInputs[0]?.sessionId ?? null);
+  }, [selectedSessionId, sessionInputs]);
 
-    return selectedSessionId
-      ? sessionInputs.find((sessionInput) => sessionInput.sessionId === selectedSessionId) ?? sessionInputs[0]
-      : sessionInputs[0];
-  }, [sessionInputs, selectedSessionId]);
-  const sessionInsightCards = useMemo(
-    () => (activeSessionInput ? buildSessionInsightCards(activeSessionInput) : []),
-    [activeSessionInput],
-  );
-  const sessionDraftReport = useMemo(
-    () => (activeSessionInput ? buildSessionDraftReport(activeSessionInput) : null),
-    [activeSessionInput],
-  );
+  const activeSessionInput = useMemo<SessionReportInput | null>(() => {
+    if (sessionInputs.length === 0) return null;
+    return sessionInputs.find((input) => input.sessionId === selectedSessionId) ?? sessionInputs[0] ?? null;
+  }, [selectedSessionId, sessionInputs]);
+
   const generatedSessionReport = useMemo(
-    () => (activeSessionInput ? getLatestReportBySessionId(activeSessionInput.sessionId) : undefined),
+    () => activeSessionInput ? getLatestReportBySessionId(activeSessionInput.sessionId) : undefined,
     [activeSessionInput, getLatestReportBySessionId, sessionReports],
   );
+
+  const hasVisibleTreatmentPlan = Boolean(currentTreatmentPlanContent)
+    && Boolean(activeSessionInput)
+    && linkedSessionId === activeSessionInput?.sessionId
+    && linkedSessionReportId === generatedSessionReport?.id;
+
+  const insightCards = useMemo(
+    () => activeSessionInput ? buildSessionInsightCards(activeSessionInput) : [],
+    [activeSessionInput],
+  );
+
+  const draftReport = useMemo(
+    () => activeSessionInput ? buildSessionDraftReport(activeSessionInput) : null,
+    [activeSessionInput],
+  );
+
+  const recommendationCards = useMemo(() => {
+    if (generatedSessionReport?.recommendations?.length) {
+      return generatedSessionReport.recommendations.slice(0, 4);
+    }
+    if (hasVisibleTreatmentPlan) {
+      return extractRecommendationCards(currentTreatmentPlanContent);
+    }
+    return [];
+  }, [generatedSessionReport, hasVisibleTreatmentPlan, currentTreatmentPlanContent]);
+
+  const reportArchive = useMemo(() => {
+    return sessionReports.filter((report) => {
+      if (selectedPatientId && report.patientId !== selectedPatientId) return false;
+      if (selectedSessionId && report.sessionId !== selectedSessionId) return false;
+      return true;
+    });
+  }, [selectedPatientId, selectedSessionId, sessionReports]);
+
+  const assessmentOutputs = useMemo(() => {
+    return (['posture', 'rom', 'medvoice'] as const).map((type) => {
+      const output = activeSessionInput?.outputs[type];
+      const presentation = modulePresentation[type];
+      const summary = output ? buildAssessmentOutputSummary(output.sourceAssessment) : null;
+      return {
+        type,
+        output,
+        presentation,
+        summaryText: trimText(summary?.preview ?? null),
+        evidenceText: output ? `证据项 ${summary?.evidenceCount ?? 0}` : '等待模块结果',
+      };
+    });
+  }, [activeSessionInput]);
 
   const exportToJson = (assessment: Assessment) => {
     const dataStr = JSON.stringify(assessment, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `assessment-${assessment.id}-${new Date(assessment.createdAt).toISOString().split('T')[0]}.json`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `assessment-${assessment.id}.json`;
+    anchor.click();
     URL.revokeObjectURL(url);
   };
 
@@ -310,89 +220,59 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
     let csvContent = '';
 
     if (assessment.data.posture?.metrics) {
-      const metrics = assessment.data.posture.metrics;
-      csvContent = 'metric,value\n' + Object.entries(metrics).map(([k, v]) => `${k},${v}`).join('\n');
+      csvContent = 'metric,value\n' + Object.entries(assessment.data.posture.metrics).map(([key, value]) => `${key},${value}`).join('\n');
     } else if (assessment.data.rom?.items) {
       csvContent = 'joint,direction,side,angle,maxAngle,minAngle,confidence\n';
       assessment.data.rom.items.forEach((item) => {
         csvContent += `${item.joint},${item.direction},${item.side},${item.angle},${item.maxAngle},${item.minAngle},${item.confidence}\n`;
       });
     } else if (assessment.data.medvoice) {
-      const mv = assessment.data.medvoice;
+      const medvoice = assessment.data.medvoice;
       csvContent = 'field,value\n';
-      csvContent += `patient_name,${mv.patientInfo.name}\n`;
-      csvContent += `visit_date,${mv.patientInfo.visit_date}\n`;
-      csvContent += `view_mode,${mv.viewMode}\n`;
-      if (mv.structuredCase) {
-        Object.entries(mv.structuredCase).forEach(([k, v]) => {
-          if (v) csvContent += `${k},${String(v).replace(/\n/g, ' ')}\n`;
-        });
-      }
+      csvContent += `patient_name,${medvoice.patientInfo.name}\n`;
+      csvContent += `visit_date,${medvoice.patientInfo.visit_date}\n`;
+      csvContent += `view_mode,${medvoice.viewMode}\n`;
     }
 
     if (!csvContent) return;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `assessment-${assessment.id}-${new Date(assessment.createdAt).toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const openReportText = (assessment: Assessment) => {
-    const content = getAssessmentPreview(assessment);
-    if (!content) return;
-    setSelectedReportMarkdown(content);
-  };
-
-  const exportReportText = (assessment: Assessment) => {
-    const content = getAssessmentPreview(assessment);
-    if (!content) return;
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `report-${assessment.id}.txt`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `assessment-${assessment.id}.csv`;
+    anchor.click();
     URL.revokeObjectURL(url);
   };
 
   const exportSessionReportJson = (report: SessionReportOutput) => {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `session-report-${report.sessionId}.json`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `session-report-${report.sessionId}.json`;
+    anchor.click();
     URL.revokeObjectURL(url);
   };
 
   const exportSessionReportText = (report: SessionReportOutput) => {
     const blob = new Blob([report.markdown], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `session-report-${report.sessionId}.md`;
-    a.click();
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `session-report-${report.sessionId}.md`;
+    anchor.click();
     URL.revokeObjectURL(url);
   };
 
   const handleGenerateSessionReport = async () => {
-    if (!activeSessionInput) {
-      return;
-    }
-
+    if (!activeSessionInput) return;
     const report = await generateReport(buildSessionReportGenerationRequest(activeSessionInput));
     setSelectedReportMarkdown(report.markdown);
   };
 
   const handleGenerateTreatmentPlan = async () => {
-    if (!generatedSessionReport || !activeSessionInput) {
-      return;
-    }
+    if (!generatedSessionReport || !activeSessionInput) return;
 
     await generatePlanFromSessionReport({
       patientId: generatedSessionReport.patientId,
@@ -404,595 +284,279 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
     });
   };
 
-  const sessionScopedReports = useMemo(() => {
-    return sessionReports.filter((report) => {
-      if (selectedPatientId && report.patientId !== selectedPatientId) {
-        return false;
-      }
-      if (selectedSessionId && report.sessionId !== selectedSessionId) {
-        return false;
-      }
-      return true;
-    });
-  }, [selectedPatientId, selectedSessionId, sessionReports]);
-
-  const hasVisibleTreatmentPlan =
-    Boolean(currentTreatmentPlanContent) &&
-    Boolean(activeSessionInput) &&
-    linkedSessionId === activeSessionInput?.sessionId &&
-    linkedSessionReportId === generatedSessionReport?.id;
-
   return (
     <div className="rehab-page custom-scrollbar">
-      <div className="rehab-page-inner">
-        <PageTitleSection
-          title={mode === 'reports' ? '报告中心' : '数据中心'}
-          description={
-            selectedPatientId
-              ? `已筛选：${patientMap.get(selectedPatientId) || 'Unknown Patient'}`
-              : mode === 'reports'
-                ? '突出报告状态、生成时间与查看入口'
-                : '高密度列表查看评估记录、时间、类型与状态'
+      <div className="rehab-page-inner space-y-5">
+        <PageHeader
+          eyebrow="接诊 -> 评估 -> 报告"
+          title="报告中心"
+          description="报告中心聚合当前接诊结果，突出评估结果、AI 分析和康复建议。页面只展示结构化信息，详细文本放到查看弹层。"
+          summary={
+            activeSessionInput ? (
+              <>
+                <StatusTag status={generatedSessionReport ? 'completed' : 'pending'} />
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                  接诊 ID {activeSessionInput.sessionId}
+                </span>
+              </>
+            ) : undefined
           }
-          right={<span className="status-badge status-disabled">共 {filteredAssessments.length} 条</span>}
+          actions={
+            <>
+              <Button variant="secondary" icon={<Wand2 size={16} />} onClick={handleGenerateTreatmentPlan} loading={isGeneratingTreatmentPlan} disabled={!generatedSessionReport}>生成康复建议</Button>
+              <Button variant="primary" icon={<Sparkles size={16} />} onClick={handleGenerateSessionReport} loading={isGeneratingSessionReport} disabled={!activeSessionInput}>生成综合报告</Button>
+            </>
+          }
         />
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {stats.map((item) => (
-            <div key={item.label} className="bento-card p-5 flex items-center justify-between">
-              <div>
-                <div className={metricValueClass}>{item.value}</div>
-                <div className={cn(metaTextClass, 'mt-1')}>{item.label}</div>
-              </div>
-              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', item.tone)}>
-                <item.icon size={18} />
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {mode === 'reports' ? (
-          <section className="bento-card p-4">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className={titleTextClass}>接诊输入概览</div>
-                <div className={cn(metaTextClass, 'mt-1')}>按接诊汇总体态、ROM、语音病历输入，明确综合报告可用上下文。</div>
-              </div>
-              <span className={metaTextClass}>{selectedSessionId ? `已筛选接诊 ${selectedSessionId}` : `共 ${sessionInputs.length} 个接诊`}</span>
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => setSelectedSessionId(null)}
-                className={sessionScopeButtonClass(!selectedSessionId)}
+        <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+          <div className="grid gap-4 xl:grid-cols-[1fr_1fr_1.1fr]">
+            <div>
+              <div className="mb-2 text-sm font-semibold text-slate-900">患者范围</div>
+              <select
+                value={selectedPatientId ?? 'all'}
+                onChange={(event) => setSelectedPatientId(event.target.value === 'all' ? null : event.target.value)}
+                className="field-select"
               >
-                <div className="text-sm font-semibold">全部接诊</div>
-                <div className={cn(metaTextClass, 'mt-1')}>查看当前筛选范围内所有报告输入</div>
-              </button>
-
-              {sessionInputs.map((sessionInput) => (
-                <button
-                  key={sessionInput.sessionId}
-                  type="button"
-                  onClick={() => setSelectedSessionId(sessionInput.sessionId)}
-                  className={sessionCardClass(selectedSessionId === sessionInput.sessionId)}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className={cn(titleTextClass, 'truncate')}>{sessionInput.patientName || sessionInput.patientId}</div>
-                      <div className={cn(metaTextClass, 'truncate')}>{sessionInput.sessionId}</div>
-                    </div>
-                    <UnifiedStatusBadge
-                      status={sessionInput.readiness.readyCount >= 2 ? 'success' : sessionInput.readiness.readyCount >= 1 ? 'processing' : 'warning'}
-                      text={`已就绪 ${sessionInput.readiness.readyCount}/3`}
-                    />
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    {(['posture', 'rom', 'medvoice'] as const).map((type) => {
-                      const output = sessionInput.outputs[type];
-                      const readiness = output ? readinessBadgeMap[output.status] : readinessBadgeMap.missing;
-                      const label = type === 'posture' ? '体态' : type === 'rom' ? 'ROM' : '语音';
-
-                      return (
-                        <div key={type} className={cn(mutedSurfaceCardClass, 'px-3 py-2')}>
-                          <div className={metaTextClass}>{label}</div>
-                          <div className="mt-1">
-                            <UnifiedStatusBadge status={readiness.tone} text={readiness.text} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </button>
-              ))}
+                <option value="all">全部患者</option>
+                {availablePatients.map((patient) => (
+                  <option key={patient.id} value={patient.id}>
+                    {(patient.name || `患者 ${patient.id}`) + ` · ${patient.id}`}
+                  </option>
+                ))}
+              </select>
             </div>
-          </section>
+
+            <div>
+              <div className="mb-2 text-sm font-semibold text-slate-900">接诊范围</div>
+              <select
+                value={selectedSessionId ?? 'all'}
+                onChange={(event) => setSelectedSessionId(event.target.value === 'all' ? null : event.target.value)}
+                className="field-select"
+              >
+                <option value="all">当前患者的最近接诊</option>
+                {sessionInputs.map((input) => (
+                  <option key={input.sessionId} value={input.sessionId}>
+                    {(input.patientName || input.patientId) + ` · ${input.sessionId}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">报告准备度</div>
+              <p className="mt-1 text-sm text-slate-500">当前接诊已收集的有效模块数量，可据此判断是否适合生成综合报告。</p>
+              <ProgressBar value={activeSessionInput?.readiness.readyCount ?? 0} total={3} className="mt-4" />
+            </div>
+          </div>
+        </Card>
+
+        {sessionReportError ? (
+          <Card variant="default" padding="md" className="border-rose-200 bg-rose-50 text-rose-700">
+            <div className="text-sm">{sessionReportError}</div>
+          </Card>
         ) : null}
 
-        {mode === 'reports' && activeSessionInput ? (
-          <section className="bento-card p-5">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <div className={titleTextClass}>综合报告编排区</div>
-                <div className={cn(metaTextClass, 'mt-1')}>
-                  {`${activeSessionInput.patientName || activeSessionInput.patientId} · ${activeSessionInput.sessionId}`}
-                </div>
-                <div className={cn(bodyTextClass, 'mt-3')}>
-                  综合 LLM 报告将只在这里基于当前接诊输入统一生成。当前阶段先完成 posture、ROM、语音病历的输入归集与可视化。
-                </div>
-                {sessionReportError ? (
-                  <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                    {sessionReportError}
-                  </div>
-                ) : null}
-              </div>
+        {treatmentPlanError ? (
+          <Card variant="default" padding="md" className="border-rose-200 bg-rose-50 text-rose-700">
+            <div className="text-sm">{treatmentPlanError}</div>
+          </Card>
+        ) : null}
 
-              <div className="flex flex-wrap items-center gap-2">
-                <UnifiedStatusBadge
-                  status={activeSessionInput.readiness.readyCount >= 2 ? 'success' : activeSessionInput.readiness.readyCount >= 1 ? 'processing' : 'warning'}
-                  text={`综合输入 ${activeSessionInput.readiness.readyCount}/3`}
-                />
-                <span className="status-badge status-disabled">
-                  {activeSessionInput.readiness.missingTypes.length > 0
-                    ? `待补 ${activeSessionInput.readiness.missingTypes.join(' / ')}`
-                    : '输入已齐备'}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_1fr]">
-              <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-                {(['posture', 'rom', 'medvoice'] as const).map((type) => {
-                  const output = activeSessionInput.outputs[type];
-                  const readiness = output ? readinessBadgeMap[output.status] : readinessBadgeMap.missing;
-                  const label = type === 'posture' ? '体态评估输入' : type === 'rom' ? 'ROM 输入' : '语音病历输入';
-
-                  return (
-                    <article key={type} className={neutralSurfaceCardClass}>
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className={titleTextClass}>{label}</div>
-                          <div className={cn(metaTextClass, 'mt-1')}>
-                            {output ? `最近更新 ${new Date(output.createdAt).toLocaleString('zh-CN')}` : '当前接诊尚未提供该输入'}
-                          </div>
-                        </div>
-                        <UnifiedStatusBadge status={readiness.tone} text={readiness.text} />
-                      </div>
-
-                      <div className={cn(whiteSurfaceCardClass, 'mt-3 min-h-[120px]', previewTextClass)}>
-                        {output?.preview ? (
-                          <div className="line-clamp-5 whitespace-pre-wrap">{output.preview}</div>
-                        ) : (
-                          <div className={emptyMutedTextClass}>暂无可用于综合报告的输入摘要。</div>
-                        )}
-                      </div>
-
-                      {output?.preview ? (
-                        <button
-                          type="button"
-                          className="btn-secondary mt-3 h-9 px-3"
-                          onClick={() => setSelectedReportMarkdown(output.preview)}
-                        >
-                          <FileText size={14} />
-                          查看输入详情
-                        </button>
-                      ) : null}
-                    </article>
-                  );
-                })}
-              </div>
-
-              <article className="rounded-2xl border border-slate-200 bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] p-4">
-                <div className="flex items-start justify-between gap-3">
+        {!activeSessionInput ? (
+          <StatePanel
+            title="当前没有可生成报告的接诊"
+            description="请先完成至少一个评估模块，或切换患者后再进入报告中心。"
+          />
+        ) : (
+          <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+            <div className="space-y-4">
+              <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className={titleTextClass}>综合报告入口</div>
-                    <div className={cn(metaTextClass, 'mt-1')}>综合报告只在这里发起并落库，下面同时显示当前编排预览和最近一次已生成结果。</div>
+                    <h2 className="text-lg font-semibold text-slate-900">评估结果</h2>
+                    <p className="mt-1 text-sm text-slate-500">整合同一接诊下的体态、ROM 和语音问诊结构化结论。</p>
                   </div>
-                  <UnifiedStatusBadge
-                    status={generatedSessionReport ? 'success' : activeSessionInput.readiness.readyCount >= 2 ? 'processing' : 'warning'}
-                    text={generatedSessionReport ? '已生成' : activeSessionInput.readiness.readyCount >= 2 ? '可编排' : '待补输入'}
-                  />
+                  <StatusTag status={activeSessionInput.readiness.readyCount === 3 ? 'completed' : 'pending'} />
                 </div>
 
-                <div className={cn(whiteSurfaceCardClass, 'mt-3 min-h-[176px] whitespace-pre-wrap', previewTextClass)}>
-                  {generatedSessionReport?.markdown || sessionDraftReport}
+                <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+                  {assessmentOutputs.map((item) => {
+                    const Icon = item.presentation.icon;
+                    return (
+                      <AssessmentCard
+                        key={item.type}
+                        icon={Icon}
+                        title={item.presentation.title}
+                        description={item.presentation.description}
+                        status={item.output ? outputStatusToWorkflowStatus(item.output.status) : 'pending'}
+                        summary={item.summaryText}
+                        meta={item.evidenceText}
+                        actionLabel={item.output ? '查看结果' : undefined}
+                        onAction={item.output ? () => setSelectedAssessment(item.output.sourceAssessment) : undefined}
+                        accentClassName={item.presentation.accentClassName}
+                      />
+                    );
+                  })}
                 </div>
+              </Card>
 
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="btn-primary h-9 px-3"
-                    onClick={() => void handleGenerateSessionReport()}
-                    disabled={!activeSessionInput || activeSessionInput.readiness.readyCount < 2 || isGeneratingSessionReport}
-                  >
-                    <FileText size={14} />
-                    {isGeneratingSessionReport ? '生成中...' : '生成综合报告'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary h-9 px-3"
-                    onClick={() => setSelectedReportMarkdown(generatedSessionReport?.markdown || sessionDraftReport || null)}
-                    disabled={!generatedSessionReport?.markdown && !sessionDraftReport}
-                  >
-                    <ExternalLink size={14} />
-                    {generatedSessionReport ? '查看已生成报告' : '查看综合预览'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary h-9 px-3"
-                    onClick={() => generatedSessionReport ? exportSessionReportText(generatedSessionReport) : undefined}
-                    disabled={!generatedSessionReport}
-                  >
-                    <FileText size={14} />
-                    导出综合报告
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary h-9 px-3"
-                    onClick={() => generatedSessionReport ? exportSessionReportJson(generatedSessionReport) : undefined}
-                    disabled={!generatedSessionReport}
-                  >
-                    <FileJson size={14} />
-                    导出综合 JSON
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-primary h-9 px-3"
-                    onClick={() => void handleGenerateTreatmentPlan()}
-                    disabled={!generatedSessionReport || isGeneratingTreatmentPlan}
-                  >
-                    <FileSpreadsheet size={14} />
-                    {isGeneratingTreatmentPlan ? '生成治疗计划中...' : '生成治疗计划'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary h-9 px-3"
-                    onClick={() => setSelectedReportMarkdown(currentTreatmentPlanContent || null)}
-                    disabled={!hasVisibleTreatmentPlan}
-                  >
-                    <ExternalLink size={14} />
-                    查看治疗计划
-                  </button>
-                </div>
-              </article>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
-              {sessionInsightCards.map((card) => (
-                <article key={card.id} className={elevatedSurfaceCardClass}>
-                  <div className="flex items-center gap-2">
-                    <span className={sessionInsightToneClass(card.tone)}>
-                      {card.tone === 'blue' ? 'Cross Input' : card.tone === 'amber' ? 'Gap Alert' : 'Clinical Link'}
-                    </span>
+              <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">AI 分析</h2>
+                    <p className="mt-1 text-sm text-slate-500">将多模块结果压缩成短结论卡片，帮助快速判断本次接诊重点。</p>
                   </div>
-                  <div className={cn(titleTextLgClass, 'mt-3')}>{card.title}</div>
-                  <div className={cn(bodyTextClass, 'mt-2 leading-6')}>{card.summary}</div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {card.evidence.map((item) => (
-                      <span key={item} className={evidenceChipClass}>
-                        {item}
-                      </span>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                    <Brain size={18} />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
+                  {(generatedSessionReport?.insights?.length
+                    ? generatedSessionReport.insights.map((insight, index) => ({
+                        id: `insight-${index}`,
+                        title: `AI 分析 ${index + 1}`,
+                        summary: trimText(insight, 140),
+                        evidence: [],
+                        action: '用于生成综合报告结论。',
+                      }))
+                    : insightCards
+                  ).map((card) => (
+                    <div key={card.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-sm font-semibold text-slate-900">{card.title}</div>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">{card.summary}</p>
+                      {'evidence' in card && card.evidence.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {card.evidence.map((evidence) => (
+                            <span key={evidence} className="inline-flex rounded-full bg-white px-2.5 py-1 text-xs text-slate-500">
+                              {evidence}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="mt-3 text-xs text-slate-500">{card.action}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">康复建议</h2>
+                    <p className="mt-1 text-sm text-slate-500">只保留可执行建议，避免长段文字占据页面注意力。</p>
+                  </div>
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white">
+                    <Sparkles size={18} />
+                  </div>
+                </div>
+
+                {recommendationCards.length === 0 ? (
+                  <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    生成综合报告或康复建议后，这里会展示结构化建议卡片。
+                  </div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {recommendationCards.map((recommendation, index) => (
+                      <div key={`${recommendation}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">建议 {index + 1}</div>
+                        <p className="mt-2 text-sm leading-6 text-slate-700">{recommendation}</p>
+                      </div>
                     ))}
                   </div>
-                  <div className={cn(mutedSurfaceCardClass, 'mt-3', bodyTextSoftClass)}>
-                    {card.action}
-                  </div>
-                </article>
-              ))}
+                )}
+              </Card>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-              <article className={elevatedSurfaceCardClass}>
-                <div className="flex items-start justify-between gap-3">
+            <div className="space-y-4">
+              <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className={titleTextClass}>综合治疗计划</div>
-                    <div className={cn(metaTextClass, 'mt-1')}>治疗计划只消费综合 session report，不再直接依赖单次 assessment。</div>
+                    <h2 className="text-lg font-semibold text-slate-900">当前接诊摘要</h2>
+                    <p className="mt-1 text-sm text-slate-500">不展开全文的情况下，快速确认当前患者、接诊与报告状态。</p>
                   </div>
-                  <UnifiedStatusBadge
-                    status={hasVisibleTreatmentPlan ? 'success' : isGeneratingTreatmentPlan ? 'processing' : 'warning'}
-                    text={hasVisibleTreatmentPlan ? '已生成' : isGeneratingTreatmentPlan ? '生成中' : '待生成'}
-                  />
+                  <StatusTag status={generatedSessionReport ? 'completed' : 'pending'} />
                 </div>
 
-                {treatmentPlanError ? (
-                  <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                    {treatmentPlanError}
-                  </div>
-                ) : null}
-
-                <div className={cn(mutedSurfaceCardClass, 'mt-3 min-h-[220px] whitespace-pre-wrap', bodyTextSoftClass)}>
-                  {hasVisibleTreatmentPlan
-                    ? currentTreatmentPlanContent
-                    : generatedSessionReport
-                      ? '已具备综合报告，可从上方生成接诊级治疗计划。'
-                      : '请先在报告中心生成综合报告，再生成治疗计划。'}
+                <div className="mt-4 space-y-3 text-sm text-slate-600">
+                  <div className="flex items-center gap-2"><User size={14} className="text-slate-400" />{activeSessionInput.patientName || activeSessionInput.patientId}</div>
+                  <div className="flex items-center gap-2"><Calendar size={14} className="text-slate-400" />{activeSessionInput.sessionId}</div>
+                  <div className="flex items-center gap-2"><FileText size={14} className="text-slate-400" />{generatedSessionReport ? '综合报告已生成' : '综合报告待生成'}</div>
                 </div>
-              </article>
 
-              <article className={neutralSurfaceCardClass}>
-                <div className={titleTextClass}>综合报告归档</div>
-                <div className={cn(metaTextClass, 'mt-1')}>这里单独归档 session 级综合报告，与下方 assessment 级局部报告列表分开。</div>
+                <div className="mt-4 space-y-2">
+                  <Button variant="secondary" className="w-full justify-center" icon={<ExternalLink size={16} />} onClick={() => setSelectedReportMarkdown(generatedSessionReport?.markdown || draftReport || null)} disabled={!generatedSessionReport && !draftReport}>
+                    查看报告全文
+                  </Button>
+                  <Button variant="secondary" className="w-full justify-center" icon={<FileText size={16} />} onClick={() => generatedSessionReport && exportSessionReportText(generatedSessionReport)} disabled={!generatedSessionReport}>
+                    导出 Markdown
+                  </Button>
+                  <Button variant="secondary" className="w-full justify-center" icon={<FileJson size={16} />} onClick={() => generatedSessionReport && exportSessionReportJson(generatedSessionReport)} disabled={!generatedSessionReport}>
+                    导出 JSON
+                  </Button>
+                </div>
+              </Card>
 
-                <div className="mt-3 space-y-3 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
-                  {sessionScopedReports.length === 0 ? (
-                    <div className={dashedEmptyStateClass}>
+              <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">报告预览</h2>
+                  <p className="mt-1 text-sm text-slate-500">这里只显示摘要，避免长文本挤占阅读焦点。</p>
+                </div>
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+                  {trimText(generatedSessionReport?.markdown || draftReport, 260)}
+                </div>
+              </Card>
+
+              <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">报告归档</h2>
+                  <p className="mt-1 text-sm text-slate-500">保留当前筛选范围内的综合报告，便于复查与导出。</p>
+                </div>
+                <div className="custom-scrollbar mt-4 max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                  {reportArchive.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-500">
                       当前筛选范围内还没有综合报告归档。
                     </div>
                   ) : (
-                    sessionScopedReports.map((report) => (
-                      <div key={report.id} className={whiteSurfaceCardClass}>
+                    reportArchive.map((report) => (
+                      <div key={report.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className={cn(titleTextClass, 'truncate')}>{report.sessionId}</div>
-                            <div className={cn(metaTextClass, 'truncate')}>
-                              {patientMap.get(report.patientId) || report.patientId} · {new Date(report.createdAt).toLocaleString('zh-CN')}
-                            </div>
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{report.sessionId}</div>
+                            <div className="mt-1 text-xs text-slate-500">{patientMap.get(report.patientId) || report.patientId}</div>
                           </div>
-                          <UnifiedStatusBadge status="success" text="综合报告" />
+                          <StatusTag status="completed" />
                         </div>
-
-                        <div className={cn('mt-2 line-clamp-3 whitespace-pre-wrap', bodyTextClass)}>
-                          {report.markdown}
-                        </div>
-
+                        <p className="mt-3 text-sm leading-6 text-slate-600">{trimText(report.markdown, 120)}</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button type="button" className="btn-secondary h-8 px-3" onClick={() => setSelectedReportMarkdown(report.markdown)}>
-                            <ExternalLink size={12} />
-                            查看
+                            <ExternalLink size={12} />查看
                           </button>
                           <button type="button" className="btn-secondary h-8 px-3" onClick={() => exportSessionReportText(report)}>
-                            <FileText size={12} />
-                            文本
+                            <FileText size={12} />文本
                           </button>
                           <button type="button" className="btn-secondary h-8 px-3" onClick={() => exportSessionReportJson(report)}>
-                            <FileJson size={12} />
-                            JSON
+                            <FileJson size={12} />JSON
                           </button>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
-              </article>
+              </Card>
             </div>
           </section>
-        ) : null}
-
-        <section className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4">
-          <aside className="bento-card p-4">
-            <div className={cn(titleTextClass, 'mb-3')}>筛选条件</div>
-
-            <label className="relative block mb-3">
-              <Search size={15} className={cn('absolute left-3 top-1/2 -translate-y-1/2', COLORS.neutral.light.textLight)} />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索患者或记录"
-                className={searchInputClass}
-              />
-            </label>
-
-            <div className="space-y-2 mb-3">
-              <div className={metaTextClass}>记录状态</div>
-              <div className="grid grid-cols-2 gap-2">
-                {([
-                  { id: 'all', label: '全部' },
-                  { id: 'completed', label: '已完成' },
-                  { id: 'reviewed', label: '已复核' },
-                  { id: 'pending', label: '待处理' },
-                ] as Array<{ id: StatusFilter; label: string }>).map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setStatusFilter(item.id)}
-                    className={filterToggleClass(statusFilter === item.id)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <div className={cn(metaTextClass, 'mb-1')}>记录类型</div>
-              <select
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
-                className={selectInputClass}
-              >
-                <option value="all">全部类型</option>
-                <option value="posture">体态评估</option>
-                <option value="rom">关节活动度</option>
-                <option value="medvoice">语音接诊</option>
-                <option value="combined">综合评估</option>
-              </select>
-            </div>
-
-            {mode === 'reports' ? (
-              <div className="mb-3">
-                <div className={cn(metaTextClass, 'mb-1')}>接诊筛选</div>
-                <select
-                  value={selectedSessionId ?? 'all'}
-                  onChange={(e) => setSelectedSessionId(e.target.value === 'all' ? null : e.target.value)}
-                  className={selectInputClass}
-                >
-                  <option value="all">全部接诊</option>
-                  {sessionInputs.map((sessionInput) => (
-                    <option key={sessionInput.sessionId} value={sessionInput.sessionId}>
-                      {`${sessionInput.patientName || sessionInput.patientId} · ${sessionInput.sessionId}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
-
-            <div className="space-y-2 max-h-[380px] overflow-y-auto custom-scrollbar pr-1">
-              <button
-                onClick={() => setSelectedPatientId(null)}
-                className={patientFilterButtonClass(!selectedPatientId)}
-              >
-                全部患者
-              </button>
-
-              {filteredPatients.map((patient) => (
-                <button
-                  key={patient.id}
-                  onClick={() => setSelectedPatientId(patient.id)}
-                  className={patientFilterButtonClass(selectedPatientId === patient.id)}
-                >
-                  <div className="font-medium truncate">{patient.name || `患者 ${patient.id}`}</div>
-                  <div className={cn(metaTextClass, 'truncate')}>{patient.id}</div>
-                </button>
-              ))}
-            </div>
-          </aside>
-
-          <div className="bento-card p-0 overflow-hidden">
-            {mode === 'reports' ? (
-              <>
-                <div className={cn(reportListHeaderClass, 'grid grid-cols-[1.6fr_1fr_0.9fr_1fr_auto] gap-3')}>
-                  <span>报告主信息</span>
-                  <span>生成时间</span>
-                  <span>报告状态</span>
-                  <span>导出方式</span>
-                  <span>查看</span>
-                </div>
-
-                {filteredAssessments.length === 0 ? (
-                  <div className="p-5">
-                    <StatePanel
-                      title="暂无报告记录"
-                      description="完成评估并生成报告后会显示在这里。"
-                    />
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-200">
-                    {filteredAssessments.map((assessment) => {
-                      const reportStatus = getReportStatus(assessment);
-                      const reportText = getAssessmentPreview(assessment);
-
-                      return (
-                        <div key={assessment.id} className={cn(reportListRowClass, 'grid grid-cols-[1.6fr_1fr_0.9fr_1fr_auto] gap-3')}>
-                          <div className="min-w-0">
-                            <div className={cn(titleTextClass, 'truncate')}>{typeLabelMap[assessment.type]}</div>
-                            <div className={cn(metaTextClass, 'truncate')}>{patientMap.get(assessment.patientId) || assessment.patientId}</div>
-                            <div className={cn(subtleTextClass, 'truncate mt-1')}>{assessment.sessionId}</div>
-                          </div>
-
-                          <div className={bodyTextClass}>
-                            {new Date(assessment.createdAt).toLocaleString('zh-CN', {
-                              month: '2-digit',
-                              day: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </div>
-
-                          <UnifiedStatusBadge status={reportStatus.tone} text={reportStatus.text} />
-                          <span className={metaTextClass}>{getReportExportLabel(assessment)}</span>
-
-                          <div className="flex items-center gap-1 justify-end">
-                            <button
-                              onClick={() => exportToJson(assessment)}
-                              className="btn-icon"
-                              title="导出 JSON"
-                            >
-                              <FileJson size={14} />
-                            </button>
-                            <button
-                              onClick={() => exportToCsv(assessment)}
-                              className="btn-icon"
-                              title="导出 CSV"
-                            >
-                              <FileSpreadsheet size={14} />
-                            </button>
-                            <button
-                              onClick={() => exportReportText(assessment)}
-                              className={cn('btn-icon', !reportText && 'opacity-50 cursor-not-allowed')}
-                              disabled={!reportText}
-                              title="导出文本"
-                            >
-                              <FileText size={14} />
-                            </button>
-                            <button
-                              onClick={() => reportText ? openReportText(assessment) : setSelectedAssessment(assessment)}
-                              className="btn-secondary h-9 px-3"
-                            >
-                              查看
-                              <ExternalLink size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className={cn(reportListHeaderClass, 'grid grid-cols-[1.8fr_1fr_1fr_1fr_auto] gap-3')}>
-                  <span>主信息</span>
-                  <span>患者</span>
-                  <span>时间</span>
-                  <span>状态</span>
-                  <span>操作</span>
-                </div>
-
-                {filteredAssessments.length === 0 ? (
-                  <div className="p-5">
-                    <StatePanel
-                      title="暂无评估记录"
-                      description="请先完成评估流程。"
-                    />
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-200">
-                    {filteredAssessments.map((assessment) => (
-                      <div key={assessment.id} className={cn(reportListRowClass, 'grid grid-cols-[1.8fr_1fr_1fr_1fr_auto] gap-3')}>
-                        <div className="min-w-0">
-                          <div className={cn(titleTextClass, 'truncate')}>{typeLabelMap[assessment.type]}</div>
-                          <div className={cn(metaTextClass, 'truncate')}>{assessment.id}</div>
-                        </div>
-
-                        <div className={cn(bodyTextSoftClass, 'truncate')}>{patientMap.get(assessment.patientId) || assessment.patientId}</div>
-                        <div className={bodyTextClass}>
-                          {new Date(assessment.createdAt).toLocaleString('zh-CN', {
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <UnifiedStatusBadge status={statusToneMap[assessment.status]} text={statusTextMap[assessment.status]} />
-                          <span className={metaTextClass}>{modeLabelMap[assessment.mode]}</span>
-                        </div>
-
-                        <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => exportToJson(assessment)} className="btn-icon" title="导出 JSON"><FileJson size={14} /></button>
-                          <button onClick={() => exportToCsv(assessment)} className="btn-icon" title="导出 CSV"><FileSpreadsheet size={14} /></button>
-                          <button onClick={() => deleteAssessment(assessment.id)} className="btn-icon" title="删除"><Trash2 size={14} /></button>
-                          <button onClick={() => setSelectedAssessment(assessment)} className="btn-secondary h-9 px-3">详情<ExternalLink size={12} /></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </section>
+        )}
       </div>
 
       {selectedAssessment ? (
-        <div className={cn(modalOverlayClass, 'z-[90] bg-slate-900/45')}>
-          <div className={cn(modalDialogClass, 'max-w-4xl')}>
-            <div className={modalHeaderClass}>
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-900/45 p-4 md:p-8">
+          <div className="dialog-shell max-h-[85vh] w-full max-w-4xl">
+            <div className="dialog-header">
               <div>
-                <div className={titleTextLgClass}>{typeLabelMap[selectedAssessment.type]} 详情</div>
-                <div className={cn(metaTextClass, 'mt-1 inline-flex items-center gap-3')}>
+                <div className="text-base font-semibold text-slate-900">评估详情</div>
+                <div className="mt-1 inline-flex items-center gap-3 text-xs text-slate-500">
                   <span className="inline-flex items-center gap-1"><Calendar size={12} />{new Date(selectedAssessment.createdAt).toLocaleString('zh-CN')}</span>
                   <span className="inline-flex items-center gap-1"><User size={12} />{patientMap.get(selectedAssessment.patientId) || selectedAssessment.patientId}</span>
                 </div>
@@ -1000,46 +564,16 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
               <button className="btn-icon" onClick={() => setSelectedAssessment(null)}><X size={14} /></button>
             </div>
 
-            <div className="p-5 overflow-y-auto custom-scrollbar max-h-[calc(85vh-146px)] space-y-4">
-              {selectedAssessment.data.posture ? (
-                <section className="bento-card p-4">
-                  <div className={cn(titleTextClass, 'mb-2')}>体态评估数据</div>
-                  {selectedAssessment.data.posture.issues?.length ? (
-                    <div className={bodyTextClass}>检出问题 {selectedAssessment.data.posture.issues.length} 项</div>
-                  ) : (
-                    <div className={bodyTextClass}>暂无问题列表</div>
-                  )}
-
-                  {(selectedAssessment.data.posture.markdownReport || selectedAssessment.data.posture.auxiliaryDiagnosis) ? (
-                    <button
-                      className="btn-primary mt-3"
-                      onClick={() => setSelectedReportMarkdown(selectedAssessment.data.posture?.markdownReport || selectedAssessment.data.posture?.auxiliaryDiagnosis || null)}
-                    >
-                      <FileText size={14} />
-                      查看报告内容
-                    </button>
-                  ) : null}
-                </section>
-              ) : null}
-
-              {selectedAssessment.data.rom ? (
-                <section className="bento-card p-4">
-                  <div className={cn(titleTextClass, 'mb-2')}>关节活动度数据</div>
-                  <div className={bodyTextClass}>记录项：{selectedAssessment.data.rom.items.length}</div>
-                  {selectedAssessment.data.rom.summary ? <div className={cn(bodyTextClass, 'mt-2')}>{selectedAssessment.data.rom.summary}</div> : null}
-                </section>
-              ) : null}
-
-              {selectedAssessment.data.medvoice ? (
-                <section className="bento-card p-4">
-                  <div className={cn(titleTextClass, 'mb-2')}>语音接诊数据</div>
-                  <div className={bodyTextClass}>模式：{selectedAssessment.data.medvoice.viewMode}</div>
-                  <div className={cn(bodyTextClass, 'mt-2 line-clamp-4')}>{selectedAssessment.data.medvoice.transcript || '暂无转写文本'}</div>
-                </section>
-              ) : null}
+            <div className="custom-scrollbar max-h-[calc(85vh-146px)] space-y-4 overflow-y-auto p-5">
+              <Card variant="default" padding="md">
+                <div className="text-sm font-semibold text-slate-900">结构化摘要</div>
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                  {getAssessmentPreview(selectedAssessment) || '当前记录暂无可读摘要，可使用导出功能查看原始数据。'}
+                </div>
+              </Card>
             </div>
 
-            <div className={modalFooterClass}>
+            <div className="dialog-footer">
               <button className="btn-secondary" onClick={() => exportToJson(selectedAssessment)}><FileJson size={14} /> JSON</button>
               <button className="btn-secondary" onClick={() => exportToCsv(selectedAssessment)}><FileSpreadsheet size={14} /> CSV</button>
               <button className="btn-primary" onClick={() => setSelectedAssessment(null)}>关闭</button>
@@ -1049,13 +583,15 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ mode = 'da
       ) : null}
 
       {selectedReportMarkdown ? (
-        <div className={cn(modalOverlayClass, 'z-[95] bg-slate-900/55')}>
-          <div className={cn(modalDialogClass, 'max-w-4xl')}>
-            <div className={modalHeaderClass}>
-              <div className={titleTextLgClass}>报告内容</div>
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-900/55 p-4 md:p-8">
+          <div className="dialog-shell max-h-[85vh] w-full max-w-4xl">
+            <div className="dialog-header">
+              <div className="text-base font-semibold text-slate-900">报告全文</div>
               <button className="btn-icon" onClick={() => setSelectedReportMarkdown(null)}><X size={14} /></button>
             </div>
-            <pre className={cn('max-h-[calc(85vh-76px)] overflow-auto whitespace-pre-wrap p-5 text-sm custom-scrollbar', bodyTextSoftClass)}>{selectedReportMarkdown}</pre>
+            <pre className={cn('custom-scrollbar max-h-[calc(85vh-76px)] overflow-auto whitespace-pre-wrap p-5 text-sm text-slate-700')}>
+              {selectedReportMarkdown}
+            </pre>
           </div>
         </div>
       ) : null}

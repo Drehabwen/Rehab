@@ -21,13 +21,13 @@ except ImportError:
 
 # 瀵煎叆鏍稿績妯″潡
 try:
-    from core.voice import VoiceRecorder, VoiceRecognizer
+    from core.voice import VoiceRecorder, VoiceRecognizer, HAS_PYAUDIO
     from core.nlp_processor import NLPProcessor
     from core.case_structurer import CaseStructurer
     from core.document_generator import DocumentGenerator
     from core.case_manager import CaseManager
 except ImportError:
-    from voice import VoiceRecorder, VoiceRecognizer
+    from voice import VoiceRecorder, VoiceRecognizer, HAS_PYAUDIO
     from nlp_processor import NLPProcessor
     from case_structurer import CaseStructurer
     from document_generator import DocumentGenerator
@@ -188,7 +188,16 @@ class SaveRequest(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "services": {
+            "asr_configured": bool(
+                config.get("asr_appid") and config.get("asr_api_key") and config.get("asr_api_secret")
+            ),
+            "local_recording_supported": bool(HAS_PYAUDIO),
+        },
+    }
 
 # --- 鏈湴褰曢煶鎺ュ彛 ---
 

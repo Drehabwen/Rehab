@@ -42,15 +42,18 @@ describe('Vision3EntryHub - Assessment Mode Selection', () => {
 
       expect(screen.getByRole('heading', { name: '快速评估' })).toBeInTheDocument();
       expect(screen.getByText('单视角快速筛查')).toBeInTheDocument();
-      expect(screen.getByText('选择一个视角直接开始。')).toBeInTheDocument();
+      expect(screen.getByText('选择一个视角并立即开始评估。')).toBeInTheDocument();
     });
 
-    it('should display view selector buttons', () => {
+    it('should display clear quick-start buttons', () => {
       render(<Vision3EntryHub onSelectMode={mockOnSelectMode} />);
 
       expect(screen.getByRole('button', { name: '快速评估：正面' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '快速评估：侧面' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '快速评估：背面' })).toBeInTheDocument();
+      expect(screen.getByText('正面开始')).toBeInTheDocument();
+      expect(screen.getByText('侧面开始')).toBeInTheDocument();
+      expect(screen.getByText('背面开始')).toBeInTheDocument();
     });
 
     it('should call onSelectMode with quick mode and front view when front is clicked', () => {

@@ -1,131 +1,138 @@
 ﻿import React from 'react';
-import { ArrowRight, Calendar, Clock, FileText } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Activity, ArrowLeft, BarChart3, FileText, Layers, Mic } from 'lucide-react';
+import { AssessmentCard, PageHeader, ProgressBar, StatusTag } from '@/components/workflow';
+import { Button, Card } from '@/components/ui';
 import type { Patient } from '@/types/patient';
-import { useAssessmentStore } from '@/store/useAssessmentStore';
-import { tools } from './patient-tools';
+import type { VisitTaskSummary, WorkflowToolId } from '../workflow';
 import {
-  getPatientDisplayName,
   getPatientAvatar,
   getPatientColor,
+  getPatientDisplayName,
 } from '@/lib/patient-utils';
-import { PageTitleSection, UnifiedStatusBadge } from '@/components/layout';
+import { formatDate } from '@/lib/session-utils';
+import { cn } from '@/lib/utils';
 
 interface PatientToolboxProps {
   patient: Patient;
-  onSelectTool: (toolId: string) => void;
+  visitTask: VisitTaskSummary | null;
+  onSelectTool: (toolId: WorkflowToolId) => void;
+  onOpenReports: () => void;
+  onOpenComparison: () => void;
   onBack: () => void;
   sessionCount: number;
 }
 
+const iconMap = {
+  vision3: Activity,
+  rom: Layers,
+  medvoice: Mic,
+} as const;
+
+const accentMap = {
+  vision3: 'bg-blue-600 text-white',
+  rom: 'bg-emerald-600 text-white',
+  medvoice: 'bg-violet-600 text-white',
+} as const;
+
 export const PatientToolbox: React.FC<PatientToolboxProps> = ({
   patient,
+  visitTask,
   onSelectTool,
+  onOpenReports,
+  onOpenComparison,
   onBack,
   sessionCount,
 }) => {
-  const { assessments } = useAssessmentStore();
+  const comparisonEnabled = sessionCount > 1;
 
-  const patientAssessments = assessments.filter((a) => a.patientId === patient.id);
-
-  const assessmentCounts = {
-    posture: patientAssessments.filter((a) => a.type === 'posture').length,
-    rom: patientAssessments.filter((a) => a.type === 'rom').length,
-    voice: patientAssessments.filter((a) => a.type === 'medvoice').length,
-    comparison: patientAssessments.length > 1 ? 1 : 0,
-  };
-
-  const getToolCount = (toolId: string): number => {
-    switch (toolId) {
-      case 'vision3':
-        return assessmentCounts.posture;
-      case 'medvoice':
-        return assessmentCounts.voice;
-      case 'rom':
-        return assessmentCounts.rom;
-      case 'comparison':
-        return assessmentCounts.comparison;
-      default:
-        return 0;
-    }
-  };
+  if (!visitTask) {
+    return (
+      <div className="rehab-page custom-scrollbar">
+        <div className="rehab-page-inner">
+          <Card variant="default" padding="lg">
+            <div className="text-sm text-slate-500">未能加载当前接诊信息，请返回接诊中心后重试。</div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rehab-page custom-scrollbar">
-      <div className="rehab-page-inner">
-        <PageTitleSection
-          title="患者工作台"
-          description="选择功能后进入评估流程。"
-          right={
-            <button onClick={onBack} className="btn-secondary">
-              返回患者管理
-            </button>
+      <div className="rehab-page-inner space-y-5">
+        <PageHeader
+          eyebrow="接诊 -> 评估 -> 报告"
+          title="评估中心"
+          description="本页只用于完成本次接诊评估，完成后再进入报告中心，避免接诊、评估、报告任务混在同一页面。"
+          summary={
+            <>
+              <StatusTag status={visitTask.status} />
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                接诊 ID {visitTask.visitId}
+              </span>
+            </>
+          }
+          actions={
+            <>
+              <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>返回接诊中心</Button>
+              <Button variant="secondary" icon={<BarChart3 size={16} />} onClick={onOpenComparison} disabled={!comparisonEnabled}>进度对比</Button>
+              <Button variant="primary" icon={<FileText size={16} />} onClick={onOpenReports}>进入报告中心</Button>
+            </>
           }
         />
 
-        <section className="bento-card p-5">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center text-white text-base font-semibold', getPatientColor(patient))}>
+        <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
+          <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="flex min-w-0 items-start gap-4">
+              <div className={cn('flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-semibold text-white shadow-sm', getPatientColor(patient))}>
                 {getPatientAvatar(patient)}
               </div>
-              <div className="min-w-0">
-                <div className="text-base font-semibold text-slate-900 truncate">{getPatientDisplayName(patient)}</div>
-                <div className="text-sm text-slate-500 truncate">ID: {patient.id}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl font-semibold text-slate-900">{getPatientDisplayName(patient)}</h2>
+                  <span className="text-sm text-slate-400">ID {patient.id}</span>
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  当前围绕本次接诊完成体态评估、ROM 评估和语音问诊。页面只保留必要任务信息，让下一步操作一眼可见。
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                  <span>接诊编号 {visitTask.visitId}</span>
+                  <span>接诊次数 {Math.max(sessionCount, 1)}</span>
+                  <span>最近更新 {formatDate(visitTask.updatedAt)}</span>
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-sm font-medium">体态 {assessmentCounts.posture}</div>
-              <div className="px-3 py-2 rounded-xl bg-violet-50 text-violet-700 text-sm font-medium">语音 {assessmentCounts.voice}</div>
-              <div className="px-3 py-2 rounded-xl bg-green-50 text-green-700 text-sm font-medium">ROM {assessmentCounts.rom}</div>
-              <div className="px-3 py-2 rounded-xl bg-cyan-50 text-cyan-700 text-sm font-medium">对比 {assessmentCounts.comparison}</div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">本次接诊进度</div>
+              <p className="mt-1 text-sm leading-6 text-slate-500">{visitTask.nextStep}</p>
+              <ProgressBar value={visitTask.completedModules} total={visitTask.totalModules} className="mt-4" />
             </div>
           </div>
+        </Card>
 
-          <div className="mt-4 pt-4 border-t border-slate-200 flex flex-wrap items-center gap-4 text-sm text-slate-500">
-            <span className="inline-flex items-center gap-1"><Calendar size={14} /> 建档 {new Date(patient.createdAt).toLocaleDateString('zh-CN')}</span>
-            <span className="inline-flex items-center gap-1"><Clock size={14} /> 第 {sessionCount + 1} 次接诊</span>
-            {patient.notes ? <span className="inline-flex items-center gap-1"><FileText size={14} /> {patient.notes}</span> : null}
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          {tools.map((tool) => {
-            const count = getToolCount(tool.id);
-            const disabled = !tool.available;
-
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          {visitTask.modules.map((module) => {
+            const Icon = iconMap[module.toolId];
             return (
-              <button
-                key={tool.id}
-                onClick={() => tool.available && onSelectTool(tool.id)}
-                disabled={disabled}
-                className={cn(
-                  'bento-card p-4 text-left transition-colors min-h-[148px] flex flex-col',
-                  disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-slate-50'
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className={cn('w-10 h-10 rounded-xl bg-gradient-to-br text-white flex items-center justify-center', tool.color)}>
-                    <tool.icon size={18} />
+              <AssessmentCard
+                key={module.toolId}
+                icon={Icon}
+                title={module.title}
+                description={module.description}
+                status={module.status}
+                summary={module.latestAssessment ? '当前患者已存在该模块最新记录，可直接查看结果，也可以继续补录。' : '当前患者尚未完成该模块，建议按流程顺序尽快补齐。'}
+                meta={module.latestCreatedAt ? `最近记录 ${formatDate(module.latestCreatedAt)}` : '暂无记录'}
+                actionLabel={module.actionLabel}
+                onAction={() => onSelectTool(module.toolId)}
+                accentClassName={accentMap[module.toolId]}
+                footer={
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span>记录数 {module.assessmentCount}</span>
+                    <span>{module.status === 'completed' ? '已可进入报告中心' : '完成后将进入报告中心'}</span>
                   </div>
-                  {disabled ? (
-                    <UnifiedStatusBadge status="disabled" text="即将上线" />
-                  ) : count > 0 ? (
-                    <UnifiedStatusBadge status="success" text={`已记录 ${count}`} />
-                  ) : (
-                    <UnifiedStatusBadge status="processing" text="可开始" />
-                  )}
-                </div>
-
-                <h3 className="mt-4 text-base font-semibold text-slate-900">{tool.name}</h3>
-                <p className="mt-2 text-sm text-slate-500 leading-6 line-clamp-2">{tool.description}</p>
-
-                <div className="mt-auto pt-4 flex items-center text-sm text-antey-primary font-medium">
-                  进入功能
-                  <ArrowRight size={14} className="ml-1" />
-                </div>
-              </button>
+                }
+              />
             );
           })}
         </section>

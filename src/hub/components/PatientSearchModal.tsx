@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, Clock, Search, Stethoscope, User, X } from 'lucide-react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, Clock, Search, Stethoscope, X } from 'lucide-react';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { getRelativeTime } from '@/lib/session-utils';
@@ -60,15 +60,15 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="dialog-backdrop" onClick={onClose} />
 
-      <div className="dialog-shell max-w-3xl max-h-[86vh] flex flex-col">
+      <div className="dialog-shell flex max-h-[86vh] max-w-3xl flex-col">
         <div className="dialog-header">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-antey-primary/10 text-antey-primary flex items-center justify-center">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-antey-primary/10 text-antey-primary">
               <Search size={18} />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-900">查找患者</h2>
-              <p className="text-xs text-slate-500 mt-1">按姓名或编号搜索，并快速开启接诊</p>
+              <p className="mt-1 text-xs text-slate-500">按姓名或编号搜索，并快速开启接诊。</p>
             </div>
           </div>
 
@@ -77,7 +77,7 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
           </button>
         </div>
 
-        <div className="p-4 border-b border-slate-200">
+        <div className="border-b border-slate-200 p-4">
           <label className="relative block">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -85,34 +85,34 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="输入患者姓名或编号"
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-300 bg-white text-sm"
+              className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm"
               autoFocus
             />
           </label>
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4">
+        <div className="custom-scrollbar flex-1 min-h-0 overflow-y-auto p-4">
           {!selectedPatient ? (
             <div className="space-y-2">
               {filteredPatients.length === 0 ? (
                 <div className="state-panel">
                   <h3 className="text-lg">未找到匹配患者</h3>
-                  <p>请检查输入内容，或先新建患者。</p>
+                  <p>请检查搜索内容，或先新建患者。</p>
                 </div>
               ) : (
                 filteredPatients.map((patient) => (
                   <button
                     key={patient.id}
                     onClick={() => setSelectedPatient(patient)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-between gap-3 text-left"
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3 text-left hover:bg-slate-50"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={cn('w-10 h-10 rounded-xl text-white flex items-center justify-center text-sm font-semibold', getPatientColor(patient))}>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl text-sm font-semibold text-white', getPatientColor(patient))}>
                         {getPatientAvatar(patient)}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-900 truncate">{getPatientDisplayName(patient)}</div>
-                        <div className="text-xs text-slate-500 truncate">{patient.id}</div>
+                        <div className="truncate text-sm font-semibold text-slate-900">{getPatientDisplayName(patient)}</div>
+                        <div className="truncate text-xs text-slate-500">{patient.id}</div>
                       </div>
                     </div>
                     <span className="text-xs text-slate-400">{getRelativeTime(patient.createdAt)}</span>
@@ -129,7 +129,7 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
 
               <section className="bento-card p-4">
                 <div className="flex items-center gap-3">
-                  <div className={cn('w-11 h-11 rounded-xl text-white flex items-center justify-center font-semibold', getPatientColor(selectedPatient))}>
+                  <div className={cn('flex h-11 w-11 items-center justify-center rounded-xl font-semibold text-white', getPatientColor(selectedPatient))}>
                     {getPatientAvatar(selectedPatient)}
                   </div>
                   <div>
@@ -140,16 +140,16 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
               </section>
 
               <section className="bento-card p-4">
-                <div className="text-sm font-semibold text-slate-900 mb-2">历史接诊</div>
+                <div className="mb-2 text-sm font-semibold text-slate-900">历史接诊</div>
                 {selectedSessions.length === 0 ? (
                   <p className="text-sm text-slate-500">暂无历史接诊记录。</p>
                 ) : (
                   <div className="space-y-2">
                     {selectedSessions.slice(0, 6).map((session) => (
-                      <div key={session.id} className="px-3 py-2 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+                      <div key={session.id} className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2">
                         <div className="min-w-0">
-                          <div className="text-sm text-slate-900 font-medium truncate">{session.id}</div>
-                          <div className="text-xs text-slate-500 inline-flex items-center gap-1">
+                          <div className="truncate text-sm font-medium text-slate-900">{session.id}</div>
+                          <div className="inline-flex items-center gap-1 text-xs text-slate-500">
                             <Clock size={12} />
                             第 {session.sequence} 次接诊 · {getRelativeTime(session.createdAt)}
                           </div>
@@ -175,7 +175,7 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
         {selectedPatient ? (
           <div className="dialog-footer">
             <button onClick={onClose} className="btn-secondary">取消</button>
-            <button onClick={handleContinueSession} disabled={isCreatingSession} className={cn('btn-primary', isCreatingSession && 'opacity-50 cursor-not-allowed')}>
+            <button onClick={handleContinueSession} disabled={isCreatingSession} className={cn('btn-primary', isCreatingSession && 'cursor-not-allowed opacity-50')}>
               <Stethoscope size={14} />
               {isCreatingSession ? '创建中...' : '新增接诊记录'}
             </button>

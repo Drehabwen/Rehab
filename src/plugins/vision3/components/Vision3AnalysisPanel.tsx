@@ -1,6 +1,5 @@
 import React, { useEffect, useRef } from 'react';
 import {
-  Activity,
   FileText,
   Layers,
   Sparkles,
@@ -14,7 +13,7 @@ import { PostureIssue, PostureMetrics } from '@/hooks/usePostureWS';
 import { COLORS } from '@/constants/uiStyles';
 import { AssessmentType } from '../store/usePostureAssessmentStore';
 import { ASSESSMENT_TEXTS, PANEL_TEXTS } from '../constants/uiText';
-import { buildImmediateBasicReport, buildReportInsightCards } from '../report-insights';
+import { buildImmediateBasicReport } from '../report-insights';
 
 type WorkspaceFocusTarget =
   | 'workspace-summary'
@@ -88,19 +87,6 @@ const sectionShellClass = cn('rounded-[28px] border p-4 shadow-sm', COLORS.neutr
 const titleClass = cn('mt-1 text-xl font-semibold', COLORS.neutral.light.text);
 const subtitleClass = cn('mt-1 text-sm', COLORS.neutral.slate500);
 const eyebrowClass = cn('text-[11px] font-semibold uppercase tracking-[0.22em]', COLORS.neutral.light.textLight);
-const insightEyebrowClass = cn(
-  'inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ring-1',
-  COLORS.neutral.light.bg,
-  COLORS.neutral.light.textMuted,
-  COLORS.neutral.light.ring,
-);
-const insightCardClass = cn('rounded-[22px] border p-4 shadow-sm', COLORS.neutral.whiteBg92);
-const evidenceChipClass = cn(
-  'inline-flex rounded-full px-2.5 py-1 text-xs ring-1',
-  COLORS.neutral.light.bg,
-  COLORS.neutral.light.textMuted,
-  COLORS.neutral.light.ring,
-);
 const markdownSurfaceClass = cn('min-h-[300px] sm:min-h-[340px]', COLORS.neutral.whiteBg90);
 const emptyStateIconClass = cn('h-10 w-10', COLORS.neutral.light.textLight);
 const reportSyncBadgeClass = (tone: 'cyan' | 'violet') =>
@@ -161,18 +147,12 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
     : null;
   const basicReportContent = auxiliaryDiagnosis || immediateBasicReport || null;
   const hasBasicReportContent = Boolean(basicReportContent);
-  const insightCards = buildReportInsightCards({
-    metrics: result?.metrics,
-    issues: result?.issues,
-    auxiliaryDiagnosis,
-    markdownReport: deepReportContent || markdownReport,
-  });
   const reportIntro = hasDeepReport
-    ? '\u8fd9\u91cc\u627f\u63a5\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u7684\u62a5\u544a\u9605\u8bfb\u4e0e\u7ed3\u8bba\u68b3\u7406\uff0c\u5bf9\u5e94\u6570\u636e\u8bc1\u636e\u8bf7\u8f6c\u5165\u6570\u636e\u4e2d\u5fc3\u67e5\u770b\u3002'
+    ? '\u62a5\u544a\u4e2d\u5fc3\u53ea\u7528\u4e8e\u9605\u8bfb\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u7684\u57fa\u7840\u7ed3\u8bba\u548c\u6269\u5c55\u62a5\u544a\uff0c\u6570\u636e\u8bc1\u636e\u8bf7\u5355\u72ec\u5230\u6570\u636e\u4e2d\u5fc3\u67e5\u770b\u3002'
     : hasAuxiliaryReport
-      ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u53ef\u5148\u9605\u8bfb\u672c\u6b21\u4f53\u6001\u7ed3\u8bba\uff1b\u7efc\u5408 LLM \u62a5\u544a\u5c06\u5728\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210\u3002'
+      ? '\u57fa\u7840\u62a5\u544a\u5df2\u5230\u4f4d\uff0c\u8fd9\u91cc\u53ea\u4fdd\u7559\u62a5\u544a\u9605\u8bfb\uff0c\u4e0d\u518d\u6df7\u5165\u6570\u636e\u4e2d\u5fc3\u7684\u8bc1\u636e\u5757\u3002'
       : immediateBasicReport
-        ? '\u540e\u7aef\u57fa\u7840\u62a5\u544a\u6b63\u5728\u843d\u4f4d\uff0c\u76ee\u524d\u5148\u6839\u636e\u5df2\u56de\u4f20\u6307\u6807\u4e0e\u95ee\u9898\u751f\u6210\u4e00\u4efd\u5373\u65f6\u7ed3\u8bba\uff0c\u4fdd\u8bc1\u5b8c\u6210\u540e\u5c31\u80fd\u8bfb\u3002'
+        ? '\u5f53\u524d\u5148\u5c55\u793a\u5373\u65f6\u57fa\u7840\u7ed3\u8bba\uff0c\u540e\u7eed\u5982\u6709\u62a5\u544a\u6269\u5c55\u4e5f\u53ea\u5728\u672c\u533a\u9605\u8bfb\u3002'
         : '\u5b8c\u6210\u62cd\u6444\u540e\uff0c\u8fd9\u91cc\u4f1a\u7acb\u5373\u627f\u63a5\u672c\u6b21\u4f53\u6001\u57fa\u7840\u62a5\u544a\u4e0e\u672c\u5730\u7ed3\u8bba\u3002';
   const dataIntro = result
     ? '\u6570\u636e\u4e2d\u5fc3\u7528\u4e8e\u67e5\u770b\u6307\u6807\u3001\u5f02\u5e38\u8bc1\u636e\u3001\u5934\u90e8\u4f4d\u59ff\u548c\u98ce\u9669\u6765\u6e90\uff0c\u652f\u6491\u62a5\u544a\u7ed3\u8bba\u3002'
@@ -219,24 +199,11 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
 
       {activePanel === 'report' ? (
         <section className={cn(sectionShellClass, 'bg-[linear-gradient(135deg,rgba(250,250,255,0.98),rgba(255,255,255,1))]')}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
             <div>
               <p className={eyebrowClass}>Assessment Report</p>
-              <h3 className={titleClass}>{'\u7ed3\u8bba\u4e0e\u52a8\u4f5c'}</h3>
+              <h3 className={titleClass}>{'\u62a5\u544a\u9605\u8bfb\u4e2d\u5fc3'}</h3>
               <p className={subtitleClass}>{reportIntro}</p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {result ? (
-                <button
-                  type="button"
-                  className="btn-secondary h-9 px-3"
-                  onClick={() => onNavigate?.('dashboard', 'data-metrics')}
-                >
-                  <Activity size={14} />
-                  {'\u67e5\u770b\u6570\u636e\u8bc1\u636e'}
-                </button>
-              ) : null}
             </div>
           </div>
 
@@ -248,9 +215,6 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
             <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium', centerChipClass(hasDeepReport ? 'violet' : 'slate'))}>
               {'\u62a5\u544a\u6269\u5c55'}
               {hasDeepReport ? '\u00b7\u5df2\u540c\u6b65' : '\u00b7\u7531\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7edf\u4e00\u751f\u6210'}
-            </span>
-            <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium', centerChipClass(issueCount > 0 ? 'amber' : 'blue'))}>
-              {`\u98ce\u9669\u89e3\u8bfb\u00b7${issueCount}`}
             </span>
             {hasBasicReportContent ? (
               <button
@@ -344,65 +308,6 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
         <div className={cn('h-full overflow-y-auto custom-scrollbar space-y-4 pr-1', activePanel !== 'report' && 'hidden')}>
             {hasAnyReport ? (
               <div className="space-y-4">
-                {insightCards.length > 0 ? (
-                  <section className={cn('rounded-[26px] p-4 shadow-sm', COLORS.neutral.light.border, 'border', 'bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(255,255,255,1))]')}>
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <div className={insightEyebrowClass}>
-                          <Sparkles size={12} />
-                          {'\u6d1e\u5bdf\u5efa\u8bae\u5361'}
-                        </div>
-                        <h3 className={cn('mt-3 text-lg font-semibold', COLORS.neutral.light.text)}>{'\u57fa\u4e8e\u5df2\u63a5\u6536\u62a5\u544a\u4fe1\u606f\u7684\u53ef\u89c6\u5efa\u8bae'}</h3>
-                        <p className={cn('mt-1 text-sm', COLORS.neutral.slate500)}>{'\u8fd9\u91cc\u7684\u5efa\u8bae\u57fa\u4e8e\u672c\u6b21\u4f53\u6001\u8bc4\u4f30\u5df2\u63a5\u6536\u7684\u62a5\u544a\u3001\u95ee\u9898\u5217\u8868\u548c\u91cf\u5316\u6307\u6807\u63d0\u70bc\u800c\u6210\uff0c\u4e0d\u7b49\u540c\u4e8e\u5168\u5c40\u62a5\u544a\u4e2d\u5fc3\u7684\u7efc\u5408 LLM \u62a5\u544a\u3002'}</p>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn-secondary h-9 px-3"
-                        onClick={() => onNavigate?.('dashboard', issueCount > 0 ? 'data-issues' : 'data-metrics')}
-                      >
-                        <Activity size={14} />
-                        {'\u5bf9\u7167\u6570\u636e\u8bc1\u636e'}
-                      </button>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 xl:grid-cols-3">
-                      {insightCards.map((card) => (
-                        <article
-                          key={card.id}
-                          className={cn(
-                            insightCardClass,
-                            card.tone === 'violet' && 'border-violet-100',
-                            card.tone === 'amber' && 'border-amber-100',
-                            card.tone === 'blue' && 'border-blue-100',
-                          )}
-                        >
-                          <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]', centerChipClass(card.tone))}>
-                            {card.eyebrow}
-                          </span>
-                          <h4 className={cn('mt-3 text-base font-semibold', COLORS.neutral.light.text)}>{card.title}</h4>
-                          <p className={cn('mt-2 text-sm leading-6', COLORS.neutral.light.textMuted)}>{card.summary}</p>
-
-                          <div className={cn('mt-4 rounded-2xl p-3', COLORS.neutral.light.bgSoft)}>
-                            <p className={cn('text-[11px] font-semibold uppercase tracking-[0.14em]', COLORS.neutral.light.textLight)}>{'\u6839\u636e'}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {card.evidence.map((item) => (
-                                <span key={item} className={evidenceChipClass}>
-                                  {item}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className={cn('mt-4 rounded-2xl border p-3', COLORS.neutral.light.border, COLORS.neutral.light.bg)}>
-                            <p className={cn('text-[11px] font-semibold uppercase tracking-[0.14em]', COLORS.neutral.light.textLight)}>{'\u5efa\u8bae\u52a8\u4f5c'}</p>
-                            <p className={cn('mt-2 text-sm leading-6', COLORS.neutral.light.textSoft)}>{card.action}</p>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
                 <div className={cn('grid gap-4', hasBasicReportContent && hasDeepReport ? 'xl:grid-cols-[1fr_1fr]' : 'grid-cols-1')}>
                   {hasBasicReportContent ? (
                   <section ref={basicReportRef} className="rounded-[26px] border border-cyan-100 bg-gradient-to-b from-cyan-50/70 to-white p-4 shadow-sm">
@@ -419,15 +324,6 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                             : '\u8fd9\u662f\u5b8c\u6210\u8bc4\u4f30\u540e\u7acb\u5373\u751f\u6210\u7684\u672c\u5730\u7ed3\u8bba\uff0c\u7528\u6765\u907f\u514d\u62a5\u544a\u672a\u843d\u4f4d\u65f6\u53f3\u4fa7\u51fa\u73b0\u7a7a\u767d\u3002'}
                         </p>
                       </div>
-
-                      <button
-                        type="button"
-                        className="btn-secondary h-8 px-3"
-                        onClick={() => onNavigate?.('dashboard', 'data-metrics')}
-                      >
-                        <Activity size={14} />
-                        {'\u8bc1\u636e'}
-                      </button>
                     </div>
 
                     <div className="mt-4">
@@ -457,19 +353,9 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                         </p>
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className={cn('status-badge h-7 px-3', hasDeepReport ? 'status-success' : 'status-processing')}>
-                          {hasDeepReport ? '\u5df2\u540c\u6b65' : '\u5f85\u62a5\u544a\u4e2d\u5fc3'}
-                        </span>
-                        <button
-                          type="button"
-                          className="btn-secondary h-8 px-3"
-                          onClick={() => onNavigate?.('dashboard', issueCount > 0 ? 'data-issues' : 'data-metrics')}
-                        >
-                          <TriangleAlert size={14} />
-                          {'\u67e5\u770b\u8bc1\u636e'}
-                        </button>
-                      </div>
+                      <span className={cn('status-badge h-7 px-3', hasDeepReport ? 'status-success' : 'status-processing')}>
+                        {hasDeepReport ? '\u5df2\u540c\u6b65' : '\u5f85\u62a5\u544a\u4e2d\u5fc3'}
+                      </span>
                     </div>
 
                     <div className="mt-4">

@@ -1,167 +1,153 @@
 ﻿import React, { useMemo, useState } from 'react';
-import { Plus, Users, ClipboardList, Clock, Search, Calendar, ArrowRight } from 'lucide-react';
-import { StatsCard } from '../components/StatsCard';
+import { ClipboardList, FileText, Plus, Search, Stethoscope, Users } from 'lucide-react';
 import type { Patient } from '@/types/patient';
-import type { PatientStatus } from '../types';
-import {
-  getPatientDisplayName,
-  getPatientAvatar,
-  getPatientColor,
-  getPatientSubtitle,
-} from '@/lib/patient-utils';
-import { PageTitleSection, StatePanel, UnifiedStatusBadge } from '@/components/layout';
+import type { VisitTaskSummary } from '../workflow';
+import { PageHeader, VisitCard } from '@/components/workflow';
+import { Button, Card } from '@/components/ui';
+import { StatePanel } from '@/components/layout';
 
 interface DashboardStats {
+  totalPatients: number;
   pending: number;
-  assessing: number;
-  report: number;
-  completed: number;
-}
-
-interface PatientWithStatus extends Patient {
-  status: PatientStatus;
+  inProgress: number;
+  readyForReport: number;
 }
 
 interface DashboardViewProps {
   patients: Patient[];
-  patientsWithStatus: PatientWithStatus[];
+  visitTasks: VisitTaskSummary[];
   stats: DashboardStats;
   onSelectPatient: (patient: Patient) => void;
   onNewPatient: () => void;
   onSearchPatient: () => void;
-  getPatientLabel: (patient: PatientWithStatus) => string;
-  getPatientSessions: (patientId: string) => unknown[];
 }
 
-const statusMap: Record<PatientStatus, { text: string; tone: 'success' | 'processing' | 'warning' }> = {
-  pending: { text: '待接诊', tone: 'warning' },
-  assessing: { text: '评估中', tone: 'processing' },
-  report: { text: '待报告', tone: 'processing' },
-  completed: { text: '已完成', tone: 'success' },
-};
+const summaryCards = [
+  {
+    key: 'totalPatients',
+    label: '接诊患者',
+    icon: Users,
+    accent: 'bg-slate-900 text-white',
+  },
+  {
+    key: 'pending',
+    label: '待开始接诊',
+    icon: Stethoscope,
+    accent: 'bg-amber-50 text-amber-700',
+  },
+  {
+    key: 'inProgress',
+    label: '评估进行中',
+    icon: ClipboardList,
+    accent: 'bg-blue-50 text-blue-700',
+  },
+  {
+    key: 'readyForReport',
+    label: '可进入报告',
+    icon: FileText,
+    accent: 'bg-emerald-50 text-emerald-700',
+  },
+] as const;
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   patients,
-  patientsWithStatus,
+  visitTasks,
   stats,
   onSelectPatient,
   onNewPatient,
   onSearchPatient,
-  getPatientSessions,
 }) => {
   const [keyword, setKeyword] = useState('');
 
-  const filteredPatients = useMemo(() => {
+  const filteredTasks = useMemo(() => {
     const q = keyword.trim().toLowerCase();
-    if (!q) return patientsWithStatus;
-    return patientsWithStatus.filter((patient) => {
-      const name = (patient.name || '').toLowerCase();
-      return patient.id.toLowerCase().includes(q) || name.includes(q);
+    if (!q) return visitTasks;
+
+    return visitTasks.filter((task) => {
+      return task.patient.id.toLowerCase().includes(q) || task.patientName.toLowerCase().includes(q) || task.visitId.toLowerCase().includes(q);
     });
-  }, [keyword, patientsWithStatus]);
+  }, [keyword, visitTasks]);
 
   return (
     <div className="rehab-page custom-scrollbar">
-      <div className="rehab-page-inner">
-        <PageTitleSection
-          title="患者管理"
-          description={`今日 ${new Date().toLocaleDateString('zh-CN')} · 共 ${patients.length} 位患者记录`}
-          right={<span className="status-badge status-disabled">门诊工作台</span>}
+      <div className="rehab-page-inner space-y-5">
+        <PageHeader
+          eyebrow="患者 -> 接诊 -> 评估 -> 报告"
+          title="接诊中心"
+          description="围绕当前接诊任务组织患者列表。每张卡片只回答三个问题：现在处理谁、当前进度到哪、下一步该做什么。"
+          summary={
+            <>
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                今日 {new Date().toLocaleDateString('zh-CN')}
+              </span>
+              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                共 {patients.length} 位患者
+              </span>
+            </>
+          }
+          actions={
+            <>
+              <Button variant="secondary" icon={<Users size={16} />} onClick={onSearchPatient}>搜索患者</Button>
+              <Button variant="primary" icon={<Plus size={16} />} onClick={onNewPatient}>新建患者</Button>
+            </>
+          }
         />
 
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <StatsCard count={stats.pending} label="待接诊" icon={Plus} variant="primary" onClick={onNewPatient} />
-          <StatsCard count={stats.assessing} label="评估中" icon={ClipboardList} variant="blue" />
-          <StatsCard count={stats.report} label="待报告" icon={Clock} variant="amber" />
-          <StatsCard count={stats.completed} label="已完成" icon={Users} variant="emerald" />
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {summaryCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <Card key={card.key} variant="default" padding="md" className="border-slate-200 bg-white/95 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[30px] font-semibold leading-none text-slate-900 tabular-nums">{stats[card.key]}</div>
+                    <div className="mt-2 text-sm text-slate-500">{card.label}</div>
+                  </div>
+                  <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${card.accent}`}>
+                    <Icon size={18} />
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
         </section>
 
-        <section className="bento-card p-4 flex flex-col lg:flex-row lg:items-center gap-3 lg:justify-between">
-          <label className="relative w-full lg:w-[420px]">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="按姓名或 ID 快速筛选"
-              className="w-full h-10 pl-9 pr-3 rounded-xl border border-slate-300 bg-white text-sm text-slate-700 outline-none focus:border-antey-primary"
-            />
-          </label>
-
-          <div className="flex items-center gap-2">
-            <button onClick={onSearchPatient} className="btn-secondary">
-              <Users size={16} />
-              高级查找
-            </button>
-            <button onClick={onNewPatient} className="btn-primary">
-              <Plus size={16} />
-              新建患者
-            </button>
-          </div>
-        </section>
-
-        <section className="bento-card p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 text-xs text-slate-500 grid grid-cols-[1.8fr_1fr_0.8fr_0.9fr_auto] gap-3">
-            <span>患者信息</span>
-            <span>最近更新</span>
-            <span>接诊次数</span>
-            <span>状态</span>
-            <span>操作</span>
-          </div>
-
-          {filteredPatients.length === 0 ? (
-            <div className="p-6">
-              <StatePanel
-                title="暂无可显示的患者"
-                description="可先新建患者，或调整搜索条件。"
-                actions={
-                  <>
-                    <button onClick={onNewPatient} className="btn-primary">新建患者</button>
-                    <button onClick={() => setKeyword('')} className="btn-secondary">清空筛选</button>
-                  </>
-                }
+        <Card variant="default" padding="md" className="border-slate-200 bg-white/90 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <label className="relative w-full lg:max-w-[460px]">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="搜索患者姓名、患者 ID 或接诊 ID"
+                className="field-input pl-10"
               />
+            </label>
+            <div className="text-sm text-slate-500">
+              当前显示 <span className="font-semibold text-slate-900">{filteredTasks.length}</span> 个接诊任务
             </div>
-          ) : (
-            <div className="divide-y divide-slate-200">
-              {filteredPatients.map((patient) => {
-                const sessionCount = getPatientSessions(patient.id).length;
-                const status = statusMap[patient.status];
-                return (
-                  <button
-                    key={patient.id}
-                    onClick={() => onSelectPatient(patient)}
-                    className="w-full px-4 py-3 hover:bg-slate-50 transition-colors text-left grid grid-cols-[1.8fr_1fr_0.8fr_0.9fr_auto] gap-3 items-center"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-semibold ${getPatientColor(patient)}`}>
-                        {getPatientAvatar(patient)}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-900 truncate">{getPatientDisplayName(patient)}</div>
-                        <div className="text-xs text-slate-500 truncate">{getPatientSubtitle(patient, sessionCount)}</div>
-                      </div>
-                    </div>
+          </div>
+        </Card>
 
-                    <div className="text-xs text-slate-600 inline-flex items-center gap-1">
-                      <Calendar size={12} className="text-slate-400" />
-                      {new Date(patient.updatedAt).toLocaleDateString('zh-CN')}
-                    </div>
-
-                    <div className="text-sm text-slate-700 tabular-nums">{sessionCount}</div>
-
-                    <UnifiedStatusBadge status={status.tone} text={status.text} />
-
-                    <span className="inline-flex items-center justify-end text-xs text-antey-primary font-medium">
-                      进入
-                      <ArrowRight size={12} className="ml-1" />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </section>
+        {filteredTasks.length === 0 ? (
+          <StatePanel
+            title="暂无可显示的接诊任务"
+            description="可以先新建患者，或调整筛选条件后再继续。"
+            actions={
+              <>
+                <button onClick={onNewPatient} className="btn-primary">新建患者</button>
+                <button onClick={() => setKeyword('')} className="btn-secondary">清空筛选</button>
+              </>
+            }
+          />
+        ) : (
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {filteredTasks.map((task) => (
+              <VisitCard key={`${task.patient.id}-${task.visitId}`} task={task} onOpen={() => onSelectPatient(task.patient)} />
+            ))}
+          </section>
+        )}
       </div>
     </div>
   );

@@ -117,6 +117,7 @@ export const Vision3Plugin: React.FC = () => {
     Boolean(report?.markdown || report?.auxiliaryDiagnosis || report?.metrics || (report?.issues?.length ?? 0) > 0)
   ), []);
   const normalizeReportContent = useCallback((value?: string | null) => (value ?? '').trim(), []);
+  const shouldUseCachedReport = step === 'completed' || captureStatus === 'completed';
   const currentViewReport = postureReports.find((report) => report.view === view && hasReportPayload(report));
   const fallbackReport = postureReports.find((report) => hasReportPayload(report)) ?? postureReports[0] ?? null;
   const currentReport = currentViewReport ?? fallbackReport;
@@ -148,7 +149,7 @@ export const Vision3Plugin: React.FC = () => {
     console.log('[Vision3Plugin] current view:', view);
   }, [postureReports, currentReport, reportSource, view]);
 
-  const displayResult = wsResult ?? (currentReport?.metrics
+  const displayResult = wsResult ?? (shouldUseCachedReport && currentReport?.metrics
     ? {
         metrics: currentReport.metrics,
         issues: currentReport.issues || [],
@@ -160,18 +161,20 @@ export const Vision3Plugin: React.FC = () => {
   const cachedBasicReport = normalizeReportContent(currentReport?.auxiliaryDiagnosis);
   const liveExpandedReport = normalizeReportContent(markdownReport);
   const cachedExpandedReport = normalizeReportContent(currentReport?.markdown);
+  const hasLiveExpandedReport = Boolean(liveExpandedReport && liveExpandedReport !== liveBasicReport);
+  const hasLiveBasicReport = Boolean(liveBasicReport);
   const displayMarkdownReport = (() => {
-    if (liveExpandedReport && liveExpandedReport !== liveBasicReport) {
+    if (hasLiveExpandedReport) {
       return markdownReport;
     }
 
-    if (cachedExpandedReport && cachedExpandedReport !== cachedBasicReport) {
+    if (shouldUseCachedReport && cachedExpandedReport && cachedExpandedReport !== cachedBasicReport) {
       return currentReport?.markdown || null;
     }
 
     return null;
   })();
-  const displayAuxiliaryDiagnosis = auxiliaryDiagnosis || currentReport?.auxiliaryDiagnosis || null;
+  const displayAuxiliaryDiagnosis = auxiliaryDiagnosis || (shouldUseCachedReport ? currentReport?.auxiliaryDiagnosis || null : null);
   const completedMetricCount = displayResult
     ? Object.values(displayResult.metrics).filter((value) => typeof value === 'number' && Number.isFinite(value)).length
     : 0;
@@ -217,13 +220,13 @@ export const Vision3Plugin: React.FC = () => {
       auxiliaryDiagnosis: displayAuxiliaryDiagnosis ? 'exists' : 'null',
       source: reportSource,
     });
-    if (displayMarkdownReport || displayAuxiliaryDiagnosis) {
+    if (hasLiveExpandedReport || hasLiveBasicReport) {
       console.log('Report received, switching to report panel');
       setActivePanel('report');
-      setFocusTarget(displayMarkdownReport ? 'report-deep' : 'report-basic');
+      setFocusTarget(hasLiveExpandedReport ? 'report-deep' : 'report-basic');
       setCaptureStatus('completed');
     }
-  }, [displayMarkdownReport, displayAuxiliaryDiagnosis, reportSource, setActivePanel, setCaptureStatus]);
+  }, [hasLiveExpandedReport, hasLiveBasicReport, setActivePanel, setCaptureStatus]);
 
   useEffect(() => {
     console.log('[Vision3Plugin] captureStatus changed:', captureStatus);
