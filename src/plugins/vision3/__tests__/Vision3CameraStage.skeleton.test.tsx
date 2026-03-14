@@ -138,6 +138,23 @@ describe('Vision3CameraStage - Skeleton Rendering', () => {
     });
   });
 
+  describe('Completed compact layout', () => {
+    it('hides capture chrome in compact completed mode and keeps the finished summary', async () => {
+      render(
+        <Vision3CameraStage
+          {...defaultProps}
+          compact
+          captureStatus='completed'
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByText('Engine Status')).not.toBeInTheDocument();
+        expect(screen.getByText('拍摄与分析已结束')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Skeleton Mirroring', () => {
     it('should apply mirroring when isMirrored is true', async () => {
       render(

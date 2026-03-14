@@ -7,6 +7,7 @@ import type {
   SessionReportInputType,
 } from '@/types/report-center';
 import { sanitizeReadableText } from '@/components/shared/MarkdownReport';
+import { buildImmediateBasicReport } from '@/plugins/vision3/report-insights';
 
 const structuredCaseToMarkdown = (structuredCase: Record<string, string | undefined> | undefined): string | null => {
   if (!structuredCase) {
@@ -68,6 +69,13 @@ export function getAssessmentPreview(assessment: Assessment): string | null {
 
   if (assessment.data.posture?.auxiliaryDiagnosis) {
     return sanitizePreview(assessment.data.posture.auxiliaryDiagnosis);
+  }
+
+  if (assessment.data.posture?.metrics || (assessment.data.posture?.issues?.length ?? 0) > 0) {
+    return sanitizePreview(buildImmediateBasicReport({
+      metrics: assessment.data.posture.metrics,
+      issues: assessment.data.posture.issues,
+    }));
   }
 
   if (assessment.data.rom?.summary) {

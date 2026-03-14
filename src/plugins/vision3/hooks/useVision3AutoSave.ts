@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { PostureMetrics, PostureIssue } from '@/hooks/usePostureWS';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
@@ -12,12 +12,26 @@ interface UseVision3AutoSaveProps {
   wsResult: { metrics: PostureMetrics; issues: PostureIssue[] } | null;
   assessmentMode: AssessmentMode;
   view: 'front' | 'side' | 'back';
-  /** 深度报告 - LLM解析的报告 */
   markdownReport?: string | null;
-  /** 基础报告 - 根据规则得出的结论 */
   auxiliaryDiagnosis?: string | null;
   timeSeriesData?: TemporalAnalysis['timeSeries'] | null;
+  immediateQuickResult?: { metrics: PostureMetrics; issues: PostureIssue[]; timestamp: number } | null;
+  immediateQuickReport?: string | null;
+  immediateQuickTimeSeries?: TemporalAnalysis['timeSeries'] | null;
 }
+
+interface PersistedPosturePayload {
+  metrics?: PostureMetrics;
+  issues?: PostureIssue[];
+  markdownReport?: string;
+  auxiliaryDiagnosis?: string;
+  timeSeries?: TemporalAnalysis['timeSeries'];
+}
+
+const hasStructuredMetrics = (metrics?: PostureMetrics | null) =>
+  Boolean(
+    metrics && Object.values(metrics).some((value) => typeof value === 'number' && Number.isFinite(value)),
+  );
 
 export const useVision3AutoSave = ({
   step,
@@ -26,17 +40,20 @@ export const useVision3AutoSave = ({
   view,
   markdownReport,
   auxiliaryDiagnosis,
-  timeSeriesData
+  timeSeriesData,
+  immediateQuickResult,
+  immediateQuickReport,
+  immediateQuickTimeSeries,
 }: UseVision3AutoSaveProps) => {
-  const hasSavedAuxiliaryRef = useRef(false);
-  const hasSavedDeepRef = useRef(false);
-  const isSavingAuxiliaryRef = useRef(false);
-  const isSavingDeepRef = useRef(false);
-  const { currentPatient, patients } = usePatientStore();
+  const isCreatingAssessmentRef = useRef(false);
+  const isUpdatingAssessmentRef = useRef(false);
+  const persistedSnapshotRef = useRef<string | null>(null);
+  const currentAssessmentIdRef = useRef<string | null>(null);
+  const { currentPatient } = usePatientStore();
   const { currentSession, sessions, startSession } = useSessionStore();
   const { addAssessment, updateAssessment } = useAssessmentStore();
   const { postureReports } = useMeasurementStore();
-  const currentAssessmentIdRef = useRef<string | null>(null);
+
   const pickLatestReport = () => (
     postureReports.find((report) => report.view === view && (report.markdown || report.auxiliaryDiagnosis || report.metrics || (report.issues?.length ?? 0) > 0))
     ?? postureReports.find((report) => report.markdown || report.auxiliaryDiagnosis || report.metrics || (report.issues?.length ?? 0) > 0)
@@ -44,47 +61,60 @@ export const useVision3AutoSave = ({
   );
 
   useEffect(() => {
-    const saveAssessment = async () => {
-      const hasReport = Boolean(auxiliaryDiagnosis || markdownReport);
-      if (
-        step === 'completed'
-        && hasReport
-        && !hasSavedAuxiliaryRef.current
-        && !isSavingAuxiliaryRef.current
-      ) {
-        try {
-          const patientId = currentPatient?.id;
-          if (!patientId) return;
+    const persistAssessment = async () => {
+      if (step !== 'completed') {
+        return;
+      }
 
-          isSavingAuxiliaryRef.current = true;
-          
+      const patientId = currentPatient?.id;
+      if (!patientId) {
+        return;
+      }
+
+      const latestReport = pickLatestReport();
+      const reportMetrics = wsResult?.metrics || immediateQuickResult?.metrics || latestReport?.metrics;
+      const reportIssues = wsResult?.issues || immediateQuickResult?.issues || latestReport?.issues;
+      const reportMarkdown = markdownReport || latestReport?.markdown || undefined;
+      const reportAuxiliary = auxiliaryDiagnosis || immediateQuickReport || latestReport?.auxiliaryDiagnosis || undefined;
+      const reportTimeSeries = timeSeriesData || immediateQuickTimeSeries || latestReport?.timeSeries || undefined;
+
+      const hasPersistablePayload = Boolean(
+        reportMarkdown
+        || reportAuxiliary
+        || hasStructuredMetrics(reportMetrics)
+        || (reportIssues?.length ?? 0) > 0,
+      );
+
+      if (!hasPersistablePayload) {
+        return;
+      }
+
+      const posturePayload: PersistedPosturePayload = {
+        metrics: reportMetrics,
+        issues: reportIssues,
+        markdownReport: reportMarkdown,
+        auxiliaryDiagnosis: reportAuxiliary,
+        timeSeries: reportTimeSeries,
+      };
+      const snapshot = JSON.stringify(posturePayload);
+
+      if (!currentAssessmentIdRef.current) {
+        if (isCreatingAssessmentRef.current) {
+          return;
+        }
+
+        try {
+          isCreatingAssessmentRef.current = true;
+
           let sessionId =
             (currentSession?.patientId === patientId ? currentSession.id : undefined)
             ?? sessions.find((session) => session.patientId === patientId)?.id;
+
           if (!sessionId) {
             const newSession = await startSession(patientId);
             sessionId = newSession.id;
           }
-          
-          const latestReport = pickLatestReport();
-          
-          // Use data from latestReport if available, otherwise fall back to wsResult
-          const reportMetrics = latestReport?.metrics || wsResult?.metrics;
-          const reportIssues = latestReport?.issues || wsResult?.issues;
-          const reportMarkdown = latestReport?.markdown || markdownReport || undefined;
-          const reportAuxiliary = latestReport?.auxiliaryDiagnosis || auxiliaryDiagnosis || undefined;
-          const reportTimeSeries = latestReport?.timeSeries || timeSeriesData || undefined;
-          
-          console.log('[useVision3AutoSave] Saving assessment with data:', {
-            hasMetrics: !!reportMetrics,
-            hasIssues: reportIssues && reportIssues.length > 0,
-            issuesCount: reportIssues?.length || 0,
-            hasMarkdown: !!reportMarkdown,
-            hasAuxiliary: !!reportAuxiliary,
-            hasTimeSeries: !!reportTimeSeries,
-            source: latestReport ? 'latestReport' : 'wsResult'
-          });
-          
+
           const assessment = await addAssessment({
             sessionId,
             patientId,
@@ -93,79 +123,86 @@ export const useVision3AutoSave = ({
             data: {
               posture: {
                 mode: assessmentMode,
-                view: view,
+                view,
                 metrics: reportMetrics,
                 issues: reportIssues,
                 confidence: 0.85,
                 auxiliaryDiagnosis: reportAuxiliary,
                 markdownReport: reportMarkdown,
-                timeSeries: reportTimeSeries
-              }
-            }
+                timeSeries: reportTimeSeries,
+              },
+            },
           });
-          hasSavedAuxiliaryRef.current = true;
+
           currentAssessmentIdRef.current = assessment.id;
-          if (markdownReport) {
-            hasSavedDeepRef.current = true;
-          }
-          console.log('Auxiliary assessment saved', assessment.id);
+          persistedSnapshotRef.current = snapshot;
+          console.log('[useVision3AutoSave] Saved posture assessment', assessment.id);
         } catch (error) {
-          console.error('Failed to save auxiliary assessment:', error);
+          console.error('Failed to save posture assessment:', error);
         } finally {
-          isSavingAuxiliaryRef.current = false;
+          isCreatingAssessmentRef.current = false;
         }
+
+        return;
       }
 
-      if (
-        markdownReport
-        && !hasSavedDeepRef.current
-        && currentAssessmentIdRef.current
-        && !isSavingDeepRef.current
-      ) {
-        isSavingDeepRef.current = true;
-        try {
-          const latestReport = pickLatestReport();
-          
-          // Use data from latestReport if available, otherwise fall back to props
-          const reportMetrics = latestReport?.metrics || wsResult?.metrics;
-          const reportIssues = latestReport?.issues || wsResult?.issues;
-          const reportMarkdown = latestReport?.markdown || markdownReport;
-          const reportAuxiliary = latestReport?.auxiliaryDiagnosis || auxiliaryDiagnosis || undefined;
-          const reportTimeSeries = latestReport?.timeSeries || timeSeriesData || undefined;
-          
-          await updateAssessment(currentAssessmentIdRef.current, {
-            data: {
-              posture: {
-                mode: assessmentMode,
-                view: view,
-                metrics: reportMetrics,
-                issues: reportIssues,
-                confidence: 0.85,
-                markdownReport: reportMarkdown,
-                auxiliaryDiagnosis: reportAuxiliary,
-                timeSeries: reportTimeSeries
-              }
-            }
-          });
-          hasSavedDeepRef.current = true;
-          console.log('Assessment updated with deep report');
-        } catch (error) {
-          console.error('Failed to update assessment with deep report:', error);
-        } finally {
-          isSavingDeepRef.current = false;
-        }
+      if (snapshot === persistedSnapshotRef.current || isUpdatingAssessmentRef.current) {
+        return;
+      }
+
+      try {
+        isUpdatingAssessmentRef.current = true;
+
+        await updateAssessment(currentAssessmentIdRef.current, {
+          data: {
+            posture: {
+              mode: assessmentMode,
+              view,
+              metrics: reportMetrics,
+              issues: reportIssues,
+              confidence: 0.85,
+              markdownReport: reportMarkdown,
+              auxiliaryDiagnosis: reportAuxiliary,
+              timeSeries: reportTimeSeries,
+            },
+          },
+        });
+
+        persistedSnapshotRef.current = snapshot;
+        console.log('[useVision3AutoSave] Updated posture assessment', currentAssessmentIdRef.current);
+      } catch (error) {
+        console.error('Failed to update posture assessment:', error);
+      } finally {
+        isUpdatingAssessmentRef.current = false;
       }
     };
-    
-    saveAssessment();
-  }, [step, wsResult, markdownReport, auxiliaryDiagnosis, timeSeriesData, currentPatient, patients, currentSession, sessions, startSession, addAssessment, updateAssessment, assessmentMode, view, postureReports]);
+
+    void persistAssessment();
+  }, [
+    step,
+    wsResult,
+    immediateQuickResult,
+    markdownReport,
+    auxiliaryDiagnosis,
+    immediateQuickReport,
+    timeSeriesData,
+    immediateQuickTimeSeries,
+    currentPatient,
+    currentSession,
+    sessions,
+    startSession,
+    addAssessment,
+    updateAssessment,
+    assessmentMode,
+    view,
+    postureReports,
+  ]);
 
   useEffect(() => {
     if (step !== 'completed') {
-      hasSavedAuxiliaryRef.current = false;
-      hasSavedDeepRef.current = false;
-      isSavingAuxiliaryRef.current = false;
-      isSavingDeepRef.current = false;
+      isCreatingAssessmentRef.current = false;
+      isUpdatingAssessmentRef.current = false;
+      persistedSnapshotRef.current = null;
       currentAssessmentIdRef.current = null;
     }
   }, [step]);

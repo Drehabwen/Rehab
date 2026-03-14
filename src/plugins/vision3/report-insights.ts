@@ -104,6 +104,7 @@ const buildMetricSignals = (metrics?: PostureMetrics | null) => {
       return {
         key: definition.key,
         label: definition.label,
+        threshold: definition.threshold,
         evidence: definition.evidence(rawValue),
         action: definition.action,
         magnitude: Math.abs(rawValue),
@@ -116,11 +117,51 @@ const buildMetricSignals = (metrics?: PostureMetrics | null) => {
 const chooseDominantIssue = (issues: PostureIssue[]) =>
   [...issues].sort((a, b) => severityRank[b.severity] - severityRank[a.severity])[0];
 
+const getSignalSeverity = (magnitude: number, threshold: number): PostureIssue['severity'] => {
+  if (magnitude >= threshold * 2.2) {
+    return 'severe';
+  }
+
+  if (magnitude >= threshold * 1.45) {
+    return 'moderate';
+  }
+
+  return 'mild';
+};
+
+const buildImmediateIssueTitle = (label: string, severity: PostureIssue['severity']) => {
+  if (severity === 'severe') {
+    return `${label}偏移明显`;
+  }
+
+  if (severity === 'moderate') {
+    return `${label}需要优先关注`;
+  }
+
+  return `${label}存在轻度偏移`;
+};
+
+export const inferImmediateIssues = (metrics?: PostureMetrics | null): PostureIssue[] => {
+  return buildMetricSignals(metrics)
+    .slice(0, 3)
+    .map((signal) => {
+      const severity = getSignalSeverity(signal.magnitude, signal.threshold);
+      return {
+        id: `immediate-${signal.key}`,
+        type: signal.key,
+        severity,
+        title: buildImmediateIssueTitle(signal.label, severity),
+        description: `当前量化结果提示 ${signal.evidence}，可作为本次快评的优先关注点。`,
+        recommendation: signal.action,
+      };
+    });
+};
+
 export const buildImmediateBasicReport = ({
   metrics,
   issues,
 }: BuildImmediateBasicReportOptions): string | null => {
-  const safeIssues = issues || [];
+  const safeIssues = issues && issues.length > 0 ? issues : inferImmediateIssues(metrics);
   const metricSignals = buildMetricSignals(metrics);
   const dominantIssue = safeIssues.length > 0 ? chooseDominantIssue(safeIssues) : null;
   const hasMetricPayload = Boolean(

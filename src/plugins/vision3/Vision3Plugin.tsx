@@ -71,6 +71,9 @@ export const Vision3Plugin: React.FC = () => {
     markdownReport,
     auxiliaryDiagnosis,
     timeSeriesData,
+    immediateQuickResult,
+    immediateQuickReport,
+    immediateQuickTimeSeries,
     streamingReport,
     isStreamingReport,
     simulateMockCapture,
@@ -149,7 +152,17 @@ export const Vision3Plugin: React.FC = () => {
     console.log('[Vision3Plugin] current view:', view);
   }, [postureReports, currentReport, reportSource, view]);
 
-  const cachedDisplayResult = shouldUseCachedReport && currentReport?.metrics
+  const hasLiveSessionPayload = Boolean(
+    wsResult
+    || markdownReport
+    || auxiliaryDiagnosis
+    || immediateQuickResult
+    || immediateQuickReport
+    || streamingReport,
+  );
+  const canUseCachedReport = shouldUseCachedReport && !hasLiveSessionPayload;
+
+  const cachedDisplayResult = canUseCachedReport && currentReport?.metrics
     ? {
         metrics: currentReport.metrics,
         issues: currentReport.issues || [],
@@ -159,9 +172,9 @@ export const Vision3Plugin: React.FC = () => {
 
   // Once an assessment is completed, prefer the persisted snapshot so the data panel
   // no longer flickers with any residual live websocket updates.
-  const displayResult = cachedDisplayResult ?? wsResult;
+  const displayResult = cachedDisplayResult ?? wsResult ?? immediateQuickResult;
 
-  const liveBasicReport = normalizeReportContent(auxiliaryDiagnosis);
+  const liveBasicReport = normalizeReportContent(auxiliaryDiagnosis || immediateQuickReport);
   const cachedBasicReport = normalizeReportContent(currentReport?.auxiliaryDiagnosis);
   const liveExpandedReport = normalizeReportContent(markdownReport);
   const cachedExpandedReport = normalizeReportContent(currentReport?.markdown);
@@ -172,15 +185,15 @@ export const Vision3Plugin: React.FC = () => {
       return markdownReport;
     }
 
-    if (shouldUseCachedReport && cachedExpandedReport && cachedExpandedReport !== cachedBasicReport) {
+    if (canUseCachedReport && cachedExpandedReport && cachedExpandedReport !== cachedBasicReport) {
       return currentReport?.markdown || null;
     }
 
     return null;
   })();
-  const displayAuxiliaryDiagnosis = shouldUseCachedReport
-    ? currentReport?.auxiliaryDiagnosis || auxiliaryDiagnosis || null
-    : auxiliaryDiagnosis || null;
+  const displayAuxiliaryDiagnosis = canUseCachedReport
+    ? currentReport?.auxiliaryDiagnosis || auxiliaryDiagnosis || immediateQuickReport || null
+    : auxiliaryDiagnosis || immediateQuickReport || null;
   const completedMetricCount = displayResult
     ? Object.values(displayResult.metrics).filter((value) => typeof value === 'number' && Number.isFinite(value)).length
     : 0;
@@ -206,6 +219,9 @@ export const Vision3Plugin: React.FC = () => {
     markdownReport,
     auxiliaryDiagnosis,
     timeSeriesData,
+    immediateQuickResult,
+    immediateQuickReport,
+    immediateQuickTimeSeries,
   });
 
   useEffect(() => {

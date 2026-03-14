@@ -221,16 +221,26 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
               : isDeepReport
                 ? auxiliaryDiagnosisRef.current
                 : null;
+            const fallbackAuxiliaryDiagnosis = !effectiveAuxiliaryDiagnosis && (effectiveMetrics || effectiveIssues.length > 0)
+              ? generateAuxiliaryReport({
+                  metrics: effectiveMetrics || {},
+                  issues: effectiveIssues,
+                  annotations: data.annotations || resultRef.current?.annotations,
+                  stability: data.stability || resultRef.current?.stability,
+                  timestamp: data.timestamp || Date.now(),
+                })
+              : null;
+            const finalAuxiliaryDiagnosis = effectiveAuxiliaryDiagnosis || fallbackAuxiliaryDiagnosis;
 
-            if (effectiveMetrics) {
+            if (effectiveMetrics || effectiveIssues.length > 0) {
               console.log('[usePostureWS] Applying posture metrics:', {
                 incomingMetricCount: hasMetrics ? Object.keys(data.metrics).length : 0,
-                effectiveMetricCount: Object.keys(effectiveMetrics).length,
+                effectiveMetricCount: Object.keys(effectiveMetrics || {}).length,
                 effectiveIssueCount: effectiveIssues.length,
                 isDeepReport
               });
               const nextResult = {
-                metrics: effectiveMetrics,
+                metrics: effectiveMetrics || {},
                 issues: effectiveIssues,
                 timestamp: data.timestamp || Date.now()
               };
@@ -238,9 +248,9 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             }
             
             // Set auxiliary diagnosis from backend (基础报告)
-            if (effectiveAuxiliaryDiagnosis !== null) {
-              console.log('[usePostureWS] Applying auxiliaryDiagnosis, length:', effectiveAuxiliaryDiagnosis.length);
-              applyAuxiliaryDiagnosisState(effectiveAuxiliaryDiagnosis);
+            if (finalAuxiliaryDiagnosis !== null) {
+              console.log('[usePostureWS] Applying auxiliaryDiagnosis, length:', finalAuxiliaryDiagnosis.length, 'fallback:', !effectiveAuxiliaryDiagnosis);
+              applyAuxiliaryDiagnosisState(finalAuxiliaryDiagnosis);
             }
             
             console.log('[usePostureWS] Saving posture report:', {
@@ -248,18 +258,18 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
               hasMarkdown: !!normalized,
               hasTimeSeries: timeSeries && timeSeries.length > 0,
               timeSeriesLength: timeSeries ? timeSeries.length : 0,
-              hasAuxiliaryDiagnosis: !!effectiveAuxiliaryDiagnosis,
+              hasAuxiliaryDiagnosis: !!finalAuxiliaryDiagnosis,
               isDeepReport
             });
             
             savePostureReportRef.current(
               currentViewRef.current, 
-              effectiveAuxiliaryDiagnosis || normalized, 
+              finalAuxiliaryDiagnosis || normalized, 
               hasStandaloneExpandedReport ? normalized : null,
               timeSeries,
               effectiveMetrics,
               effectiveIssues,
-              effectiveAuxiliaryDiagnosis || undefined
+              finalAuxiliaryDiagnosis || undefined
             );
             console.log('[usePostureWS] Posture report saved successfully');
           } else if (data.type === 'DEEP_REPORT_STREAM') {

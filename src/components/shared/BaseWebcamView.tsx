@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Results } from '@/lib/mediapipe-utils';
 import { Video, VideoOff, Loader2 } from 'lucide-react';
 import { useCameraStream } from '@/hooks/useCameraStream';
 import { useMediaPipe } from '@/hooks/useMediaPipe';
 import { useSkeletonRenderer } from '@/hooks/useSkeletonRenderer';
 import { cn } from '@/lib/utils';
+import {
+  getContainedMediaRect,
+  getSourceSizeForAspectRatio,
+  WebcamAspectRatio
+} from './webcamLayout';
 import { 
   VisualAnnotation, 
   HeadAxes
@@ -18,7 +23,7 @@ interface BaseWebcamViewProps {
   className?: string;
   children?: React.ReactNode;
   showSkeleton?: boolean;
-  aspectRatio?: '4/3' | '16/9' | 'square';
+  aspectRatio?: WebcamAspectRatio;
   annotations?: VisualAnnotation[];
   headAxes?: HeadAxes | null;
 }
@@ -40,6 +45,14 @@ export default function BaseWebcamView({
   headAxes = null
 }: BaseWebcamViewProps) {
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const [mediaRect, setMediaRect] = useState(() => {
+    const fallbackSize = getSourceSizeForAspectRatio(aspectRatio);
+    return {
+      width: fallbackSize.width,
+      height: fallbackSize.height
+    };
+  });
+  const mediaViewportRef = useRef<HTMLDivElement | null>(null);
 
   const { stream, error: cameraError, isLoading: isCameraLoading } = useCameraStream(isCameraOn);
 
@@ -50,6 +63,28 @@ export default function BaseWebcamView({
     headAxes,
     onResults
   });
+
+  const syncMediaRect = useCallback(() => {
+    const viewport = mediaViewportRef.current;
+    if (!viewport) return;
+
+    const fallbackSize = getSourceSizeForAspectRatio(aspectRatio);
+    const sourceWidth = videoRef.current?.videoWidth || fallbackSize.width;
+    const sourceHeight = videoRef.current?.videoHeight || fallbackSize.height;
+
+    const nextRect = getContainedMediaRect({
+      containerWidth: viewport.clientWidth,
+      containerHeight: viewport.clientHeight,
+      sourceWidth,
+      sourceHeight
+    });
+
+    if (!nextRect.width || !nextRect.height) return;
+
+    setMediaRect(prev =>
+      prev.width === nextRect.width && prev.height === nextRect.height ? prev : nextRect
+    );
+  }, [aspectRatio, videoRef]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -66,6 +101,27 @@ export default function BaseWebcamView({
       setIsVideoReady(false);
     }
   }, [stream, isCameraOn, videoRef]);
+
+  useEffect(() => {
+    syncMediaRect();
+  }, [syncMediaRect, isVideoReady, isCameraOn]);
+
+  useEffect(() => {
+    const viewport = mediaViewportRef.current;
+    if (!viewport) return;
+
+    syncMediaRect();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', syncMediaRect);
+      return () => window.removeEventListener('resize', syncMediaRect);
+    }
+
+    const observer = new ResizeObserver(() => syncMediaRect());
+    observer.observe(viewport);
+
+    return () => observer.disconnect();
+  }, [syncMediaRect]);
 
   const { isLoading: isModelLoading, error: modelError } = useMediaPipe(
     videoRef.current,
@@ -120,30 +176,47 @@ export default function BaseWebcamView({
             </div>
           )}
 
-          {/* Video Layer */}
-          <video
-            ref={videoRef}
-            data-testid="webcam-video"
-            aria-label="Camera preview"
-            className={cn(
-              "absolute inset-0 w-full h-full object-contain bg-gray-950 transition-opacity duration-500",
-              isVideoReady ? "opacity-100" : "opacity-0",
-              isMirrored && "scale-x-[-1]"
-            )}
-            autoPlay
-            playsInline
-            muted
-            onLoadedMetadata={() => setIsVideoReady(true)}
-          />
+          <div
+            ref={mediaViewportRef}
+            className="absolute inset-0 flex items-center justify-center"
+          >
+            <div
+              data-testid="webcam-media-frame"
+              className="relative"
+              style={{
+                width: `${mediaRect.width}px`,
+                height: `${mediaRect.height}px`
+              }}
+            >
+              {/* Video Layer */}
+              <video
+                ref={videoRef}
+                data-testid="webcam-video"
+                aria-label="Camera preview"
+                className={cn(
+                  "absolute inset-0 w-full h-full bg-gray-950 transition-opacity duration-500",
+                  isVideoReady ? "opacity-100" : "opacity-0",
+                  isMirrored && "scale-x-[-1]"
+                )}
+                autoPlay
+                playsInline
+                muted
+                onLoadedMetadata={() => {
+                  setIsVideoReady(true);
+                  syncMediaRect();
+                }}
+              />
 
-          {/* AI/Skeleton Layer */}
-          <canvas
-            ref={canvasRef}
-            data-testid="skeleton-overlay"
-            role="img"
-            aria-label="Pose skeleton overlay"
-            className="absolute inset-0 w-full h-full pointer-events-none z-20"
-          />
+              {/* AI/Skeleton Layer */}
+              <canvas
+                ref={canvasRef}
+                data-testid="skeleton-overlay"
+                role="img"
+                aria-label="Pose skeleton overlay"
+                className="absolute inset-0 w-full h-full pointer-events-none z-20"
+              />
+            </div>
+          </div>
 
           {/* Overlay Content (passed from parent) */}
           <div className="absolute inset-0 z-30 pointer-events-none">

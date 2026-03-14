@@ -1,28 +1,33 @@
 # Task Plan
 
 ## Objective
-- Rebuild the frontend workspace into a clear five-center medical AI architecture with a persistent sidebar: 接诊中心、评估中心、报告中心、数据中心、系统设置。
+- Make quick-assessment results surface immediately after capture and simplify the completed-state workspace/report UI in V3.1.
 
 ## Constraints
-- Keep existing business logic, assessment flows, store contracts, and API calls intact.
-- Prefer incremental refactors on top of the current hub structure instead of a full rewrite.
-- Preserve the core workflow: 患者 -> 接诊 -> 评估 -> 报告.
+- Keep the existing WebSocket protocol and report-generation flow intact.
+- Avoid broad report-center rewrites; focus on the slow-return path, persistence handoff, and completed-state clutter.
+- Preserve the skeleton overlay fix and the current report-center cleanup already in this worktree.
 
 ## Steps
-- [completed] Inspect the current hub shell, sidebar, and center views to map old view state onto the new product architecture.
-- [completed] Update the shared plan and navigation shell so the sidebar becomes the primary workspace entry.
-- [completed] Implement an explicit 评估中心 landing experience and route patient-specific assessment work under it.
-- [completed] Implement a dedicated 数据中心 view for history / statistics instead of reusing report center scaffolding.
-- [completed] Tighten page ownership and toolbars so 接诊、评估、报告、数据各自只承担单一目标.
-- [completed] Run frontend verification and record outcomes, follow-up risks, and structure notes.
+- [completed] Inspect the current quick-assessment/report handoff and confirm why the completed workspace can still show an empty report state.
+- [completed] Patch the quick-assessment pipeline so local structured results can generate, persist, and display an immediate basic report before backend text returns.
+- [completed] Simplify the compact completed-state camera workspace so it stops stacking capture overlays over the finished preview.
+- [completed] Update report-center/report preview helpers to reuse the immediate posture summary path where needed.
+- [completed] Add focused regression coverage and run targeted verification.
 
 ## Verification
+- `npm run test -- src/plugins/vision3/__tests__/usePostureAnalysis.test.ts src/hooks/__tests__/usePostureWS.test.ts src/hub/__tests__/report-center-insights.test.ts`
 - `npm run check`
-- Manual review of sidebar navigation and each center entry on the running frontend
+- Manual browser check of quick assessment completion, immediate basic report display, and cleaned completed-state layout
 
 ## Outcome
-- Implemented a persistent sidebar with `接诊中心 / 评估中心 / 报告中心 / 数据中心 / 系统设置` as the primary workspace navigation.
-- Reworked the hub shell so sidebar centers own the page flow; the bottom toolbar now only belongs to in-progress assessment workspaces.
-- Added an explicit assessment landing view and a separate data center view instead of overloading the report center.
-- Verification completed: `npm run check` passed.
-- Remaining follow-up: visually review the new assessment/data center layouts in the browser and continue styling polish if needed.
+- Quick stepped assessments now build a local fallback result immediately from captured landmarks, generate an instant basic report, and expose it before websocket text arrives.
+- Auto-save now persists posture assessments as soon as a structured quick result exists, then updates the same record when backend auxiliary or markdown reports arrive.
+- Report-center assessment previews now fall back to the same immediate posture summary path when only metrics/issues are available.
+- The compact completed camera card now suppresses the stepped capture overlay and engine chrome, leaving only the finished preview and a small summary.
+- Verification completed:
+  - `npm run check`
+  - `npm run test -- src/plugins/vision3/__tests__/usePostureAnalysis.test.ts src/plugins/vision3/__tests__/Vision3CameraStage.skeleton.test.tsx src/plugins/vision3/__tests__/Vision3Plugin.quick-session.test.tsx src/hub/__tests__/report-center-utils.test.ts src/hooks/__tests__/usePostureWS.test.ts`
+- Remaining risk:
+  - `Vision3CameraStage` tests still log expected `getUserMedia` warnings from the shared camera hook in JSDOM, although the targeted suite passes.
+  - A manual browser pass is still recommended to tune spacing and typography in the completed report workspace on real capture data.

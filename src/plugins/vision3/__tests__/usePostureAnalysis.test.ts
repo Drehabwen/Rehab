@@ -213,6 +213,51 @@ describe('usePostureAnalysis', () => {
     });
   });
 
+  it('completes quick analysis as soon as structured posture results arrive', async () => {
+    mockUseCaptureStateMachine.mockImplementation(() => ({
+      status: 'analyzing',
+      dispatch: mockDispatch,
+      countdown: 5,
+      recordingProgress: 0,
+      isInPosition: false,
+      error: null,
+      processLandmarks: mockProcessLandmarks,
+    }));
+
+    const { rerender } = renderHook(() => usePostureAnalysis({
+      axesScale: 1,
+      view: 'front',
+      assessmentMode: 'stepped',
+      assessmentType: 'quick',
+    }));
+
+    mockUsePostureWS.mockReturnValue({
+      ...defaultWsValue,
+      result: {
+        metrics: {
+          headForward: 4.2,
+          shoulderAngle: 1.5,
+          hipAngle: 0,
+          headDeviation: 0,
+          shoulderRounded: 0,
+          headPitch: 0,
+          headYaw: 0,
+          headRoll: 0,
+          head_axes: [],
+        },
+        issues: [],
+        annotations: [],
+        timestamp: Date.now(),
+      },
+    });
+
+    rerender();
+
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalledWith({ type: 'ANALYSIS_COMPLETE' });
+    });
+  });
+
   it('forwards pose results to the capture state machine and monitor', () => {
     const { result } = renderHook(() => usePostureAnalysis({
       axesScale: 1,
@@ -283,5 +328,25 @@ describe('usePostureAnalysis', () => {
       ]),
       'quick',
     );
+  });
+
+  it('builds an immediate local basic report for quick stepped capture before websocket text arrives', () => {
+    vi.useFakeTimers();
+
+    const { result } = renderHook(() => usePostureAnalysis({
+      axesScale: 1,
+      view: 'side',
+      assessmentMode: 'stepped',
+      assessmentType: 'quick',
+    }));
+
+    act(() => {
+      result.current.simulateMockCapture();
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(result.current.immediateQuickResult).not.toBeNull();
+    expect(result.current.immediateQuickReport).toContain('即时基础结论');
+    expect(result.current.immediateQuickTimeSeries?.length).toBeGreaterThan(0);
   });
 });

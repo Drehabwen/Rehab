@@ -70,6 +70,21 @@ const trimText = (value: string | null | undefined, maxLength = 120) => {
   return `${compact.slice(0, maxLength)}...`;
 };
 
+const buildReportPreviewMarkdown = (value: string | null | undefined, maxLines = 10) => {
+  const sanitized = sanitizeReadableText(value);
+  if (!sanitized) {
+    return null;
+  }
+
+  const lines = sanitized
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .slice(0, maxLines);
+
+  return lines.join('\n\n');
+};
+
 const extractRecommendationCards = (content: string | null | undefined): string[] => {
   if (!content) return [];
   return sanitizeReadableText(content)
@@ -208,6 +223,10 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     }
     return [];
   }, [generatedSessionReport, hasVisibleTreatmentPlan, currentTreatmentPlanContent]);
+  const reportPreviewMarkdown = useMemo(
+    () => buildReportPreviewMarkdown(generatedSessionReport?.markdown || draftReport),
+    [draftReport, generatedSessionReport?.markdown],
+  );
 
   const reportArchive = useMemo(() => {
     return sessionReports.filter((report) => {
@@ -640,8 +659,27 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
                     {isExportingPdf ? '导出中...' : '导出 PDF'}
                   </Button>
                 </div>
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">
-                  {trimText(generatedSessionReport?.markdown || draftReport, 260)}
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <MarkdownReport
+                    content={reportPreviewMarkdown}
+                    loading={false}
+                    animate={false}
+                    showChrome={false}
+                    tone="violet"
+                    className="min-h-[260px] border-0 bg-transparent shadow-none"
+                    emptyTitle="暂无预览内容"
+                    emptyDescription="生成综合报告后，这里会优先展示结构化预览。"
+                  />
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      variant="secondary"
+                      icon={<ExternalLink size={16} />}
+                      onClick={() => setSelectedReportMarkdown(generatedSessionReport?.markdown || draftReport || null)}
+                      disabled={!generatedSessionReport && !draftReport}
+                    >
+                      查看报告全文
+                    </Button>
+                  </div>
                 </div>
               </Card>
 
@@ -755,6 +793,9 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
                 loading={false}
                 animate={false}
                 tone="violet"
+                title="综合报告全文"
+                subtitle={activeSessionInput ? `${activeSessionInput.patientName || activeSessionInput.patientId} · ${activeSessionInput.sessionId}` : '报告中心'}
+                footerNote="本页展示的是当前接诊对应的综合报告全文，可继续导出 PDF 或回到报告中心查看摘要。"
                 className="min-h-[420px]"
                 emptyTitle="暂无报告内容"
                 emptyDescription="当前报告内容为空或已被自动过滤异常字符。"

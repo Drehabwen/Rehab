@@ -80,6 +80,28 @@ const medVoiceAssessment: Assessment = {
   status: 'completed',
 };
 
+const postureMetricsOnlyAssessment: Assessment = {
+  id: 'posture-2',
+  sessionId: 'session-2',
+  patientId: 'patient-2',
+  type: 'posture',
+  mode: 'stepped',
+  createdAt: now - 500,
+  data: {
+    posture: {
+      mode: 'stepped',
+      view: 'side',
+      confidence: 0.88,
+      metrics: {
+        headForward: 5.4,
+        shoulderAngle: 2.8,
+      },
+      issues: [],
+    },
+  },
+  status: 'completed',
+};
+
 describe('report-center-utils', () => {
   it('detects report payloads and previews across assessment types', () => {
     expect(hasAssessmentReportPayload(postureAssessment)).toBe(true);
@@ -119,5 +141,13 @@ describe('report-center-utils', () => {
     expect(payload.posture?.status).toBe('ready');
     expect(payload.rom?.status).toBe('ready');
     expect(payload.medvoice?.status).toBe('ready');
+  });
+
+  it('falls back to an immediate readable posture preview when only metrics are available', () => {
+    const preview = getAssessmentPreview(postureMetricsOnlyAssessment);
+
+    expect(hasAssessmentReportPayload(postureMetricsOnlyAssessment)).toBe(true);
+    expect(preview).toContain('即时基础结论');
+    expect(preview).toContain('头颈前引');
   });
 });

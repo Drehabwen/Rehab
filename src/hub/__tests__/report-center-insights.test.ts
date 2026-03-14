@@ -25,7 +25,7 @@ const sessionInput: SessionReportInput = {
       sessionId: 'session-1',
       patientId: 'patient-1',
       type: 'rom',
-      title: '关节活动度',
+      title: '关节活动范围',
       status: 'ready',
       createdAt: Date.now() - 2000,
       preview: '左肩前屈受限，外展活动轻度下降。',
@@ -67,7 +67,7 @@ describe('report-center-insights', () => {
 
     expect(draft).toContain('# 综合报告编排预览');
     expect(draft).toContain('session-1');
-    expect(draft).toContain('基础体态报告显示头前引与圆肩趋势');
+    expect(draft).toContain('基础体态报告显示头前引与圆肩趋势。');
     expect(draft).toContain('左肩前屈受限');
     expect(draft).toContain('主诉肩颈疼痛两周');
   });

@@ -150,6 +150,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
         ? `bg-rose-500 ${COLORS.neutral.whiteText} hover:bg-rose-500/80 hover:scale-105`
         : `bg-antey-accent ${COLORS.neutral.whiteText} hover:bg-antey-accent/80 hover:scale-105 shadow-antey-accent/40`,
     );
+  const isCompactCompleted = compact && captureStatus === 'completed';
 
   return (
     <div ref={videoContainerRef} className={cn(
@@ -179,7 +180,7 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       {/* Phase 4: 评估交互层 */}
       {(captureStatus === 'analyzing' || assessmentMode === 'realtime') ? (
         <AssessmentOverlay />
-      ) : (
+      ) : !isCompactCompleted ? (
         <div className="absolute inset-0 z-40 pointer-events-none">
           <SteppedAssessmentOverlay 
             view={view}
@@ -201,18 +202,20 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
             onReset={handleResetToEntry}
           />
         </div>
-      )}
+      ) : null}
 
       {/* Fullscreen Toggle Button */}
-      <button 
-        onClick={toggleFullscreen}
-        className={cn(
-          fullscreenButtonClass,
-          compact ? 'top-4 right-4 p-2.5' : 'top-6 right-6 p-3'
-        )}
-      >
-        {isFullscreen ? <Maximize2 size={20} className="rotate-180" /> : <Maximize2 size={20} />}
-      </button>
+      {!isCompactCompleted ? (
+        <button 
+          onClick={toggleFullscreen}
+          className={cn(
+            fullscreenButtonClass,
+            compact ? 'top-4 right-4 p-2.5' : 'top-6 right-6 p-3'
+          )}
+        >
+          {isFullscreen ? <Maximize2 size={20} className="rotate-180" /> : <Maximize2 size={20} />}
+        </button>
+      ) : null}
       
       {/* AI Scanning Effect */}
       {isCameraOn && !compact && captureStatus !== 'completed' && (
@@ -229,37 +232,39 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
       )}
       
       {/* Bento Overlay: Status Indicator */}
-      <div className={cn(`absolute flex items-center ${SIZES.gap.lg}`, compact ? 'top-4 left-4' : 'top-10 left-10')}>
-        <div className={cn(
-          statusPanelClass,
-          compact ? 'px-3 py-2' : SIZES.padding.lg
-        )}>
-          <div className="relative">
-            <div className={cn(`${SIZES.size.sm} ${SIZES.radius.full}`, isCameraOn ? `${COLORS.success.emeraldLight} shadow-[0_0_12px_rgba(52,211,153,0.8)]` : "bg-rose-500")} />
-            {isCameraOn && <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-40" />}
+      {!isCompactCompleted ? (
+        <div className={cn(`absolute flex items-center ${SIZES.gap.lg}`, compact ? 'top-4 left-4' : 'top-10 left-10')}>
+          <div className={cn(
+            statusPanelClass,
+            compact ? 'px-3 py-2' : SIZES.padding.lg
+          )}>
+            <div className="relative">
+              <div className={cn(`${SIZES.size.sm} ${SIZES.radius.full}`, isCameraOn ? `${COLORS.success.emeraldLight} shadow-[0_0_12px_rgba(52,211,153,0.8)]` : "bg-rose-500")} />
+              {isCameraOn && <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-40" />}
+            </div>
+            <div className="flex flex-col">
+              <span className={`${compact ? 'text-[8px]' : SIZES.font.sm} font-black ${COLORS.neutral.whiteText40} uppercase tracking-[0.3em] leading-none mb-1`}>
+                Engine Status
+              </span>
+              <span className={`${compact ? 'text-[10px]' : SIZES.font.lg} font-black ${COLORS.neutral.whiteText} uppercase tracking-[0.2em] leading-none`}>
+                {activeTab === 'posture' ? (compact ? 'Posture Core' : 'Posture AI Core') : 'Joint ROM Engine'} v3.2
+              </span>
+            </div>
+            {simulateMockCapture && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  simulateMockCapture();
+                }}
+                className="ml-2 px-3 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-500 text-[10px] font-black rounded-lg border border-amber-500/30 transition-all uppercase"
+                title={CAMERA_TEXTS.mockTest}
+              >
+                Mock
+              </button>
+            )}
           </div>
-          <div className="flex flex-col">
-            <span className={`${compact ? 'text-[8px]' : SIZES.font.sm} font-black ${COLORS.neutral.whiteText40} uppercase tracking-[0.3em] leading-none mb-1`}>
-              Engine Status
-            </span>
-            <span className={`${compact ? 'text-[10px]' : SIZES.font.lg} font-black ${COLORS.neutral.whiteText} uppercase tracking-[0.2em] leading-none`}>
-              {activeTab === 'posture' ? (compact ? 'Posture Core' : 'Posture AI Core') : 'Joint ROM Engine'} v3.2
-            </span>
-          </div>
-          {simulateMockCapture && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                simulateMockCapture();
-              }}
-              className="ml-2 px-3 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-500 text-[10px] font-black rounded-lg border border-amber-500/30 transition-all uppercase"
-              title={CAMERA_TEXTS.mockTest}
-            >
-              Mock
-            </button>
-          )}
         </div>
-      </div>
+      ) : null}
 
       {/* Floating Controls: Workbench Components */}
       {activeTab === 'posture' ? (
@@ -282,18 +287,27 @@ export const Vision3CameraStage: React.FC<Vision3CameraStageProps> = ({
           'absolute left-4 right-4 bottom-4 z-30',
           compact ? '' : 'md:left-6 md:right-6 md:bottom-6'
         )}>
-          <div className={completedSummaryClass}>
+          <div className={cn(
+            completedSummaryClass,
+            isCompactCompleted ? 'rounded-[1.35rem] bg-black/62 px-4 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.35)]' : null,
+          )}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">
                   <CheckCircle2 size={12} />
                   {'\u5df2\u5b8c\u6210'}
                 </div>
-                <h3 className="mt-3 text-lg font-semibold">{'\u62cd\u6444\u4e0e\u5206\u6790\u5df2\u7ed3\u675f'}</h3>
-                <p className={`mt-1 text-sm ${COLORS.neutral.whiteText70}`}>{'\u5de6\u4fa7\u4fdd\u7559\u5f53\u524d\u89c6\u56fe\u9884\u89c8\uff0c\u53f3\u4fa7\u53ef\u7ee7\u7eed\u9605\u8bfb\u62a5\u544a\u3002'}</p>
+                <h3 className={cn('font-semibold', isCompactCompleted ? 'mt-2 text-base' : 'mt-3 text-lg')}>
+                  {'\u62cd\u6444\u4e0e\u5206\u6790\u5df2\u7ed3\u675f'}
+                </h3>
+                <p className={cn(`mt-1 text-sm ${COLORS.neutral.whiteText70}`, isCompactCompleted ? 'text-xs leading-5' : null)}>
+                  {isCompactCompleted
+                    ? '\u5df2\u4fdd\u7559\u5f53\u524d\u89c6\u56fe\u9884\u89c8\uff0c\u53f3\u4fa7\u76f4\u63a5\u9605\u8bfb\u672c\u6b21\u7ed3\u679c\u3002'
+                    : '\u5de6\u4fa7\u4fdd\u7559\u5f53\u524d\u89c6\u56fe\u9884\u89c8\uff0c\u53f3\u4fa7\u53ef\u7ee7\u7eed\u9605\u8bfb\u62a5\u544a\u3002'}
+                </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 justify-end">
+              <div className={cn('flex flex-wrap items-center gap-2 justify-end', isCompactCompleted ? 'max-w-[44%]' : null)}>
                 <span className={`${whiteGlassChipClass} gap-1.5`}>
                   {assessmentType === 'quick' ? <Zap size={12} /> : <Layers size={12} />}
                   {assessmentType === 'quick' ? '\u5feb\u901f\u8bc4\u4f30' : '\u6807\u51c6\u8bc4\u4f30'}

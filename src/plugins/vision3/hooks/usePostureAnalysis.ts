@@ -12,6 +12,9 @@ import {
   PoseLandmark,
 } from '../vision3-utils';
 import { CONFIG } from '@/config';
+import { PostureProcessor } from '@/lib/posture-processor';
+import type { PostureIssue, PostureMetrics } from '@/types/posture';
+import { buildImmediateBasicReport, inferImmediateIssues } from '../report-insights';
 
 interface UsePostureAnalysisProps {
   axesScale: number;
@@ -20,8 +23,33 @@ interface UsePostureAnalysisProps {
   assessmentType: AssessmentType;
 }
 
+const hasStructuredPostureResult = (
+  result: ReturnType<typeof usePostureWS>['result'] | null,
+) => {
+  if (!result) {
+    return false;
+  }
+
+  const hasMetrics = Object.values(result.metrics || {}).some(
+    (value) => typeof value === 'number' && Number.isFinite(value),
+  );
+  const hasIssues = (result.issues?.length ?? 0) > 0;
+
+  return hasMetrics || hasIssues;
+};
+
 const QUICK_ANALYSIS_ERROR_MESSAGE =
   '\u5feb\u901f\u8bc4\u4f30\u81ea\u52a8\u5206\u6790\u89e6\u53d1\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u4e00\u6b21\u3002';
+
+interface ImmediateQuickResult {
+  metrics: PostureMetrics;
+  issues: PostureIssue[];
+  timestamp: number;
+}
+
+const estimateCaptureDurationMs = (frames: PoseLandmark[][]) => {
+  return Math.max(1000, Math.round((frames.length / 30) * 1000));
+};
 
 export function usePostureAnalysis({
   axesScale,
@@ -51,9 +79,15 @@ export function usePostureAnalysis({
   const quickAnalysisTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const captureDispatchRef = useRef<React.Dispatch<{ type: string; payload?: unknown }> | null>(null);
   const ackedRef = useRef(false);
+  const [immediateQuickResult, setImmediateQuickResult] = useState<ImmediateQuickResult | null>(null);
+  const [immediateQuickReport, setImmediateQuickReport] = useState<string | null>(null);
+  const [immediateQuickTimeSeries, setImmediateQuickTimeSeries] = useState<ReturnType<typeof PostureProcessor.process>['timeSeries'] | null>(null);
 
   const markdownReport = wsMarkdownReport;
-  const hasCompletedReport = Boolean(markdownReport || auxiliaryDiagnosis);
+  const hasImmediateQuickReport = assessmentType === 'quick' && Boolean(
+    immediateQuickReport || hasStructuredPostureResult(wsResult),
+  );
+  const hasCompletedReport = Boolean(markdownReport || auxiliaryDiagnosis || hasImmediateQuickReport);
 
   const failQuickAnalysis = useCallback((error: unknown) => {
     console.error('[usePostureAnalysis] Quick assessment auto analysis failed:', error);
@@ -75,11 +109,19 @@ export function usePostureAnalysis({
 
     if (assessmentMode === 'realtime') {
       console.log('[usePostureAnalysis] Calling analyze for realtime mode');
+      setImmediateQuickResult(null);
+      setImmediateQuickReport(null);
+      setImmediateQuickTimeSeries(null);
       analyze(view, data.timeSeriesLandmarks, data.width, data.height);
       return;
     }
 
     console.log('[usePostureAnalysis] Storing result for stepped mode');
+    if (assessmentType !== 'quick') {
+      setImmediateQuickResult(null);
+      setImmediateQuickReport(null);
+      setImmediateQuickTimeSeries(null);
+    }
     setSteppedResults((prev) => {
       const newResults = {
         ...prev,
@@ -87,6 +129,32 @@ export function usePostureAnalysis({
       };
 
       if (assessmentType === 'quick') {
+        try {
+          const localAnalysis = PostureProcessor.process(
+            data.timeSeriesLandmarks,
+            view,
+            estimateCaptureDurationMs(data.timeSeriesLandmarks),
+          );
+          const inferredIssues = inferImmediateIssues(localAnalysis.averages);
+          const fallbackReport = buildImmediateBasicReport({
+            metrics: localAnalysis.averages,
+            issues: inferredIssues,
+          });
+
+          setImmediateQuickResult({
+            metrics: localAnalysis.averages,
+            issues: inferredIssues,
+            timestamp: data.timestamp,
+          });
+          setImmediateQuickReport(fallbackReport);
+          setImmediateQuickTimeSeries(localAnalysis.timeSeries);
+        } catch (error) {
+          console.warn('[usePostureAnalysis] Failed to build local quick preview:', error);
+          setImmediateQuickResult(null);
+          setImmediateQuickReport(null);
+          setImmediateQuickTimeSeries(null);
+        }
+
         console.log('[usePostureAnalysis] Quick assessment: auto-triggering analysis after capture');
         if (quickAnalysisTimeoutRef.current) {
           clearTimeout(quickAnalysisTimeoutRef.current);
@@ -138,27 +206,25 @@ export function usePostureAnalysis({
   }, []);
 
   useEffect(() => {
-    console.log('[usePostureAnalysis] report state changed:', {
-      markdownReport: markdownReport ? 'exists' : 'null',
-      auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
-    });
-    if (hasCompletedReport) {
-      console.log('[usePostureAnalysis] Setting step to completed');
-      setStep('completed');
+    if (captureStatus === 'idle') {
+      setImmediateQuickResult(null);
+      setImmediateQuickReport(null);
+      setImmediateQuickTimeSeries(null);
     }
-  }, [auxiliaryDiagnosis, hasCompletedReport, markdownReport, setStep]);
+  }, [captureStatus]);
 
   useEffect(() => {
     console.log('[usePostureAnalysis] Checking analysis completion:', {
       markdownReport: markdownReport ? 'exists' : 'null',
       auxiliaryDiagnosis: auxiliaryDiagnosis ? 'exists' : 'null',
+      hasImmediateQuickReport,
       captureStatus,
     });
     if (hasCompletedReport && captureStatus === 'analyzing') {
       console.log('[usePostureAnalysis] Dispatching ANALYSIS_COMPLETE');
       captureDispatch({ type: 'ANALYSIS_COMPLETE' });
     }
-  }, [auxiliaryDiagnosis, captureDispatch, captureStatus, hasCompletedReport, markdownReport]);
+  }, [auxiliaryDiagnosis, captureDispatch, captureStatus, hasCompletedReport, hasImmediateQuickReport, markdownReport]);
 
   useEffect(() => {
     if (captureStatus === 'analyzing') {
@@ -218,14 +284,14 @@ export function usePostureAnalysis({
   }, [analyzeBatch]);
 
   useEffect(() => {
-    if (captureStatus === 'completed') {
+    if (hasCompletedReport || captureStatus === 'completed') {
       setStep('completed');
     } else if (captureStatus === 'analyzing') {
       setStep('analyzing');
     } else if (captureStatus === 'idle') {
       setStep('idle');
     }
-  }, [captureStatus, setStep]);
+  }, [captureStatus, hasCompletedReport, setStep]);
 
   const onResults = useCallback((results: Results) => {
     if (results.poseLandmarks) {
@@ -248,6 +314,8 @@ export function usePostureAnalysis({
     streamingReport,
     isStreamingReport,
     auxiliaryDiagnosis,
+    immediateQuickReport,
+    immediateQuickResult,
     onResults,
     captureStatus,
     setCaptureStatus: (value: React.SetStateAction<CaptureStatus>) => {
@@ -281,6 +349,7 @@ export function usePostureAnalysis({
     headAxes,
     annotations: wsResult?.annotations || [],
     timeSeriesData,
+    immediateQuickTimeSeries,
     simulateMockCapture: () => {
       console.log('[Mock] Starting simulation...');
       const mockFrames: PoseLandmark[][] = [];
