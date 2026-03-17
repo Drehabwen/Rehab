@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { calculateCervicalAngle, useROMAnalysis } from '../hooks/useROMAnalysis';
+import { calculateCervicalAngle, extractAngleFromResults, useROMAnalysis } from '../hooks/useROMAnalysis';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 
 const buildMeasurement = (
@@ -61,5 +61,53 @@ describe('useROMAnalysis', () => {
     landmarks[24] = { x: 0.54, y: 0.7, z: 0 };
 
     expect(calculateCervicalAngle(landmarks, 'flexion')).toBeLessThan(20);
+  });
+
+  it('distinguishes shoulder internal and external rotation by signed angle', () => {
+    const landmarks = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0 }));
+    landmarks[11] = { x: 0, y: 0, z: 0 };
+    landmarks[12] = { x: 1, y: 0, z: 0 };
+    landmarks[13] = { x: 0.6, y: 0, z: 0.6 };
+    landmarks[23] = { x: 0, y: -1, z: 0 };
+
+    const internalRotation = extractAngleFromResults(
+      { poseLandmarks: landmarks },
+      'shoulder',
+      'internal_rotation',
+      'left',
+    );
+    const externalRotation = extractAngleFromResults(
+      { poseLandmarks: landmarks },
+      'shoulder',
+      'external_rotation',
+      'left',
+    );
+
+    expect(internalRotation).toBeGreaterThan(20);
+    expect(externalRotation).toBe(0);
+  });
+
+  it('reports external rotation when rotation sign is opposite', () => {
+    const landmarks = Array.from({ length: 33 }, () => ({ x: 0, y: 0, z: 0 }));
+    landmarks[11] = { x: 0, y: 0, z: 0 };
+    landmarks[12] = { x: 1, y: 0, z: 0 };
+    landmarks[13] = { x: 0.6, y: 0, z: -0.6 };
+    landmarks[23] = { x: 0, y: -1, z: 0 };
+
+    const internalRotation = extractAngleFromResults(
+      { poseLandmarks: landmarks },
+      'shoulder',
+      'internal_rotation',
+      'left',
+    );
+    const externalRotation = extractAngleFromResults(
+      { poseLandmarks: landmarks },
+      'shoulder',
+      'external_rotation',
+      'left',
+    );
+
+    expect(internalRotation).toBe(0);
+    expect(externalRotation).toBeGreaterThan(20);
   });
 });
