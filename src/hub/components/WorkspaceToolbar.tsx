@@ -1,22 +1,27 @@
-﻿import React from 'react';
-import { Activity, Layers, Mic, BarChart3 } from 'lucide-react';
+import React from 'react';
+import { Activity, BarChart3, Dumbbell, Layers, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface WorkspaceToolbarProps {
-  activeTool: 'vision3' | 'medvoice' | 'comparison' | 'rom';
-  onSelectTool: (tool: 'vision3' | 'medvoice' | 'comparison' | 'rom') => void;
+  activeTool: 'vision3' | 'medvoice' | 'comparison' | 'rom' | 'training_plan';
+  onSelectTool: (tool: 'vision3' | 'medvoice' | 'comparison' | 'rom' | 'training_plan') => void;
+  visibleToolIds?: Array<'vision3' | 'medvoice' | 'comparison' | 'rom' | 'training_plan'>;
 }
 
 const primaryTools = [
-  { id: 'vision3' as const, name: '体态评估', icon: Activity, accent: 'text-blue-600' },
-  { id: 'rom' as const, name: 'ROM 评估', icon: Layers, accent: 'text-emerald-600' },
-  { id: 'medvoice' as const, name: '语音问诊', icon: Mic, accent: 'text-violet-600' },
+  { id: 'vision3' as const, name: '体态筛查', icon: Activity, accent: 'text-blue-600' },
+  { id: 'rom' as const, name: 'ROM 辅助', icon: Layers, accent: 'text-emerald-600' },
+  { id: 'medvoice' as const, name: '问询补充', icon: Mic, accent: 'text-violet-600' },
+  { id: 'training_plan' as const, name: '干预建议', icon: Dumbbell, accent: 'text-orange-600' },
 ];
 
-const comparisonTool = { id: 'comparison' as const, name: '进度对比', icon: BarChart3, accent: 'text-cyan-600' };
+const comparisonTool = { id: 'comparison' as const, name: '趋势对比', icon: BarChart3, accent: 'text-cyan-600' };
 
-export const WorkspaceToolbar: React.FC<WorkspaceToolbarProps> = ({ activeTool, onSelectTool }) => {
-  const visibleTools = activeTool === 'comparison' ? [...primaryTools, comparisonTool] : primaryTools;
+export const WorkspaceToolbar: React.FC<WorkspaceToolbarProps> = ({ activeTool, onSelectTool, visibleToolIds }) => {
+  const baseTools = activeTool === 'comparison' ? [...primaryTools, comparisonTool] : primaryTools;
+  const visibleTools = visibleToolIds?.length
+    ? baseTools.filter((tool) => visibleToolIds.includes(tool.id))
+    : baseTools;
 
   return (
     <div className="fixed bottom-3 left-1/2 z-30 -translate-x-1/2">

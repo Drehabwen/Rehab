@@ -104,7 +104,7 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
 
   setSingleMeasurement: (joint, direction, side) => set(() => ({
     activeMeasurements: [{
-      id: 'default-single',
+      id: crypto.randomUUID(),
       joint,
       direction,
       side,

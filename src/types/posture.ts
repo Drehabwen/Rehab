@@ -36,5 +36,7 @@ export interface PostureMetrics {
   headYaw?: number;
   headRoll?: number;
   swayOffset?: number;
+  jitterIndex?: number;
+  stabilityScore?: number;
   head_axes?: { x: number; y: number }[];
 }

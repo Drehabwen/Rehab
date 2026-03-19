@@ -1,5 +1,15 @@
-﻿import React from 'react';
-import { ClipboardList, FileText, Settings, ChevronLeft, ChevronRight, Activity, Database } from 'lucide-react';
+import React from 'react';
+import {
+  Activity,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  FileText,
+  School,
+  Settings,
+  Users,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -8,16 +18,32 @@ interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onSettingsClick?: () => void;
+  visibleItemIds?: string[];
+  showSettings?: boolean;
 }
 
 const navItems = [
-  { id: 'dashboard', icon: ClipboardList, label: '接诊中心' },
-  { id: 'assessment', icon: Activity, label: '评估中心' },
+  { id: 'home', icon: ClipboardList, label: '首页' },
+  { id: 'screening', icon: Activity, label: '筛查工作台' },
+  { id: 'students', icon: Users, label: '学生档案' },
   { id: 'reports', icon: FileText, label: '报告中心' },
-  { id: 'datacenter', icon: Database, label: '数据中心' },
+  { id: 'alerts', icon: Bell, label: '预警复测' },
+  { id: 'organization', icon: School, label: '机构管理' },
 ];
 
-export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isCollapsed, onToggle, onSettingsClick }) => {
+export const HubSidebar: React.FC<SidebarProps> = ({
+  activeId,
+  onSelect,
+  isCollapsed,
+  onToggle,
+  onSettingsClick,
+  visibleItemIds,
+  showSettings = true,
+}) => {
+  const visibleNavItems = visibleItemIds?.length
+    ? navItems.filter((item) => visibleItemIds.includes(item.id))
+    : navItems;
+
   return (
     <aside
       className={cn(
@@ -27,17 +53,17 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
     >
       <div className="flex items-center gap-3 border-b border-slate-700/40 px-4 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-antey-primary text-sm font-semibold text-white">
-          R
+          P
         </div>
         {!isCollapsed ? (
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold tracking-tight">Medical AI Workspace</div>
+            <div className="truncate text-sm font-semibold tracking-tight">体态筛查监控中心</div>
           </div>
         ) : null}
       </div>
 
       <nav className="flex-1 space-y-2 px-3 py-4">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const active = activeId === item.id;
           return (
             <button
@@ -48,6 +74,7 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
                 active ? 'bg-white/10 text-white' : 'text-slate-300 hover:bg-white/5',
               )}
               title={isCollapsed ? item.label : undefined}
+              type="button"
             >
               <item.icon size={18} className={cn('flex-shrink-0', active ? 'text-antey-primary' : 'text-slate-300')} />
               {!isCollapsed ? <span className="flex-1 truncate text-sm font-medium">{item.label}</span> : null}
@@ -62,18 +89,22 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
       </div>
 
       <div className="space-y-2 p-3">
-        <button
-          onClick={onSettingsClick || (() => {})}
-          className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-slate-300 transition-colors hover:bg-white/5"
-        >
-          <Settings size={16} />
-          {!isCollapsed ? <span className="text-sm font-medium">系统设置</span> : null}
-        </button>
+        {showSettings ? (
+          <button
+            onClick={onSettingsClick || (() => {})}
+            className="flex h-10 w-full items-center gap-3 rounded-xl px-3 text-slate-300 transition-colors hover:bg-white/5"
+            type="button"
+          >
+            <Settings size={16} />
+            {!isCollapsed ? <span className="text-sm font-medium">系统设置</span> : null}
+          </button>
+        ) : null}
 
         <button
           onClick={onToggle}
           className="flex h-10 w-full items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-white/5"
           aria-label="toggle sidebar"
+          type="button"
         >
           {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>

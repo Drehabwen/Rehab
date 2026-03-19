@@ -6,10 +6,20 @@ import statistics
 from typing import Dict, Any, List, Optional
 
 # 加载环境变量
-dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
-if os.path.exists(dotenv_path):
-    from dotenv import load_dotenv
-    load_dotenv(dotenv_path)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+backend_dir = os.path.dirname(current_dir)
+project_root = os.path.dirname(backend_dir)
+
+possible_env_paths = [
+    os.path.join(backend_dir, '.env'),
+    os.path.join(project_root, '.env'),
+]
+
+for dotenv_path in possible_env_paths:
+    if os.path.exists(dotenv_path):
+        from dotenv import load_dotenv
+        load_dotenv(dotenv_path)
+        break
 
 from openai import OpenAI
 

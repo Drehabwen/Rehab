@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Activity,
   ClipboardCheck,
@@ -23,30 +23,30 @@ import { PageTitleSection, UnifiedStatusBadge, StatePanel } from '@/components/l
 type ViewMode = 'standard' | 'soap';
 
 const standardSections = [
-  { id: '主诉', label: '主诉', icon: MessageSquare },
-  { id: '现病史', label: '现病史', icon: Activity },
-  { id: '既往史', label: '既往史', icon: History },
+  { id: '主诉', label: '主诉反馈', icon: MessageSquare },
+  { id: '现病史', label: '现病史/背景', icon: Activity },
+  { id: '既往史', label: '既往情况', icon: History },
   { id: '体格检查', label: '体格检查', icon: ClipboardCheck },
-  { id: '诊断', label: '诊断', icon: ClipboardCheck },
-  { id: '处理意见', label: '处理意见', icon: Save },
-  { id: 'ai_suggestions', label: 'AI建议', icon: Activity },
+  { id: '诊断', label: '分析判断', icon: ClipboardCheck },
+  { id: '处理意见', label: '建议与计划', icon: Save },
+  { id: 'ai_suggestions', label: 'AI 建议', icon: Activity },
 ] as const;
 
 const soapSections = [
-  { id: 'S', label: 'S 主观', icon: MessageSquare },
-  { id: 'O', label: 'O 客观', icon: Activity },
-  { id: 'A', label: 'A 评估', icon: ClipboardCheck },
-  { id: 'P', label: 'P 计划', icon: Save },
-  { id: 'ai_suggestions', label: 'AI建议', icon: Activity },
+  { id: 'S', label: 'S 主观信息', icon: MessageSquare },
+  { id: 'O', label: 'O 客观信息', icon: Activity },
+  { id: 'A', label: 'A 分析判断', icon: ClipboardCheck },
+  { id: 'P', label: 'P 计划建议', icon: Save },
+  { id: 'ai_suggestions', label: 'AI 建议', icon: Activity },
 ] as const;
 
 const structuredCaseAliases: Record<string, string[]> = {
   主诉: ['主诉', 'chief_complaint'],
-  现病史: ['现病史', 'present_illness'],
-  既往史: ['既往史', 'past_history'],
-  体格检查: ['体格检查', 'physical_exam'],
-  诊断: ['诊断', 'diagnosis'],
-  处理意见: ['处理意见', 'plan', 'treatment_plan'],
+  现病史: ['现病史', 'present_illness', '背景', '训练背景'],
+  既往史: ['既往史', 'past_history', '历史表现', '历史数据'],
+  体格检查: ['体格检查', 'physical_exam', '身体素质评估'],
+  诊断: ['诊断', 'analysis', '表现分析'],
+  处理意见: ['处理意见', 'plan', 'treatment_plan', '训练调整建议'],
   S: ['S'],
   O: ['O'],
   A: ['A'],
@@ -62,6 +62,7 @@ const normalizeStructuredCase = (input: StructuredCase): StructuredCase => {
       const value = input[alias];
       return typeof value === 'string' && value.trim().length > 0;
     });
+
     if (matchedKey) {
       normalized[targetKey] = input[matchedKey];
     }
@@ -96,7 +97,7 @@ const composeExportText = (transcript: string, structuredCase: StructuredCase | 
       .map(([key, value]) => `## ${key}\n${String(value).trim()}`);
 
     if (sections.length > 0) {
-      lines.push('# 结构化病历');
+      lines.push('# 结构化摘要');
       lines.push(...sections);
     }
   }
@@ -135,24 +136,24 @@ export const MedVoicePlugin: React.FC = () => {
   });
 
   const sections = useMemo(() => (viewMode === 'standard' ? standardSections : soapSections), [viewMode]);
-  const currentSectionData = sections.find((s) => s.id === activeSection) || sections[0];
+  const currentSectionData = sections.find((section) => section.id === activeSection) || sections[0];
 
   const hasTranscript = transcript.trim().length > 0;
   const structuredReady = hasStructuredContent(structuredCase);
-  const canSaveToReportCenter = Boolean(structuredReady && hasTranscript && currentPatient);
+  const canSaveToArchive = Boolean(structuredReady && hasTranscript && currentPatient);
 
   const recordingStatus = isRecording
     ? { tone: 'processing' as const, text: `录音中 ${formatTime(recordTime)}` }
     : { tone: 'disabled' as const, text: '录音已停止' };
 
   const caseStatus = isProcessing
-    ? { tone: 'processing' as const, text: '解析中' }
+    ? { tone: 'processing' as const, text: 'AI 解析中' }
     : structuredReady
       ? isSaved
-        ? { tone: 'success' as const, text: '已解析' }
-        : { tone: 'warning' as const, text: '待确认' }
+        ? { tone: 'success' as const, text: '已保存归档' }
+        : { tone: 'warning' as const, text: '待确认保存' }
       : hasTranscript
-        ? { tone: 'processing' as const, text: '待解析' }
+        ? { tone: 'processing' as const, text: '待结构化' }
         : { tone: 'disabled' as const, text: '待录音' };
 
   const handleStructure = async (inputText?: string) => {
@@ -162,12 +163,12 @@ export const MedVoicePlugin: React.FC = () => {
     setIsProcessing(true);
     try {
       const visionData = {
-        active: activeMeasurements.map((m) => ({
-          joint: m.joint,
-          direction: m.direction,
-          side: m.side,
-          maxAngle: m.maxAngle,
-          currentAngle: m.currentAngle,
+        active: activeMeasurements.map((measurement) => ({
+          joint: measurement.joint,
+          direction: measurement.direction,
+          side: measurement.side,
+          maxAngle: measurement.maxAngle,
+          currentAngle: measurement.currentAngle,
         })),
         latest_saved: savedMeasurements.length > 0 ? savedMeasurements[0] : null,
       };
@@ -228,6 +229,7 @@ export const MedVoicePlugin: React.FC = () => {
           },
         },
       });
+
       setIsSaved(true);
     } catch (error) {
       console.error('Save failed', error);
@@ -249,10 +251,10 @@ export const MedVoicePlugin: React.FC = () => {
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `medvoice-${new Date().toISOString().slice(0, 10)}.txt`;
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `medvoice-${new Date().toISOString().slice(0, 10)}.txt`;
+    link.click();
     URL.revokeObjectURL(url);
   };
 
@@ -262,17 +264,17 @@ export const MedVoicePlugin: React.FC = () => {
     <div className="rehab-page">
       <div className="rehab-page-inner h-full min-h-0">
         <PageTitleSection
-          title="语音接诊"
-          description="左侧录音与实时转写，右侧结构化病历与确认。"
-          right={
+          title="问询补充"
+          description="左侧进行录音与实时转写，右侧查看结构化摘要，并将结果保存到报告归档。"
+          right={(
             <>
               <UnifiedStatusBadge status={recordingStatus.tone} text={recordingStatus.text} />
               <UnifiedStatusBadge status={caseStatus.tone} text={caseStatus.text} />
             </>
-          }
+          )}
         />
 
-        <section className="bento-card p-4 flex flex-wrap items-center gap-2">
+        <section className="bento-card flex flex-wrap items-center gap-2 p-4">
           {isRecording ? (
             <button onClick={stopRecording} className="btn-primary">
               <Square size={14} />
@@ -284,25 +286,26 @@ export const MedVoicePlugin: React.FC = () => {
               开始录音
             </button>
           ) : !structuredReady ? (
-            <button onClick={() => handleStructure()} disabled={isProcessing} className={cn('btn-primary', isProcessing && 'opacity-50 cursor-not-allowed')}>
+            <button
+              onClick={() => handleStructure()}
+              disabled={isProcessing}
+              className={cn('btn-primary', isProcessing && 'opacity-50 cursor-not-allowed')}
+            >
               <Activity size={14} />
               {isProcessing ? '解析中...' : '结构化解析'}
             </button>
           ) : (
             <button
               onClick={handleSaveToAssessment}
-              disabled={!canSaveToReportCenter || isSaving}
-              className={cn('btn-primary', (!canSaveToReportCenter || isSaving) && 'opacity-50 cursor-not-allowed')}
+              disabled={!canSaveToArchive || isSaving}
+              className={cn('btn-primary', (!canSaveToArchive || isSaving) && 'opacity-50 cursor-not-allowed')}
             >
               <Save size={14} />
-              {isSaving ? '保存中...' : '保存到报告中心'}
+              {isSaving ? '保存中...' : '保存到报告归档'}
             </button>
           )}
 
-          <button
-            onClick={isRecording ? stopRecording : startRecording}
-            className="btn-secondary"
-          >
+          <button onClick={isRecording ? stopRecording : startRecording} className="btn-secondary">
             {isRecording ? <Square size={14} /> : <Mic size={14} />}
             {isRecording ? '结束录音' : '继续录音'}
           </button>
@@ -321,42 +324,46 @@ export const MedVoicePlugin: React.FC = () => {
             清空
           </button>
 
-          <button onClick={handleExportText} disabled={!canExport} className={cn('btn-secondary ml-auto', !canExport && 'opacity-50 cursor-not-allowed')}>
+          <button
+            onClick={handleExportText}
+            disabled={!canExport}
+            className={cn('btn-secondary ml-auto', !canExport && 'opacity-50 cursor-not-allowed')}
+          >
             <Download size={14} />
             导出文本
           </button>
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
-          <article className="lg:col-span-5 bento-card p-5 flex flex-col min-h-[420px]">
-            <div className="flex items-center justify-between mb-3">
+        <section className="grid flex-1 min-h-0 grid-cols-1 gap-4 lg:grid-cols-12">
+          <article className="bento-card flex min-h-[420px] flex-col p-5 lg:col-span-5">
+            <div className="mb-3 flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-900">实时转写</h3>
               <span className="text-xs text-slate-500">
-                {isRecording ? `录音时长 ${formatTime(recordTime)}` : hasTranscript ? `字数 ${transcript.length}` : '待开始'}
+                {isRecording ? `录音时长 ${formatTime(recordTime)}` : hasTranscript ? `字数 ${transcript.length}` : '等待开始'}
               </span>
             </div>
 
-            <div className="h-10 mb-3 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden">
+            <div className="mb-3 h-10 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
               <div
                 className="h-full bg-violet-500/60 transition-all duration-200"
                 style={{ width: `${Math.min(100, Math.max(4, waveformPower))}%` }}
               />
             </div>
 
-            <div className="flex-1 rounded-xl border border-slate-200 bg-slate-50 p-4 overflow-y-auto custom-scrollbar">
+            <div className="custom-scrollbar flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
               {transcript ? (
-                <p className="text-sm text-slate-700 whitespace-pre-wrap leading-6">{transcript}</p>
+                <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{transcript}</p>
               ) : (
-                <StatePanel title="暂无转写内容" description="点击“开始录音”后自动生成实时转写。" />
+                <StatePanel title="暂无转写内容" description="点击“开始录音”后，系统会在这里实时显示转写结果。" />
               )}
             </div>
           </article>
 
-          <article className="lg:col-span-7 bento-card p-5 flex flex-col min-h-[420px]">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <article className="bento-card flex min-h-[420px] flex-col p-5 lg:col-span-7">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold text-slate-900">结构化病历</h3>
-                <p className="text-xs text-slate-500 mt-1">状态：{caseStatus.text}</p>
+                <h3 className="text-base font-semibold text-slate-900">结构化摘要</h3>
+                <p className="mt-1 text-xs text-slate-500">状态：{caseStatus.text}</p>
               </div>
 
               <div className="segmented-control">
@@ -383,21 +390,22 @@ export const MedVoicePlugin: React.FC = () => {
 
             {!isRecording && structuredReady && !isSaved ? (
               <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                {currentPatient ? '当前病历已解析，建议核对后保存到报告中心。' : '请先进入具体患者工作台，再将病历保存到报告中心。'}
+                {currentPatient ? '当前摘要已解析完成，建议核对后保存到报告归档。' : '请先选择学生，再将当前摘要保存到报告归档。'}
               </div>
             ) : null}
 
-            <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4 flex-1 min-h-0">
-              <div className="space-y-2 overflow-y-auto custom-scrollbar pr-1">
+            <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 md:grid-cols-[220px_1fr]">
+              <div className="custom-scrollbar space-y-2 overflow-y-auto pr-1">
                 {sections.map((section) => {
                   const active = activeSection === section.id;
                   const hasValue = Boolean(structuredCase?.[section.id]);
+
                   return (
                     <button
                       key={section.id}
                       onClick={() => setActiveSection(section.id)}
                       className={cn(
-                        'w-full h-10 px-3 rounded-xl border text-sm flex items-center justify-between',
+                        'flex h-10 w-full items-center justify-between rounded-xl border px-3 text-sm',
                         active ? 'border-antey-primary bg-antey-primary/10 text-antey-primary' : 'border-slate-300 text-slate-700 hover:bg-slate-50',
                       )}
                     >
@@ -405,24 +413,24 @@ export const MedVoicePlugin: React.FC = () => {
                         <section.icon size={14} />
                         {section.label}
                       </span>
-                      {hasValue ? <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> : null}
+                      {hasValue ? <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> : null}
                     </button>
                   );
                 })}
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 overflow-y-auto custom-scrollbar">
+              <div className="custom-scrollbar overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-4">
                 {isProcessing ? (
-                  <div className="h-full flex items-center justify-center">
+                  <div className="flex h-full items-center justify-center">
                     <UnifiedStatusBadge status="processing" text="AI 正在解析中" />
                   </div>
                 ) : structuredCase?.[activeSection] ? (
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-slate-900">{currentSectionData.label}</h4>
-                    <p className="text-sm text-slate-700 leading-6 whitespace-pre-wrap">{structuredCase[activeSection]}</p>
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">{structuredCase[activeSection]}</p>
                   </div>
                 ) : (
-                  <StatePanel title="该分节暂无内容" description="完成录音后点击“结构化解析”生成。" />
+                  <StatePanel title="该分节暂无内容" description="完成录音后点击“结构化解析”，系统会自动生成对应摘要。" />
                 )}
               </div>
             </div>

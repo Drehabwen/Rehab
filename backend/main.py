@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
@@ -6,16 +6,26 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import statistics
 import time
+import math
 import uvicorn
 import os
 import sys
 import json
 
-# 鍔犺浇鐜鍙橀噺
-dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
-if os.path.exists(dotenv_path):
-    from dotenv import load_dotenv
-    load_dotenv(dotenv_path)
+# 加载环境变量
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.dirname(current_dir)
+
+possible_env_paths = [
+    os.path.join(current_dir, '.env'),
+    os.path.join(project_root, '.env'),
+]
+
+for dotenv_path in possible_env_paths:
+    if os.path.exists(dotenv_path):
+        from dotenv import load_dotenv
+        load_dotenv(dotenv_path)
+        break
 
 from config import config
 
@@ -31,7 +41,7 @@ from models import (
     SessionTreatmentPlanRequest,
     SessionReportRequest, SessionReportResponse,
 )
-from utils.posture_analysis import analyze_posture
+from utils.posture_analysis import analyze_posture, LANDMARKS
 from utils.joint_analysis import calculate_joint_angle
 from utils.camera_stream import CameraManager
 from utils.llm_reporter import generate_posture_report, posture_agent
@@ -60,11 +70,127 @@ camera_manager = CameraManager()
 medvoice_integrated = False
 
 DEBUG_LOGS = os.getenv("DEBUG_LOGS", "false").lower() == "true"
+STRICT_RBAC = os.getenv("STRICT_RBAC", "false").lower() == "true"
+
+ROLE_PERMISSIONS: Dict[str, set[str]] = {
+    "manager": {
+        "settings.read.org",
+        "system.read",
+        "plan.publish.team",
+        "report.create.team",
+        "case.read",
+        "case.approve",
+        "report.publish",
+        "report.export",
+    },
+    "operator": {
+        "system.read",
+        "assessment.create.team",
+        "assessment.submit.team",
+        "record.use",
+        "structure.use",
+        "case.read",
+        "case.write",
+        "case.submit",
+    },
+}
+
+ROLE_ALIASES: Dict[str, str] = {
+    "super_head_coach": "manager",
+    "head_coach": "manager",
+    "assistant_medic": "operator",
+    "athlete_readonly": "operator",
+}
+
+WS_PERMISSION_MAP: Dict[str, str] = {
+    "POSTURE_SYNC": "assessment.create.team",
+    "JOINT_ANALYSIS": "assessment.create.team",
+    "POSTURE_BATCH_ANALYSIS": "assessment.submit.team",
+    "POSTURE_STEPPED_ANALYSIS": "assessment.submit.team",
+    "POSTURE_DEEP_ANALYSIS": "report.create.team",
+}
 
 
 def debug_print(*args, **kwargs):
     if DEBUG_LOGS:
         print(*args, **kwargs)
+
+
+def normalize_role(value: Optional[str]) -> str:
+    role = (value or "").strip()
+    if role in ROLE_ALIASES:
+        role = ROLE_ALIASES[role]
+    return role if role in ROLE_PERMISSIONS else ""
+
+
+def build_auth_context(
+    user_id: Optional[str],
+    role: Optional[str],
+    team_id: Optional[str],
+) -> Dict[str, str]:
+    normalized_role = normalize_role(role)
+    if STRICT_RBAC and (not user_id or not normalized_role or not team_id):
+        raise HTTPException(status_code=401, detail="Missing authentication context")
+    resolved_user_id = (user_id or "system").strip() or "system"
+    resolved_role = normalized_role or "manager"
+    resolved_team_id = (team_id or "default-team").strip() or "default-team"
+    if resolved_role not in ROLE_PERMISSIONS:
+        raise HTTPException(status_code=403, detail="Unsupported role")
+    return {
+        "user_id": resolved_user_id,
+        "role": resolved_role,
+        "team_id": resolved_team_id,
+    }
+
+
+def get_http_auth_context(request: Request) -> Dict[str, str]:
+    return build_auth_context(
+        user_id=request.headers.get("x-user-id"),
+        role=request.headers.get("x-user-role"),
+        team_id=request.headers.get("x-team-id"),
+    )
+
+
+def get_ws_auth_context(websocket: WebSocket) -> Dict[str, str]:
+    return build_auth_context(
+        user_id=websocket.query_params.get("userId") or websocket.headers.get("x-user-id"),
+        role=websocket.query_params.get("role") or websocket.headers.get("x-user-role"),
+        team_id=websocket.query_params.get("teamId") or websocket.headers.get("x-team-id"),
+    )
+
+
+def ensure_permission(
+    auth_context: Dict[str, str],
+    permission: str,
+    scope_strategy: str,
+) -> None:
+    role = auth_context["role"]
+    team_id = auth_context["team_id"]
+    if permission not in ROLE_PERMISSIONS.get(role, set()):
+        raise HTTPException(status_code=403, detail="Permission denied")
+    if scope_strategy == "org_admin_only" and role != "manager":
+        raise HTTPException(status_code=403, detail="Org-level permission required")
+    if scope_strategy in {"team_from_token", "self_from_token"} and not team_id:
+        raise HTTPException(status_code=403, detail="Team scope required")
+
+
+def write_audit_log(
+    auth_context: Dict[str, str],
+    action: str,
+    target: str,
+    success: bool,
+) -> None:
+    payload = {
+        "type": "audit",
+        "actorUserId": auth_context["user_id"],
+        "actorRole": auth_context["role"],
+        "teamId": auth_context["team_id"],
+        "action": action,
+        "target": target,
+        "success": success,
+        "timestamp": int(time.time() * 1000),
+    }
+    print(json.dumps(payload, ensure_ascii=False))
 
 
 def load_cors_origins() -> List[str]:
@@ -82,6 +208,28 @@ def build_time_series(frames):
         base_timestamp = frame.timestamp or int(time.time() * 1000)
         num_frames = len(frame.timeSeriesLandmarks)
         
+        # Calculate fatigue metrics for this frame sequence if possible
+        jitter_val = 0.0
+        stability_val = 1.0
+        if num_frames > 1:
+            num_lms = len(frame.timeSeriesLandmarks[0])
+            major_indices = [
+                LANDMARKS["LEFT_SHOULDER"], LANDMARKS["RIGHT_SHOULDER"],
+                LANDMARKS["LEFT_HIP"], LANDMARKS["RIGHT_HIP"],
+                LANDMARKS["LEFT_EAR"], LANDMARKS["RIGHT_EAR"]
+            ]
+            jitter_indices = []
+            for idx in major_indices:
+                xs = [pts[idx].x for pts in frame.timeSeriesLandmarks]
+                ys = [pts[idx].y for pts in frame.timeSeriesLandmarks]
+                var_x = statistics.variance(xs) if len(xs) > 1 else 0.0
+                var_y = statistics.variance(ys) if len(ys) > 1 else 0.0
+                jitter_indices.append(math.sqrt(var_x**2 + var_y**2))
+            avg_jitter = sum(jitter_indices) / len(jitter_indices)
+            normalized_jitter = min(avg_jitter / 0.01, 1.0)
+            jitter_val = round(normalized_jitter, 3)
+            stability_val = round(1.0 - normalized_jitter, 3)
+
         for i, landmarks in enumerate(frame.timeSeriesLandmarks):
             analysis = analyze_posture(
                 view=frame.view,
@@ -91,6 +239,10 @@ def build_time_series(frames):
             )
             metrics = analysis["metrics"].model_dump()
             metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
+            
+            # Inject fatigue metrics
+            metrics["jitterIndex"] = jitter_val
+            metrics["stabilityScore"] = stability_val
             
             # Synthesize timestamp: assume 30fps (33ms per frame), ending at base_timestamp
             timestamp = base_timestamp - (num_frames - 1 - i) * 33
@@ -253,18 +405,26 @@ def gen_frames():
         pass
 
 @app.get("/video_feed")
-async def video_feed():
+async def video_feed(request: Request):
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "assessment.create.team", "team_from_token")
     return StreamingResponse(gen_frames(), 
                             media_type="multipart/x-mixed-replace; boundary=frame")
 
 @app.post("/camera/start")
-async def start_camera():
+async def start_camera(request: Request):
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "assessment.create.team", "team_from_token")
     success = camera_manager.start()
+    write_audit_log(auth_context, "camera.start", "camera_manager", bool(success))
     return {"status": "success" if success else "error"}
 
 @app.post("/camera/stop")
-async def stop_camera():
+async def stop_camera(request: Request):
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "assessment.create.team", "team_from_token")
     camera_manager.stop()
+    write_audit_log(auth_context, "camera.stop", "camera_manager", True)
     return {"status": "success"}
 
 # CORS configuration
@@ -284,6 +444,12 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     debug_print("WebSocket connection established", flush=True)
     try:
+        auth_context = get_ws_auth_context(websocket)
+    except HTTPException as e:
+        await websocket.send_text(json.dumps({"type": "AUTH_ERROR", "detail": e.detail}, ensure_ascii=False))
+        await websocket.close(code=1008)
+        return
+    try:
         while True:
             # Add timeout to prevent blocking forever if client is silent
             # But client sends data, so let's just read
@@ -299,6 +465,13 @@ async def websocket_endpoint(websocket: WebSocket):
             
             msg_type = message.get("type")
             debug_print(f"Message type: {msg_type}", flush=True)
+            required_permission = WS_PERMISSION_MAP.get(msg_type)
+            if required_permission:
+                try:
+                    ensure_permission(auth_context, required_permission, "team_from_token")
+                except HTTPException:
+                    await websocket.send_text(json.dumps({"type": "AUTH_ERROR", "detail": "Permission denied"}, ensure_ascii=False))
+                    continue
 
             if msg_type == "POSTURE_SYNC":
                 debug_print("Processing POSTURE_SYNC...", flush=True)
@@ -338,17 +511,41 @@ async def websocket_endpoint(websocket: WebSocket):
                             )
                             for i in range(num_lms)
                         ]
-                    
-                    debug_print(f"Calculated average landmarks for {num_frames} frames", flush=True)
-
-                    # Perform analysis on averaged landmarks
-                    result = await run_in_threadpool(
-                        analyze_posture,
-                        view=request.view,
-                        landmarks=avg_landmarks,
-                        width=request.width,
-                        height=request.height
-                    )
+                        
+                        # Calculate Jitter and Stability for Fatigue Detection
+                        # We look at the variance of landmarks over the sync window (e.g., 1s)
+                        jitter_indices = []
+                        for i in range(num_lms):
+                            # Variance of x and y for each landmark
+                            xs = [f[i].x for f in request.timeSeriesLandmarks]
+                            ys = [f[i].y for f in request.timeSeriesLandmarks]
+                            var_x = statistics.variance(xs) if len(xs) > 1 else 0.0
+                            var_y = statistics.variance(ys) if len(ys) > 1 else 0.0
+                            jitter_indices.append(math.sqrt(var_x**2 + var_y**2))
+                        
+                        # Overall jitter is the average jitter of major joints (shoulders, hips, ears)
+                        major_indices = [
+                            LANDMARKS["LEFT_SHOULDER"], LANDMARKS["RIGHT_SHOULDER"],
+                            LANDMARKS["LEFT_HIP"], LANDMARKS["RIGHT_HIP"],
+                            LANDMARKS["LEFT_EAR"], LANDMARKS["RIGHT_EAR"]
+                        ]
+                        avg_jitter = sum(jitter_indices[i] for i in major_indices) / len(major_indices)
+                        
+                        # Perform analysis on averaged landmarks
+                        result = await run_in_threadpool(
+                            analyze_posture,
+                            view=request.view,
+                            landmarks=avg_landmarks,
+                            width=request.width,
+                            height=request.height
+                        )
+                        
+                        # Update fatigue metrics in the result
+                        # Normalize jitter: 0.005 is a typical jitter threshold for fatigue
+                        normalized_jitter = min(avg_jitter / 0.01, 1.0)
+                        result["metrics"].jitterIndex = round(normalized_jitter, 3)
+                        # Stability score: 1.0 - normalized jitter (simplified)
+                        result["metrics"].stabilityScore = round(1.0 - normalized_jitter, 3)
                     # result['metrics'] is a Pydantic model, use model_dump() to get dict
                     debug_print(f"Analysis complete. Metrics: {result['metrics']}", flush=True)
                     
@@ -558,7 +755,10 @@ async def websocket_endpoint(websocket: WebSocket):
 # --- HTTP Routes ---
 
 @app.get("/health")
-async def health_check():
+async def health_check(request: Request):
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "settings.read.org", "org_admin_only")
+    write_audit_log(auth_context, "health.read", "system.health", True)
     return {
         "status": "healthy",
         "services": {
@@ -569,95 +769,124 @@ async def health_check():
 
 
 @app.post("/api/treatment-plan/generate")
-async def generate_plan(request: TreatmentPlanRequest) -> TreatmentPlanResponse:
+async def generate_plan(request: Request, payload: TreatmentPlanRequest) -> TreatmentPlanResponse:
     """Generate a treatment plan."""
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "plan.publish.team", "team_from_token")
     try:
         ensure_treatment_plan_config()
-        assessment_data = await get_assessment_data(request.assessmentId)
+        assessment_data = await get_assessment_data(payload.assessmentId)
         content = await generate_treatment_plan(assessment_data)
-        return TreatmentPlanResponse(
-            patientId=request.patientId,
-            assessmentId=request.assessmentId,
+        response = TreatmentPlanResponse(
+            patientId=payload.patientId,
+            assessmentId=payload.assessmentId,
             content=content,
-            createdBy=request.createdBy,
+            createdBy=payload.createdBy,
             createdAt=datetime.now(),
             updatedAt=datetime.now()
         )
+        write_audit_log(auth_context, "treatment_plan.generate", payload.assessmentId, True)
+        return response
     except TreatmentPlanConfigError as e:
+        write_audit_log(auth_context, "treatment_plan.generate", payload.assessmentId, False)
         raise HTTPException(status_code=503, detail=str(e))
     except AssessmentDataUnavailableError as e:
+        write_audit_log(auth_context, "treatment_plan.generate", payload.assessmentId, False)
         raise HTTPException(status_code=501, detail=str(e))
     except Exception as e:
+        write_audit_log(auth_context, "treatment_plan.generate", payload.assessmentId, False)
         raise HTTPException(status_code=500, detail=f"Failed to generate treatment plan: {str(e)}")
 
 
 @app.post("/api/treatment-plan/generate/stream")
-async def generate_plan_stream(request: TreatmentPlanRequest):
+async def generate_plan_stream(request: Request, payload: TreatmentPlanRequest):
     """Generate a treatment plan with streaming output."""
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "plan.publish.team", "team_from_token")
     assessment_data = None
     try:
         ensure_treatment_plan_config()
-        assessment_data = await get_assessment_data(request.assessmentId)
+        assessment_data = await get_assessment_data(payload.assessmentId)
     except TreatmentPlanConfigError as e:
+        write_audit_log(auth_context, "treatment_plan.generate_stream", payload.assessmentId, False)
         raise HTTPException(status_code=503, detail=str(e))
     except AssessmentDataUnavailableError as e:
+        write_audit_log(auth_context, "treatment_plan.generate_stream", payload.assessmentId, False)
         raise HTTPException(status_code=501, detail=str(e))
 
     async def stream_response():
         try:
             async for chunk in generate_treatment_plan_stream(assessment_data):
                 yield chunk
+            write_audit_log(auth_context, "treatment_plan.generate_stream", payload.assessmentId, True)
         except Exception as e:
+            write_audit_log(auth_context, "treatment_plan.generate_stream", payload.assessmentId, False)
             yield f"Failed to generate treatment plan: {str(e)}"
 
     return StreamingResponse(stream_response(), media_type="text/plain")
 
 
 @app.post("/api/treatment-plan/generate-from-session-report")
-async def generate_plan_from_session_report(request: SessionTreatmentPlanRequest) -> TreatmentPlanResponse:
+async def generate_plan_from_session_report(request: Request, payload: SessionTreatmentPlanRequest) -> TreatmentPlanResponse:
     """Generate a treatment plan from a session-level comprehensive report."""
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "plan.publish.team", "team_from_token")
     try:
         ensure_treatment_plan_config()
-        content = await generate_treatment_plan_from_session_report(request.model_dump())
-        return TreatmentPlanResponse(
-            patientId=request.patientId,
-            sessionId=request.sessionId,
-            sessionReportId=request.sessionReportId,
+        content = await generate_treatment_plan_from_session_report(payload.model_dump())
+        response = TreatmentPlanResponse(
+            patientId=payload.patientId,
+            sessionId=payload.sessionId,
+            sessionReportId=payload.sessionReportId,
             content=content,
-            createdBy=request.createdBy,
+            createdBy=payload.createdBy,
             createdAt=datetime.now(),
             updatedAt=datetime.now(),
         )
+        write_audit_log(auth_context, "treatment_plan.generate_from_session_report", payload.sessionReportId, True)
+        return response
     except TreatmentPlanConfigError as e:
+        write_audit_log(auth_context, "treatment_plan.generate_from_session_report", payload.sessionReportId, False)
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
+        write_audit_log(auth_context, "treatment_plan.generate_from_session_report", payload.sessionReportId, False)
         raise HTTPException(status_code=500, detail=f"Failed to generate treatment plan from session report: {str(e)}")
 
 
 @app.post("/api/treatment-plan/generate-from-session-report/stream")
-async def generate_plan_stream_from_session_report(request: SessionTreatmentPlanRequest):
+async def generate_plan_stream_from_session_report(request: Request, payload: SessionTreatmentPlanRequest):
     """Generate a treatment plan from a session-level comprehensive report with streaming output."""
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "plan.publish.team", "team_from_token")
     try:
         ensure_treatment_plan_config()
     except TreatmentPlanConfigError as e:
+        write_audit_log(auth_context, "treatment_plan.generate_from_session_report_stream", payload.sessionReportId, False)
         raise HTTPException(status_code=503, detail=str(e))
 
     async def stream_response():
         try:
-            async for chunk in generate_treatment_plan_stream_from_session_report(request.model_dump()):
+            async for chunk in generate_treatment_plan_stream_from_session_report(payload.model_dump()):
                 yield chunk
+            write_audit_log(auth_context, "treatment_plan.generate_from_session_report_stream", payload.sessionReportId, True)
         except Exception as e:
+            write_audit_log(auth_context, "treatment_plan.generate_from_session_report_stream", payload.sessionReportId, False)
             yield f"Failed to generate treatment plan from session report: {str(e)}"
 
     return StreamingResponse(stream_response(), media_type="text/plain")
 
 
 @app.post("/api/session-report/generate")
-async def generate_session_level_report(request: SessionReportRequest) -> SessionReportResponse:
+async def generate_session_level_report(request: Request, payload: SessionReportRequest) -> SessionReportResponse:
     """Generate a session-level comprehensive report from posture / ROM / voice inputs."""
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "report.create.team", "team_from_token")
     try:
-        return await run_in_threadpool(generate_session_report, request)
+        response = await run_in_threadpool(generate_session_report, payload)
+        write_audit_log(auth_context, "session_report.generate", payload.sessionId, True)
+        return response
     except Exception as e:
+        write_audit_log(auth_context, "session_report.generate", payload.sessionId, False)
         raise HTTPException(status_code=500, detail=f"Failed to generate session report: {str(e)}")
 
 # Integration with MedVoice AI
@@ -676,4 +905,3 @@ if __name__ == "__main__":
     import uvicorn
     # Use port from config to avoid conflicts with zombie processes on 8000
     uvicorn.run(app, host="0.0.0.0", port=8002)
-

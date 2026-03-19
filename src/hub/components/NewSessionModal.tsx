@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CheckCircle, RefreshCw, Stethoscope, User, X } from 'lucide-react';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
@@ -64,8 +64,8 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
               <Stethoscope size={18} />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">新建患者接诊</h2>
-              <p className="text-xs text-slate-500 mt-1">创建患者后自动开启本次接诊</p>
+              <h2 className="text-lg font-semibold text-slate-900">新建运动员训练监控</h2>
+              <p className="text-xs text-slate-500 mt-1">创建运动员后自动开启本次监控</p>
             </div>
           </div>
 
@@ -78,7 +78,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
           <label className="block">
             <span className="text-sm font-medium text-slate-700 inline-flex items-center gap-1.5">
               <User size={14} />
-              患者姓名（可选）
+              运动员姓名（可选）
             </span>
             <input
               type="text"
@@ -91,7 +91,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
 
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">患者编号</span>
+              <span className="text-sm font-medium text-slate-700">运动员编号</span>
               <button onClick={generateNewId} disabled={isGenerating} className="btn-secondary h-8 px-3 text-xs">
                 <RefreshCw size={12} className={cn(isGenerating && 'animate-spin')} />
                 刷新编号
@@ -100,7 +100,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
 
             <div className="mt-2 p-4 rounded-xl bg-slate-900 text-white border border-slate-700">
               <div className="text-2xl font-semibold tracking-[0.18em]">{patientId || '--'}</div>
-              <div className="mt-1 text-xs text-slate-400">请在后续流程中使用该编号检索患者</div>
+              <div className="mt-1 text-xs text-slate-400">请在后续流程中使用该编号检索运动员</div>
             </div>
           </div>
         </div>
@@ -109,7 +109,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
           <button onClick={onClose} className="btn-secondary">取消</button>
           <button onClick={handleConfirm} disabled={isCreating || isGenerating} className={cn('btn-primary', (isCreating || isGenerating) && 'opacity-50 cursor-not-allowed')}>
             {isCreating ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-            {isCreating ? '创建中...' : '确认接诊'}
+            {isCreating ? '创建中...' : '开始监控'}
           </button>
         </div>
       </div>

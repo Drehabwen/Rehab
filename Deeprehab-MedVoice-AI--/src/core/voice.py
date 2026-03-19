@@ -283,15 +283,14 @@ class VoiceRecognizer:
                 if self.use_pyaudio:
                     try:
                         data = stream.read(1024, exception_on_overflow=False)
-                        # 计算音量用于前端波形显示
+                        import numpy as np
+                        audio_data = np.frombuffer(data, dtype=np.int16)
+                        power = 0
+                        if len(audio_data) > 0:
+                            peak = np.abs(audio_data).max()
+                            power = min(100, int(peak / 327.68))
                         if self.on_power:
-                            import numpy as np
-                            audio_data = np.frombuffer(data, dtype=np.int16)
-                            if len(audio_data) > 0:
-                                peak = np.abs(audio_data).max()
-                                # 映射到 0-100 范围
-                                power = min(100, int(peak / 327.68))
-                                self.on_power(power)
+                            self.on_power(power)
                     except:
                         break
                 else:

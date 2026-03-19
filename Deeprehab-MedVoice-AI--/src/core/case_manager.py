@@ -77,7 +77,10 @@ class CaseManager:
             "patient_name": case["patient_name"],
             "visit_date": case["visit_date"],
             "diagnosis": case["diagnosis"],
-            "file_path": case_file
+            "file_path": case_file,
+            "owner_user_id": case.get("owner_user_id"),
+            "assigned_to": case.get("assigned_to"),
+            "team_id": case.get("team_id"),
         }
         
         existing_index = next((i for i, c in enumerate(self.index["cases"]) if c["case_id"] == case["case_id"]), None)

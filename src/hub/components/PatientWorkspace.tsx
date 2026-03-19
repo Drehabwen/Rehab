@@ -24,37 +24,37 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
   const tools = [
     { 
       id: 'vision3' as const, 
-      name: '体态分析', 
+      name: '体态与动作监控', 
       icon: Camera, 
       color: 'from-blue-500 to-cyan-500',
       description: '基于计算机视觉的实时姿态评估与关键关节活动度分析'
     },
     { 
       id: 'medvoice' as const, 
-      name: '语音接诊', 
+      name: '主观疲劳问询', 
       icon: Mic, 
       color: 'from-purple-500 to-pink-500',
-      description: 'AI 驱动的病历录入与语音指令交互助手'
+      description: 'AI 驱动的 RPE 评分录入与语音指令交互助手'
     },
     { 
       id: 'comparison' as const, 
-      name: '前后对比', 
+      name: '表现对比', 
       icon: BarChart3, 
       color: 'from-emerald-500 to-teal-500',
-      description: '对比不同时期的评估数据，展示治疗效果和改善趋势'
+      description: '对比不同训练时期的评估数据，展示训练效果和表现趋势'
     },
     { 
       id: 'reports' as const, 
-      name: '报告中心', 
+      name: '教练报告中心', 
       icon: FileText, 
       color: 'from-amber-500 to-orange-500',
-      description: '查看历史评估报告与生成新的分析报告'
+      description: '查看历史监控报告与生成新的分析报告'
     },
   ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      {/* 患者信息头 */}
+      {/* 运动员信息头 */}
       <div className="flex items-center gap-6">
         <button 
           onClick={onBack}
@@ -80,7 +80,7 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
                 </h2>
               </div>
               <p className="text-slate-400 text-sm font-medium">
-                第 <span className="text-antey-primary font-black">{sessionCount}</span> 次接诊
+                第 <span className="text-antey-primary font-black">{sessionCount}</span> 次监控
               </p>
             </div>
           </div>

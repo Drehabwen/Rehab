@@ -37,38 +37,52 @@ def _get_client() -> AsyncOpenAI:
 def build_prompt(assessment_data: Dict[str, Any]) -> str:
     """Build prompt for treatment plan generation."""
     return f"""
-You are a rehabilitation specialist. Generate a 4-week treatment plan based on this assessment data:
+你是一位专业的运动表现教练和体能康复专家。请根据以下评估数据，为运动员生成一份为期 4 周的个性化运动训练与康复方案：
 
 {json.dumps(assessment_data, ensure_ascii=False, indent=2)}
 
-Requirements:
-1. Identify key problems from the assessment.
-2. Build a 4-week plan.
-3. 3-5 sessions/week, 30-45 minutes/session.
-4. Include warm-up, core training, and cool-down for each session.
-5. Provide actionable instructions and precautions.
-6. Include milestones and progress evaluation methods.
-7. Use professional but clear language.
-8. Output in Markdown.
+要求：
+1. 从评估数据中识别关键问题（如体态异常、活动度受限、动作不稳等）。
+2. 制定一个 4 周的训练计划。
+3. 每周 3-5 次训练，每次 30-45 分钟。
+4. 每次训练包含：热身、核心/专项训练、拉伸放松。
+5. 提供可操作的动作指导和注意事项。
+6. 包含阶段性目标和进度评估方法。
+7. 使用专业、严谨且充满激励性的语言（教练口吻）。
+8. 以 Markdown 格式输出。
 """
 
 
 def build_session_report_prompt(session_report_data: Dict[str, Any]) -> str:
     """Build prompt for treatment-plan generation from a global session report."""
+    patient_type = session_report_data.get("patientType", "adult")
+    patient_type_label = "青少年运动员" if patient_type == "adolescent" else "成年运动员"
+    
+    adolescent_instruction = ""
+    if patient_type == "adolescent":
+        adolescent_instruction = """
+- **青少年训练原则**：重点在于建立正确的动作模式、灵活性和核心稳定性。避免过早进行高强度的抗阻训练。
+- **趣味性与互动**：建议中可以增加一些游戏化或互动性强的描述，激发青少年运动兴趣。
+- **发育保护**：特别关注脊柱、生长板和关节的压力，避免过度冲击。
+"""
+
     return f"""
-You are a rehabilitation specialist. Generate a 4-week treatment plan from this global session report context:
+你是一位专业的运动表现教练和体能康复专家。请根据以下综合监控报告，为{patient_type_label}生成一份为期 4 周的个性化运动训练方案：
 
 {json.dumps(session_report_data, ensure_ascii=False, indent=2)}
 
-Requirements:
-1. Treat the session report as the primary source of truth.
-2. Synthesize posture, ROM, and case-history findings into one plan.
-3. Build a 4-week plan with 3-5 sessions/week and 30-45 minutes/session.
-4. Organize each week with goals, exercises, dosage, and precautions.
-5. Call out missing inputs when they limit plan confidence.
-6. Include home-program guidance and reassessment checkpoints.
-7. Use professional but clear language.
-8. Output in Markdown.
+运动员类型：{patient_type_label}
+
+要求：
+1. 以综合报告为核心依据，综合分析体态、ROM、主观反馈及运动稳定性。
+2. 结合【Vision3 疲劳/稳定性监控数据】（如 jitterIndex, stabilityScore）评估当前的过度训练风险和竞技状态。
+3. 制定 4 周计划，每周 3-5 次，每次 30-45 分钟。
+4. 每周计划需包含明确的训练重点、动作安排、强度建议和恢复指导。
+5. 如果数据缺失影响判断，请在方案中明确指出需要补充的测试项。
+6. 包含家庭自主训练指导和复测节点。
+7. 使用专业、严谨且充满激励性的语言（教练口吻）。
+8. 以 Markdown 格式输出。
+{adolescent_instruction}
 """
 
 

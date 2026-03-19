@@ -5,6 +5,7 @@ import { HubSidebar } from './components/HubSidebar';
 import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
 import { MedVoicePlugin } from '@/plugins/medvoice/MedVoicePlugin';
 import { ROMPlugin } from '@/plugins/rom/ROMPlugin';
+import { TrainingPlanPlugin } from '@/plugins/training-plan/TrainingPlanPlugin';
 import { NexusReportCenter } from './components/NexusReportCenter';
 import { NewSessionModal } from './components/NewSessionModal';
 import { PatientSearchModal } from './components/PatientSearchModal';
@@ -14,7 +15,9 @@ import { ProgressComparison } from './components/ProgressComparison';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar';
 import { DashboardView } from './views/DashboardView';
 import { AssessmentCenterView } from './views/AssessmentCenterView';
-import { DataCenterView } from './views/DataCenterView';
+import { StudentsView } from './views/StudentsView';
+import { AlertsView } from './views/AlertsView';
+import { OrganizationView } from './views/OrganizationView';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
@@ -22,15 +25,28 @@ import { usePatientList } from './hooks/usePatientList';
 import type { Patient } from '@/types/patient';
 import { getPatientAvatar, getPatientDisplayName } from '@/lib/patient-utils';
 import { PatientHeaderBar, StatePanel } from '@/components/layout';
+import {
+  canAccessSettings,
+  canOpenReports,
+  getAllowedCenters,
+  getAllowedTools,
+  getRuntimeAuthContext,
+  type AssessmentTool,
+  type CenterId,
+} from '@/auth/access';
 
-type CenterId = 'dashboard' | 'assessment' | 'reports' | 'datacenter';
 type AssessmentStage = 'overview' | 'workspace';
-type AssessmentTool = 'vision3' | 'medvoice' | 'comparison' | 'rom';
 
 export const NexusHub: React.FC = () => {
-  const [activeCenter, setActiveCenter] = useState<CenterId>('dashboard');
+  const authContext = useMemo(() => getRuntimeAuthContext(), []);
+  const allowedCenters = useMemo<CenterId[]>(() => getAllowedCenters(authContext), [authContext]);
+  const allowedTools = useMemo<AssessmentTool[]>(() => getAllowedTools(authContext), [authContext]);
+  const defaultCenter = allowedCenters[0] ?? 'screening';
+  const defaultTool = allowedTools[0] ?? 'vision3';
+
+  const [activeCenter, setActiveCenter] = useState<CenterId>(defaultCenter);
   const [assessmentStage, setAssessmentStage] = useState<AssessmentStage>('overview');
-  const [activePlugin, setActivePlugin] = useState<AssessmentTool>('vision3');
+  const [activePlugin, setActivePlugin] = useState<AssessmentTool>(defaultTool);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
@@ -38,14 +54,14 @@ export const NexusHub: React.FC = () => {
   const [showDataSettings, setShowDataSettings] = useState(false);
 
   const { patients, loadPatients, setCurrentPatient, getPatientById } = usePatientStore();
-  const { sessions, loadSessions, getPatientSessions } = useSessionStore();
+  const { sessions, loadSessions, getPatientSessions, startSession } = useSessionStore();
   const { assessments, loadAssessments } = useAssessmentStore();
 
   useEffect(() => {
     loadPatients();
     loadSessions();
     loadAssessments();
-  }, [loadPatients, loadSessions, loadAssessments]);
+  }, [loadAssessments, loadPatients, loadSessions]);
 
   const { stats, visitTasks, getVisitTaskByPatientId } = usePatientList({
     patients,
@@ -58,22 +74,53 @@ export const NexusHub: React.FC = () => {
     [getVisitTaskByPatientId, selectedPatient],
   );
 
+  const reportsEnabled = canOpenReports(authContext);
+  const settingsEnabled = canAccessSettings(authContext);
+  const comparisonEnabled = allowedTools.includes('comparison');
+
+  useEffect(() => {
+    if (!allowedCenters.includes(activeCenter)) {
+      setActiveCenter(defaultCenter);
+      setAssessmentStage('overview');
+    }
+  }, [activeCenter, allowedCenters, defaultCenter]);
+
+  useEffect(() => {
+    if (!allowedTools.includes(activePlugin)) {
+      setActivePlugin(defaultTool);
+      setAssessmentStage('overview');
+    }
+  }, [activePlugin, allowedTools, defaultTool]);
+
+  const navigateToScreening = (patient?: Patient | null) => {
+    if (patient) {
+      setSelectedPatient(patient);
+      setCurrentPatient(patient);
+    }
+    if (allowedCenters.includes('screening')) {
+      setActiveCenter('screening');
+    }
+  };
+
   const handleSelectPatient = (patient: Patient) => {
     setSelectedPatient(patient);
     setCurrentPatient(patient);
-    setActiveCenter('assessment');
+    navigateToScreening(patient);
     setAssessmentStage('overview');
   };
 
   const handleToolSelectFromToolbox = (toolId: string) => {
+    if (!allowedTools.includes(toolId as AssessmentTool)) {
+      return;
+    }
     setActivePlugin(toolId as AssessmentTool);
-    setActiveCenter('assessment');
+    setActiveCenter('screening');
     setAssessmentStage('workspace');
   };
 
   const handleBackFromToolbox = () => {
     setAssessmentStage('overview');
-    setActiveCenter('assessment');
+    setActiveCenter('screening');
     setSelectedPatient(null);
     setCurrentPatient(null);
   };
@@ -82,43 +129,67 @@ export const NexusHub: React.FC = () => {
     setAssessmentStage('overview');
   };
 
-  const handleSelectTool = (tool: AssessmentTool) => {
-    setActivePlugin(tool);
-    if (!selectedPatient) return;
-    setActiveCenter('assessment');
-    setAssessmentStage('workspace');
-  };
-
   const handleStartNewPatient = async (patientId: string) => {
     await loadPatients();
     const newPatient = getPatientById(patientId);
     if (newPatient) {
       setSelectedPatient(newPatient);
       setCurrentPatient(newPatient);
-      setActiveCenter('assessment');
+      setActiveCenter('screening');
       setAssessmentStage('overview');
     }
     setShowNewSessionModal(false);
   };
 
   const handleOpenReports = () => {
-    setActiveCenter('reports');
+    if (allowedCenters.includes('reports')) {
+      setActiveCenter('reports');
+    }
+  };
+
+  const handleOpenPatientHistory = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setCurrentPatient(patient);
+    if (allowedCenters.includes('students')) {
+      setActiveCenter('students');
+      return;
+    }
+    if (allowedCenters.includes('reports')) {
+      setActiveCenter('reports');
+      return;
+    }
+    navigateToScreening(patient);
+    setAssessmentStage('overview');
+  };
+
+  const handleStartEvaluation = async (patient: Patient) => {
+    setSelectedPatient(patient);
+    setCurrentPatient(patient);
+    await startSession(patient.id);
+    await loadSessions();
+    setActiveCenter('screening');
+    setAssessmentStage('overview');
   };
 
   const handleOpenComparison = () => {
+    if (!allowedTools.includes('comparison')) {
+      return;
+    }
     setActivePlugin('comparison');
-    setActiveCenter('assessment');
+    setActiveCenter('screening');
     setAssessmentStage('workspace');
   };
 
   const renderAssessmentWorkspace = () => {
     switch (activePlugin) {
       case 'vision3':
-        return <Vision3Plugin />;
+        return <Vision3Plugin onNavigateToReports={handleOpenReports} />;
       case 'medvoice':
         return <MedVoicePlugin />;
       case 'rom':
         return <ROMPlugin />;
+      case 'training_plan':
+        return <TrainingPlanPlugin />;
       case 'comparison':
         return selectedPatient ? (
           <ProgressComparison
@@ -130,11 +201,11 @@ export const NexusHub: React.FC = () => {
           <div className="rehab-page">
             <div className="rehab-page-inner">
               <StatePanel
-                title="暂时无法进行前后对比"
-                description="至少需要 2 次完整评估记录。"
+                title="当前无法进行前后对比"
+                description="至少需要 2 次完整筛查记录后，才能进入前后对比视图。"
                 actions={(
                   <>
-                    <button className="btn-primary" onClick={() => setAssessmentStage('overview')}>去完成首次评估</button>
+                    <button className="btn-primary" onClick={() => setAssessmentStage('overview')}>返回筛查工作台</button>
                     <button className="btn-secondary" onClick={() => setActiveCenter('reports')}>查看报告</button>
                   </>
                 )}
@@ -143,26 +214,37 @@ export const NexusHub: React.FC = () => {
           </div>
         );
       default:
-        return <Vision3Plugin />;
+        return <Vision3Plugin onNavigateToReports={handleOpenReports} />;
     }
   };
 
   const renderCenterContent = () => {
     switch (activeCenter) {
-      case 'dashboard':
+      case 'home':
         return (
           <DashboardView
             patients={patients}
             visitTasks={visitTasks}
             stats={stats}
             onSelectPatient={handleSelectPatient}
+            onOpenHistory={handleOpenPatientHistory}
+            onStartEvaluation={handleStartEvaluation}
+            canOpenHistory={reportsEnabled}
             onNewPatient={() => setShowNewSessionModal(true)}
             onSearchPatient={() => setShowSearchModal(true)}
           />
         );
-      case 'assessment':
+      case 'screening':
         if (!selectedPatient) {
-          return <AssessmentCenterView visitTasks={visitTasks} onSelectPatient={handleSelectPatient} />;
+          return (
+            <AssessmentCenterView
+              visitTasks={visitTasks}
+              onSelectPatient={handleSelectPatient}
+              onOpenHistory={handleOpenPatientHistory}
+              onStartEvaluation={handleStartEvaluation}
+              canOpenHistory={reportsEnabled}
+            />
+          );
         }
 
         if (assessmentStage === 'workspace') {
@@ -178,6 +260,30 @@ export const NexusHub: React.FC = () => {
             onOpenComparison={handleOpenComparison}
             onBack={handleBackFromToolbox}
             sessionCount={getPatientSessions(selectedPatient.id).length}
+            allowedToolIds={allowedTools.filter((tool) => tool !== 'comparison')}
+            showComparison={comparisonEnabled}
+            showReports={reportsEnabled}
+          />
+        );
+      case 'students':
+        return (
+          <StudentsView
+            patients={patients}
+            visitTasks={visitTasks}
+            selectedPatient={selectedPatient}
+            onSelectPatient={(patient) => {
+              setSelectedPatient(patient);
+              setCurrentPatient(patient);
+            }}
+            onOpenScreening={(patient) => {
+              navigateToScreening(patient);
+              setAssessmentStage('overview');
+            }}
+            onOpenReports={(patient) => {
+              setSelectedPatient(patient);
+              setCurrentPatient(patient);
+              handleOpenReports();
+            }}
           />
         );
       case 'reports':
@@ -188,12 +294,23 @@ export const NexusHub: React.FC = () => {
             sessionId={selectedVisitTask?.sessionId ?? null}
           />
         );
-      case 'datacenter':
+      case 'alerts':
         return (
-          <DataCenterView
+          <AlertsView
+            visitTasks={visitTasks}
+            onSelectPatient={handleSelectPatient}
+            onOpenHistory={handleOpenPatientHistory}
+            onStartEvaluation={handleStartEvaluation}
+            canOpenHistory={reportsEnabled}
+          />
+        );
+      case 'organization':
+        return (
+          <OrganizationView
             sessions={sessions}
             assessments={assessments}
             visitTasks={visitTasks}
+            onOpenSettings={() => settingsEnabled && setShowDataSettings(true)}
           />
         );
       default:
@@ -201,24 +318,26 @@ export const NexusHub: React.FC = () => {
     }
   };
 
-  const showPatientHeader = activeCenter === 'assessment' && !!selectedPatient;
-  const showWorkspaceToolbar = activeCenter === 'assessment' && assessmentStage === 'workspace' && !!selectedPatient;
+  const showPatientHeader = activeCenter === 'screening' && !!selectedPatient;
+  const showWorkspaceToolbar = activeCenter === 'screening' && assessmentStage === 'workspace' && !!selectedPatient;
 
   return (
     <div className="mesh-gradient flex h-screen overflow-hidden text-slate-900">
       <HubSidebar
         activeId={activeCenter}
         onSelect={(id) => {
-          if (id === 'dashboard' || id === 'assessment' || id === 'reports' || id === 'datacenter') {
-            setActiveCenter(id);
-            if (id !== 'assessment') {
+          if (allowedCenters.includes(id as CenterId)) {
+            setActiveCenter(id as CenterId);
+            if (id !== 'screening') {
               setAssessmentStage('overview');
             }
           }
         }}
         isCollapsed={isCollapsed}
         onToggle={() => setIsCollapsed(!isCollapsed)}
-        onSettingsClick={() => setShowDataSettings(true)}
+        onSettingsClick={() => settingsEnabled && setShowDataSettings(true)}
+        visibleItemIds={allowedCenters}
+        showSettings={settingsEnabled}
       />
 
       <main className={cn('relative flex min-w-0 flex-1 flex-col')}>
@@ -226,9 +345,9 @@ export const NexusHub: React.FC = () => {
           <PatientHeaderBar
             name={getPatientDisplayName(selectedPatient)}
             avatar={getPatientAvatar(selectedPatient)}
-            meta={`第 ${Math.max(getPatientSessions(selectedPatient.id).length, 1)} 次接诊 · 最近更新 ${new Date(selectedPatient.updatedAt).toLocaleDateString('zh-CN')}`}
+            meta={`第 ${Math.max(getPatientSessions(selectedPatient.id).length, 1)} 次筛查 · 最近更新 ${new Date(selectedPatient.updatedAt).toLocaleDateString('zh-CN')}`}
             onBack={assessmentStage === 'workspace' ? handleBackFromWorkspace : handleBackFromToolbox}
-            onSettings={() => setShowDataSettings(true)}
+            onSettings={() => settingsEnabled && setShowDataSettings(true)}
           />
         ) : null}
 
@@ -237,26 +356,31 @@ export const NexusHub: React.FC = () => {
         </div>
 
         {showWorkspaceToolbar ? (
-          <WorkspaceToolbar activeTool={activePlugin} onSelectTool={handleSelectTool} />
+          <WorkspaceToolbar
+            activeTool={activePlugin}
+            onSelectTool={(toolId) => handleToolSelectFromToolbox(toolId)}
+            visibleToolIds={allowedTools}
+          />
         ) : null}
-
-        <NewSessionModal
-          isOpen={showNewSessionModal}
-          onClose={() => setShowNewSessionModal(false)}
-          onStartSession={handleStartNewPatient}
-        />
-
-        <PatientSearchModal
-          isOpen={showSearchModal}
-          onClose={() => setShowSearchModal(false)}
-          onSelectPatient={handleSelectPatient}
-        />
-
-        <DataSettingsModal
-          isOpen={showDataSettings}
-          onClose={() => setShowDataSettings(false)}
-        />
       </main>
+
+      <NewSessionModal
+        isOpen={showNewSessionModal}
+        onClose={() => setShowNewSessionModal(false)}
+        onStartSession={handleStartNewPatient}
+      />
+      <PatientSearchModal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        onSelectPatient={(patient) => {
+          handleSelectPatient(patient);
+          setShowSearchModal(false);
+        }}
+      />
+      <DataSettingsModal
+        isOpen={showDataSettings}
+        onClose={() => setShowDataSettings(false)}
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, Clock, Search, Stethoscope, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, Clock, Search, Activity, X } from 'lucide-react';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { getRelativeTime } from '@/lib/session-utils';
@@ -67,8 +67,8 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
               <Search size={18} />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">查找患者</h2>
-              <p className="mt-1 text-xs text-slate-500">按姓名或编号搜索，并快速开启接诊。</p>
+              <h2 className="text-lg font-semibold text-slate-900">查找运动员</h2>
+              <p className="mt-1 text-xs text-slate-500">按姓名或编号搜索，并快速开启监控。</p>
             </div>
           </div>
 
@@ -84,7 +84,7 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="输入患者姓名或编号"
+              placeholder="输入运动员姓名或编号"
               className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm"
               autoFocus
             />
@@ -96,8 +96,8 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
             <div className="space-y-2">
               {filteredPatients.length === 0 ? (
                 <div className="state-panel">
-                  <h3 className="text-lg">未找到匹配患者</h3>
-                  <p>请检查搜索内容，或先新建患者。</p>
+                  <h3 className="text-lg">未找到匹配运动员</h3>
+                  <p>请检查搜索内容，或先新建运动员。</p>
                 </div>
               ) : (
                 filteredPatients.map((patient) => (
@@ -140,9 +140,9 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
               </section>
 
               <section className="bento-card p-4">
-                <div className="mb-2 text-sm font-semibold text-slate-900">历史接诊</div>
+                <div className="mb-2 text-sm font-semibold text-slate-900">历史监控</div>
                 {selectedSessions.length === 0 ? (
-                  <p className="text-sm text-slate-500">暂无历史接诊记录。</p>
+                  <p className="text-sm text-slate-500">暂无历史监控记录。</p>
                 ) : (
                   <div className="space-y-2">
                     {selectedSessions.slice(0, 6).map((session) => (
@@ -151,7 +151,7 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
                           <div className="truncate text-sm font-medium text-slate-900">{session.id}</div>
                           <div className="inline-flex items-center gap-1 text-xs text-slate-500">
                             <Clock size={12} />
-                            第 {session.sequence} 次接诊 · {getRelativeTime(session.createdAt)}
+                            第 {session.sequence} 场监控 · {getRelativeTime(session.createdAt)}
                           </div>
                         </div>
                         <button
@@ -176,8 +176,8 @@ export const PatientSearchModal: React.FC<PatientSearchModalProps> = ({ isOpen, 
           <div className="dialog-footer">
             <button onClick={onClose} className="btn-secondary">取消</button>
             <button onClick={handleContinueSession} disabled={isCreatingSession} className={cn('btn-primary', isCreatingSession && 'cursor-not-allowed opacity-50')}>
-              <Stethoscope size={14} />
-              {isCreatingSession ? '创建中...' : '新增接诊记录'}
+              <Activity size={14} />
+              {isCreatingSession ? '创建中...' : '开始本次监控'}
             </button>
           </div>
         ) : null}

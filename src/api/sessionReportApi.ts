@@ -1,4 +1,5 @@
 import { CONFIG } from '@/config';
+import { buildAuthHeaders } from '@/auth/access';
 import type { SessionReportGenerationRequest, SessionReportOutput } from '@/types/report-center';
 
 const API_BASE_URL = CONFIG.api.baseUrl;
@@ -9,6 +10,7 @@ export const SessionReportApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...buildAuthHeaders(),
       },
       body: JSON.stringify(payload),
     });

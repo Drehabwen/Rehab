@@ -1,8 +1,7 @@
-import { Assessment, AssessmentRecord, TreatmentPlanVersion } from '../types/assessment';
-import { AssessmentRecordStorage } from '../utils/assessmentRecordStorage';
 import { APP_CONFIG } from '../config/appConfig';
+import type { Assessment, AssessmentRecord, TreatmentPlanVersion } from '../types/assessment';
 
-interface DataCenterStorage {
+interface ScreeningArchiveStorage {
   assessments: Assessment[];
   treatmentPlans: TreatmentPlanVersion[];
   records: AssessmentRecord[];
@@ -10,7 +9,7 @@ interface DataCenterStorage {
   version: string;
 }
 
-interface DataStatistics {
+export interface ScreeningArchiveStatistics {
   totalAssessments: number;
   totalRecords: number;
   totalTreatmentPlans: number;
@@ -19,160 +18,159 @@ interface DataStatistics {
   recentAssessments: Assessment[];
 }
 
-export class DataCenterService {
-  private static STORAGE_KEY = 'rehab_data_center';
-  private static VERSION = '1.0';
+export class ScreeningArchiveService {
+  private static readonly STORAGE_KEY = 'rehab_data_center';
+  private static readonly VERSION = '1.0';
 
   static saveAssessment(assessment: Assessment): boolean {
     try {
-      const data = this.loadData();
-      const existingIndex = data.assessments.findIndex(a => a.id === assessment.id);
-      
+      const archive = this.loadArchive();
+      const existingIndex = archive.assessments.findIndex((item) => item.id === assessment.id);
+
       if (existingIndex >= 0) {
-        data.assessments[existingIndex] = assessment;
+        archive.assessments[existingIndex] = assessment;
       } else {
-        data.assessments.push(assessment);
+        archive.assessments.push(assessment);
       }
-      
-      data.lastUpdated = new Date().toISOString();
-      return this.saveData(data);
+
+      archive.lastUpdated = new Date().toISOString();
+      return this.saveArchive(archive);
     } catch (error) {
-      console.error('保存评估数据失败:', error);
+      console.error('保存筛查结果失败:', error);
       return false;
     }
   }
 
-  static saveTreatmentPlan(plan: TreatmentPlanVersion): boolean {
+  static saveInterventionPlan(plan: TreatmentPlanVersion): boolean {
     try {
-      const data = this.loadData();
-      const existingIndex = data.treatmentPlans.findIndex(p => p.id === plan.id);
-      
+      const archive = this.loadArchive();
+      const existingIndex = archive.treatmentPlans.findIndex((item) => item.id === plan.id);
+
       if (existingIndex >= 0) {
-        data.treatmentPlans[existingIndex] = plan;
+        archive.treatmentPlans[existingIndex] = plan;
       } else {
-        data.treatmentPlans.push(plan);
+        archive.treatmentPlans.push(plan);
       }
-      
-      data.lastUpdated = new Date().toISOString();
-      return this.saveData(data);
+
+      archive.lastUpdated = new Date().toISOString();
+      return this.saveArchive(archive);
     } catch (error) {
-      console.error('保存治疗计划失败:', error);
+      console.error('保存干预建议失败:', error);
       return false;
     }
   }
 
   static saveRecord(record: AssessmentRecord): boolean {
     try {
-      const data = this.loadData();
-      const existingIndex = data.records.findIndex(r => r.id === record.id);
-      
+      const archive = this.loadArchive();
+      const normalizedRecord = this.normalizeRecord(record);
+      const existingIndex = archive.records.findIndex((item) => item.id === normalizedRecord.id);
+
       if (existingIndex >= 0) {
-        data.records[existingIndex] = record;
+        archive.records[existingIndex] = normalizedRecord;
       } else {
-        data.records.push(record);
+        archive.records.push(normalizedRecord);
       }
-      
-      data.lastUpdated = new Date().toISOString();
-      return this.saveData(data);
+
+      archive.records.sort((left, right) => this.toTimestamp(right.timestamp) - this.toTimestamp(left.timestamp));
+      archive.lastUpdated = new Date().toISOString();
+      return this.saveArchive(archive);
     } catch (error) {
-      console.error('保存评估记录失败:', error);
+      console.error('保存筛查记录失败:', error);
       return false;
     }
   }
 
   static loadAssessments(patientId?: string): Assessment[] {
-    const data = this.loadData();
-    if (patientId) {
-      return data.assessments.filter(a => a.patientId === patientId);
-    }
-    return data.assessments;
+    const archive = this.loadArchive();
+    return patientId
+      ? archive.assessments.filter((item) => item.patientId === patientId)
+      : archive.assessments;
   }
 
-  static loadTreatmentPlans(patientId?: string): TreatmentPlanVersion[] {
-    const data = this.loadData();
-    if (patientId) {
-      return data.treatmentPlans.filter(p => p.patientId === patientId);
-    }
-    return data.treatmentPlans;
+  static loadInterventionPlans(patientId?: string): TreatmentPlanVersion[] {
+    const archive = this.loadArchive();
+    return patientId
+      ? archive.treatmentPlans.filter((item) => item.patientId === patientId)
+      : archive.treatmentPlans;
   }
 
   static loadRecords(patientId?: string): AssessmentRecord[] {
-    const data = this.loadData();
-    if (patientId) {
-      return data.records.filter(r => r.patientId === patientId);
-    }
-    return data.records;
+    const archive = this.loadArchive();
+    const sortedRecords = [...archive.records].sort(
+      (left, right) => this.toTimestamp(right.timestamp) - this.toTimestamp(left.timestamp),
+    );
+    return patientId
+      ? sortedRecords.filter((item) => item.patientId === patientId)
+      : sortedRecords;
   }
 
   static getAssessment(id: string): Assessment | null {
-    const data = this.loadData();
-    return data.assessments.find(a => a.id === id) || null;
+    const archive = this.loadArchive();
+    return archive.assessments.find((item) => item.id === id) ?? null;
   }
 
-  static getTreatmentPlan(id: string): TreatmentPlanVersion | null {
-    const data = this.loadData();
-    return data.treatmentPlans.find(p => p.id === id) || null;
+  static getInterventionPlan(id: string): TreatmentPlanVersion | null {
+    const archive = this.loadArchive();
+    return archive.treatmentPlans.find((item) => item.id === id) ?? null;
   }
 
   static getRecord(id: string): AssessmentRecord | null {
-    const data = this.loadData();
-    return data.records.find(r => r.id === id) || null;
+    const archive = this.loadArchive();
+    return archive.records.find((item) => item.id === id) ?? null;
   }
 
   static deleteAssessment(id: string): boolean {
     try {
-      const data = this.loadData();
-      data.assessments = data.assessments.filter(a => a.id !== id);
-      data.lastUpdated = new Date().toISOString();
-      return this.saveData(data);
+      const archive = this.loadArchive();
+      archive.assessments = archive.assessments.filter((item) => item.id !== id);
+      archive.lastUpdated = new Date().toISOString();
+      return this.saveArchive(archive);
     } catch (error) {
-      console.error('删除评估数据失败:', error);
+      console.error('删除筛查结果失败:', error);
       return false;
     }
   }
 
-  static deleteTreatmentPlan(id: string): boolean {
+  static deleteInterventionPlan(id: string): boolean {
     try {
-      const data = this.loadData();
-      data.treatmentPlans = data.treatmentPlans.filter(p => p.id !== id);
-      data.lastUpdated = new Date().toISOString();
-      return this.saveData(data);
+      const archive = this.loadArchive();
+      archive.treatmentPlans = archive.treatmentPlans.filter((item) => item.id !== id);
+      archive.lastUpdated = new Date().toISOString();
+      return this.saveArchive(archive);
     } catch (error) {
-      console.error('删除治疗计划失败:', error);
+      console.error('删除干预建议失败:', error);
       return false;
     }
   }
 
   static deleteRecord(id: string): boolean {
     try {
-      const data = this.loadData();
-      data.records = data.records.filter(r => r.id !== id);
-      data.lastUpdated = new Date().toISOString();
-      return this.saveData(data);
+      const archive = this.loadArchive();
+      archive.records = archive.records.filter((item) => item.id !== id);
+      archive.lastUpdated = new Date().toISOString();
+      return this.saveArchive(archive);
     } catch (error) {
-      console.error('删除评估记录失败:', error);
+      console.error('删除筛查记录失败:', error);
       return false;
     }
   }
 
-  static getStatistics(patientId?: string): DataStatistics {
-    const data = this.loadData();
-    let assessments = data.assessments;
-    let records = data.records;
-    let treatmentPlans = data.treatmentPlans;
+  static getStatistics(patientId?: string): ScreeningArchiveStatistics {
+    const archive = this.loadArchive();
+    let assessments = archive.assessments;
+    let records = archive.records;
+    let treatmentPlans = archive.treatmentPlans;
 
     if (patientId) {
-      assessments = assessments.filter(a => a.patientId === patientId);
-      records = records.filter(r => r.patientId === patientId);
-      treatmentPlans = treatmentPlans.filter(p => p.patientId === patientId);
+      assessments = assessments.filter((item) => item.patientId === patientId);
+      records = records.filter((item) => item.patientId === patientId);
+      treatmentPlans = treatmentPlans.filter((item) => item.patientId === patientId);
     }
 
     const storageUsed = this.getStorageUsed();
     const storageAvailable = storageUsed < APP_CONFIG.STORAGE_LIMITS.CRITICAL_THRESHOLD;
-
-    const recentAssessments = [...assessments]
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(0, 5);
+    const recentAssessments = [...assessments].sort((left, right) => right.createdAt - left.createdAt).slice(0, 5);
 
     return {
       totalAssessments: assessments.length,
@@ -184,123 +182,148 @@ export class DataCenterService {
     };
   }
 
-  static exportData(patientId?: string): string {
-    const data = this.loadData();
-    let exportData = { ...data };
+  static exportArchive(patientId?: string): string {
+    const archive = this.loadArchive();
+    let scopedArchive: ScreeningArchiveStorage = { ...archive };
 
     if (patientId) {
-      exportData = {
-        ...data,
-        assessments: data.assessments.filter(a => a.patientId === patientId),
-        records: data.records.filter(r => r.patientId === patientId),
-        treatmentPlans: data.treatmentPlans.filter(p => p.patientId === patientId),
+      scopedArchive = {
+        ...archive,
+        assessments: archive.assessments.filter((item) => item.patientId === patientId),
+        records: archive.records.filter((item) => item.patientId === patientId),
+        treatmentPlans: archive.treatmentPlans.filter((item) => item.patientId === patientId),
       };
     }
 
-    return JSON.stringify({
-      ...exportData,
-      exportDate: new Date().toISOString(),
-    }, null, 2);
+    const sortedRecords = [...scopedArchive.records].sort(
+      (left, right) => this.toTimestamp(right.timestamp) - this.toTimestamp(left.timestamp),
+    );
+    const recordOverview = {
+      total: sortedRecords.length,
+      latestAt: sortedRecords[0]?.timestamp ?? null,
+      byType: {
+        front: sortedRecords.filter((record) => record.assessmentType === 'front').length,
+        side: sortedRecords.filter((record) => record.assessmentType === 'side').length,
+        back: sortedRecords.filter((record) => record.assessmentType === 'back').length,
+      },
+      fatigueInterventions: {
+        interventionCount: new Set(
+          sortedRecords
+            .map((record) => record.intervention?.interventionId)
+            .filter((value): value is string => Boolean(value)),
+        ).size,
+        beforeAfterPairCount: this.countBeforeAfterPairs(sortedRecords),
+      },
+    };
+
+    return JSON.stringify(
+      {
+        ...scopedArchive,
+        records: sortedRecords,
+        recordOverview,
+        exportDate: new Date().toISOString(),
+      },
+      null,
+      2,
+    );
   }
 
-  static importData(jsonStr: string): boolean {
+  static importArchive(jsonStr: string): boolean {
     try {
-      const importedData = JSON.parse(jsonStr);
-      const currentData = this.loadData();
+      const importedArchive = JSON.parse(jsonStr);
+      const currentArchive = this.loadArchive();
 
-      if (importedData.assessments) {
-        currentData.assessments = [
-          ...currentData.assessments,
-          ...importedData.assessments,
-        ];
+      if (importedArchive.assessments) {
+        currentArchive.assessments = this.upsertById(currentArchive.assessments, importedArchive.assessments);
       }
 
-      if (importedData.records) {
-        currentData.records = [
-          ...currentData.records,
-          ...importedData.records,
-        ];
+      if (importedArchive.records) {
+        currentArchive.records = this.upsertById(
+          currentArchive.records,
+          importedArchive.records.map((record: AssessmentRecord) => this.normalizeRecord(record)),
+          (left, right) => this.toTimestamp(right.timestamp) >= this.toTimestamp(left.timestamp),
+        ).sort((left, right) => this.toTimestamp(right.timestamp) - this.toTimestamp(left.timestamp));
       }
 
-      if (importedData.treatmentPlans) {
-        currentData.treatmentPlans = [
-          ...currentData.treatmentPlans,
-          ...importedData.treatmentPlans,
-        ];
+      if (importedArchive.treatmentPlans) {
+        currentArchive.treatmentPlans = this.upsertById(
+          currentArchive.treatmentPlans,
+          importedArchive.treatmentPlans,
+        );
       }
 
-      currentData.lastUpdated = new Date().toISOString();
-      return this.saveData(currentData);
+      currentArchive.lastUpdated = new Date().toISOString();
+      return this.saveArchive(currentArchive);
     } catch (error) {
-      console.error('导入数据失败:', error);
+      console.error('导入归档数据失败:', error);
       return false;
     }
   }
 
-  static clearData(patientId?: string): boolean {
+  static clearArchive(patientId?: string): boolean {
     try {
-      if (patientId) {
-        const data = this.loadData();
-        data.assessments = data.assessments.filter(a => a.patientId !== patientId);
-        data.records = data.records.filter(r => r.patientId !== patientId);
-        data.treatmentPlans = data.treatmentPlans.filter(p => p.patientId !== patientId);
-        data.lastUpdated = new Date().toISOString();
-        return this.saveData(data);
-      } else {
+      if (!patientId) {
         localStorage.removeItem(this.STORAGE_KEY);
         return true;
       }
+
+      const archive = this.loadArchive();
+      archive.assessments = archive.assessments.filter((item) => item.patientId !== patientId);
+      archive.records = archive.records.filter((item) => item.patientId !== patientId);
+      archive.treatmentPlans = archive.treatmentPlans.filter((item) => item.patientId !== patientId);
+      archive.lastUpdated = new Date().toISOString();
+      return this.saveArchive(archive);
     } catch (error) {
-      console.error('清空数据失败:', error);
+      console.error('清空归档数据失败:', error);
       return false;
     }
   }
 
-  private static loadData(): DataCenterStorage {
+  private static loadArchive(): ScreeningArchiveStorage {
     try {
       const dataStr = localStorage.getItem(this.STORAGE_KEY);
       if (!dataStr) {
-        return this.getDefaultData();
+        return this.getDefaultArchive();
       }
 
-      const data = JSON.parse(dataStr);
-      if (data.version !== this.VERSION) {
-        console.warn('数据中心版本不匹配，使用默认数据');
-        return this.getDefaultData();
+      const archive = JSON.parse(dataStr);
+      if (archive.version !== this.VERSION) {
+        console.warn('检测到旧版归档数据，已回退到默认结构。');
+        return this.getDefaultArchive();
       }
 
       return {
-        assessments: data.assessments || [],
-        treatmentPlans: data.treatmentPlans || [],
-        records: data.records || [],
-        lastUpdated: data.lastUpdated || new Date().toISOString(),
-        version: data.version || this.VERSION,
+        assessments: archive.assessments || [],
+        treatmentPlans: archive.treatmentPlans || [],
+        records: archive.records || [],
+        lastUpdated: archive.lastUpdated || new Date().toISOString(),
+        version: archive.version || this.VERSION,
       };
     } catch (error) {
-      console.error('加载数据中心失败:', error);
-      return this.getDefaultData();
+      console.error('加载归档数据失败:', error);
+      return this.getDefaultArchive();
     }
   }
 
-  private static saveData(data: DataCenterStorage): boolean {
+  private static saveArchive(archive: ScreeningArchiveStorage): boolean {
     try {
-      const dataStr = JSON.stringify(data);
+      const dataStr = JSON.stringify(archive);
       const dataSize = new Blob([dataStr]).size;
 
       if (dataSize > APP_CONFIG.STORAGE_LIMITS.CRITICAL_THRESHOLD) {
-        console.error('数据中心存储容量已达临界值');
+        console.error('归档数据已达到本地存储上限。');
         return false;
       }
 
       localStorage.setItem(this.STORAGE_KEY, dataStr);
       return true;
     } catch (error) {
-      console.error('保存数据中心失败:', error);
+      console.error('保存归档数据失败:', error);
       return false;
     }
   }
 
-  private static getDefaultData(): DataCenterStorage {
+  private static getDefaultArchive(): ScreeningArchiveStorage {
     return {
       assessments: [],
       treatmentPlans: [],
@@ -314,8 +337,136 @@ export class DataCenterService {
     try {
       const dataStr = localStorage.getItem(this.STORAGE_KEY);
       return dataStr ? new Blob([dataStr]).size : 0;
-    } catch (error) {
+    } catch {
       return 0;
     }
   }
+
+  private static upsertById<T extends { id: string }>(
+    existing: T[],
+    incoming: T[],
+    shouldReplace: (currentItem: T, incomingItem: T) => boolean = () => true,
+  ): T[] {
+    const items = new Map<string, T>();
+    existing.forEach((item) => items.set(item.id, item));
+    incoming.forEach((item) => {
+      const currentItem = items.get(item.id);
+      if (!currentItem || shouldReplace(currentItem, item)) {
+        items.set(item.id, item);
+      }
+    });
+    return Array.from(items.values());
+  }
+
+  private static normalizeTimestamp(value: string): string {
+    const timestamp = this.toTimestamp(value);
+    return timestamp <= 0 ? new Date().toISOString() : new Date(timestamp).toISOString();
+  }
+
+  private static toTimestamp(value: string): number {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  private static normalizeRecord(record: AssessmentRecord): AssessmentRecord {
+    return {
+      ...record,
+      timestamp: this.normalizeTimestamp(record.timestamp),
+      fatigueMetrics: this.normalizeFatigueMetrics(record.fatigueMetrics),
+      intervention: this.normalizeIntervention(record.intervention),
+    };
+  }
+
+  private static normalizeFatigueMetrics(
+    metrics?: AssessmentRecord['fatigueMetrics'],
+  ): AssessmentRecord['fatigueMetrics'] {
+    if (!metrics) {
+      return undefined;
+    }
+
+    const normalized = {
+      rpe: this.normalizeNumeric(metrics.rpe),
+      stabilityScore: this.normalizeNumeric(metrics.stabilityScore),
+      jitterIndex: this.normalizeNumeric(metrics.jitterIndex),
+      fatigueScore: this.normalizeNumeric(metrics.fatigueScore),
+      recoveryScore: this.normalizeNumeric(metrics.recoveryScore),
+    };
+
+    return Object.values(normalized).some((value) => typeof value === 'number') ? normalized : undefined;
+  }
+
+  private static normalizeIntervention(
+    intervention?: AssessmentRecord['intervention'],
+  ): AssessmentRecord['intervention'] {
+    if (!intervention?.interventionId) {
+      return undefined;
+    }
+
+    const phase = intervention.phase.toLowerCase();
+    const normalizedPhase: AssessmentRecord['intervention']['phase'] =
+      phase === 'before' || phase === 'during' || phase === 'after' ? phase : 'during';
+
+    return {
+      ...intervention,
+      phase: normalizedPhase,
+    };
+  }
+
+  private static normalizeNumeric(value: unknown): number | undefined {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+      return undefined;
+    }
+    return Number(value.toFixed(4));
+  }
+
+  private static countBeforeAfterPairs(records: AssessmentRecord[]): number {
+    const interventionPhaseMap = new Map<string, Set<'before' | 'during' | 'after'>>();
+
+    records.forEach((record) => {
+      const interventionId = record.intervention?.interventionId;
+      const phase = record.intervention?.phase;
+      if (!interventionId || !phase) {
+        return;
+      }
+
+      const phases = interventionPhaseMap.get(interventionId) ?? new Set<'before' | 'during' | 'after'>();
+      phases.add(phase);
+      interventionPhaseMap.set(interventionId, phases);
+    });
+
+    return Array.from(interventionPhaseMap.values()).filter(
+      (phases) => phases.has('before') && phases.has('after'),
+    ).length;
+  }
+
+  static saveTreatmentPlan(plan: TreatmentPlanVersion): boolean {
+    return this.saveInterventionPlan(plan);
+  }
+
+  static loadTreatmentPlans(patientId?: string): TreatmentPlanVersion[] {
+    return this.loadInterventionPlans(patientId);
+  }
+
+  static getTreatmentPlan(id: string): TreatmentPlanVersion | null {
+    return this.getInterventionPlan(id);
+  }
+
+  static deleteTreatmentPlan(id: string): boolean {
+    return this.deleteInterventionPlan(id);
+  }
+
+  static exportData(patientId?: string): string {
+    return this.exportArchive(patientId);
+  }
+
+  static importData(jsonStr: string): boolean {
+    return this.importArchive(jsonStr);
+  }
+
+  static clearData(patientId?: string): boolean {
+    return this.clearArchive(patientId);
+  }
 }
+
+export { ScreeningArchiveService as DataCenterService };
+export type DataStatistics = ScreeningArchiveStatistics;

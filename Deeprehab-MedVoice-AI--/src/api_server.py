@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -59,6 +59,84 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+STRICT_RBAC = os.getenv("STRICT_RBAC", "false").lower() == "true"
+
+ROLE_PERMISSIONS: Dict[str, set[str]] = {
+    "manager": {
+        "system.read",
+        "case.read",
+        "case.approve",
+        "report.publish",
+        "report.export",
+        "plan.publish.team",
+        "report.create.team",
+    },
+    "operator": {
+        "system.read",
+        "record.use",
+        "structure.use",
+        "case.read",
+        "case.write",
+        "case.submit",
+    },
+}
+
+ROLE_ALIASES: Dict[str, str] = {
+    "super_head_coach": "manager",
+    "head_coach": "manager",
+    "assistant_medic": "operator",
+    "athlete_readonly": "operator",
+}
+
+
+def normalize_role(value: Optional[str]) -> str:
+    role = (value or "").strip()
+    if role in ROLE_ALIASES:
+        role = ROLE_ALIASES[role]
+    return role if role in ROLE_PERMISSIONS else ""
+
+
+def build_auth_context(
+    user_id: Optional[str],
+    role: Optional[str],
+    team_id: Optional[str],
+) -> Dict[str, str]:
+    normalized_role = normalize_role(role)
+    if STRICT_RBAC and (not user_id or not normalized_role or not team_id):
+        raise HTTPException(status_code=401, detail="Missing authentication context")
+    resolved_user_id = (user_id or "system").strip() or "system"
+    resolved_role = normalized_role or "manager"
+    resolved_team_id = (team_id or "default-team").strip() or "default-team"
+    if resolved_role not in ROLE_PERMISSIONS:
+        raise HTTPException(status_code=403, detail="Unsupported role")
+    return {
+        "user_id": resolved_user_id,
+        "role": resolved_role,
+        "team_id": resolved_team_id,
+    }
+
+
+def get_http_auth_context(request: Request) -> Dict[str, str]:
+    return build_auth_context(
+        user_id=request.headers.get("x-user-id"),
+        role=request.headers.get("x-user-role"),
+        team_id=request.headers.get("x-team-id"),
+    )
+
+
+def get_ws_auth_context(websocket: WebSocket) -> Dict[str, str]:
+    return build_auth_context(
+        user_id=websocket.query_params.get("userId") or websocket.headers.get("x-user-id"),
+        role=websocket.query_params.get("role") or websocket.headers.get("x-user-role"),
+        team_id=websocket.query_params.get("teamId") or websocket.headers.get("x-team-id"),
+    )
+
+
+def ensure_permission(auth_context: Dict[str, str], permission: str) -> None:
+    role = auth_context["role"]
+    if permission not in ROLE_PERMISSIONS.get(role, set()):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
 
 def load_runtime_env():
     if load_dotenv is None:
@@ -69,6 +147,7 @@ def load_runtime_env():
     repo_root = os.path.dirname(project_root)
 
     possible_env_paths = [
+        os.path.join(repo_root, ".env"),
         os.path.join(repo_root, "backend", ".env"),
         os.path.join(project_root, ".env"),
         os.path.join(current_dir, ".env"),
@@ -202,8 +281,10 @@ async def health_check():
 # --- 鏈湴褰曢煶鎺ュ彛 ---
 
 @app.post("/api/record/start")
-async def start_local_record():
+async def start_local_record(request: Request):
     try:
+        auth_context = get_http_auth_context(request)
+        ensure_permission(auth_context, "record.use")
         # 杩欓噷鍙互浣跨敤 on_update 鏉ラ€氳繃 websocket 鎴栧叾浠栨柟寮忔帹閫佸疄鏃舵枃鏈?        # 鐩墠鍏堢畝鍗曞疄鐜?        recorder.start_recording()
         return {"status": "success", "message": "宸插紑鍚湰鍦伴害鍏嬮褰曢煶"}
     except Exception as e:
@@ -211,8 +292,10 @@ async def start_local_record():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/record/stop")
-async def stop_local_record():
+async def stop_local_record(request: Request):
     try:
+        auth_context = get_http_auth_context(request)
+        ensure_permission(auth_context, "record.use")
         transcript = recorder.stop_recording()
         return {
             "status": "success",
@@ -226,13 +309,15 @@ async def stop_local_record():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/transcribe")
-async def transcribe_audio(request: TranscribeRequest):
-    logger.info(f"鏀跺埌杞綍璇锋眰锛屾牸寮? {request.format}, 鏁版嵁澶у皬: {len(request.audio_data)}")
+async def transcribe_audio(payload: TranscribeRequest, request: Request):
+    auth_context = get_http_auth_context(request)
+    ensure_permission(auth_context, "record.use")
+    logger.info(f"鏀跺埌杞綍璇æ±ï¼æ ¼å¼: {payload.format}, æ°æ®å¤§å°: {len(payload.audio_data)}")
     try:
-        audio_bytes = base64.b64decode(request.audio_data)
+        audio_bytes = base64.b64decode(payload.audio_data)
         logger.info(f"Base64瑙ｇ爜鎴愬姛锛屽瓧鑺傛暟: {len(audio_bytes)}")
         
-        with tempfile.NamedTemporaryFile(suffix=f'.{request.format}', delete=False) as temp_file:
+        with tempfile.NamedTemporaryFile(suffix=f'.{payload.format}', delete=False) as temp_file:
             temp_file.write(audio_bytes)
             temp_file_path = temp_file.name
         
@@ -261,13 +346,15 @@ async def transcribe_audio(request: TranscribeRequest):
         }
 
 @app.post("/api/structure")
-async def structure_case(request: StructureRequest):
+async def structure_case(payload: StructureRequest, request: Request):
     try:
+        auth_context = get_http_auth_context(request)
+        ensure_permission(auth_context, "structure.use")
         # 浣跨敤鍚堝苟鍚庣殑鏂规硶锛屾敮鎸?Vision3 鏁版嵁鍜?SOAP 妯″紡
         analyzed_dialogue, structured_case = case_structurer.analyze_and_structure(
-            request.transcript, 
-            vision3_data=request.vision3_data,
-            mode=request.mode
+            payload.transcript, 
+            vision3_data=payload.vision3_data,
+            mode=payload.mode
         )
         
         return {
@@ -283,11 +370,13 @@ async def structure_case(request: StructureRequest):
         raise HTTPException(status_code=500, detail=f'鐥呬緥缁撴瀯鍖栧け璐? {str(e)}')
 
 @app.post("/api/generate")
-async def generate_medical_record(request: GenerateRequest):
+async def generate_medical_record(payload: GenerateRequest, request: Request):
     try:
+        auth_context = get_http_auth_context(request)
+        ensure_permission(auth_context, "report.create.team")
         # 鍚堝苟淇℃伅
-        case_data = {**request.structured_case, **request.patient_info}
-        config_info = {**config, **request.doctor_info}
+        case_data = {**payload.structured_case, **payload.patient_info}
+        config_info = {**config, **payload.doctor_info}
         
         medical_record = case_structurer.generate_report(case_data, config_info)
         
@@ -303,9 +392,11 @@ async def generate_medical_record(request: GenerateRequest):
         raise HTTPException(status_code=500, detail=f'鐥呭巻鐢熸垚澶辫触: {str(e)}')
 
 @app.post("/api/export")
-async def export_document(request: ExportRequest):
+async def export_document(payload: ExportRequest, request: Request):
     try:
-        case_data = request.case_data
+        auth_context = get_http_auth_context(request)
+        ensure_permission(auth_context, "report.export")
+        case_data = payload.case_data
         
         # 缁熶竴鏄犲皠瀛楁锛岀‘淇濆鍑烘ā鍧楄兘鎷垮埌姝ｇ‘鐨勬暟鎹?
         if not case_data.get("patient_name") and case_data.get("name"):
@@ -315,11 +406,11 @@ async def export_document(request: ExportRequest):
         if "case_id" not in case_data:
             case_data["case_id"] = "EXPORT_" + datetime.now().strftime("%H%M%S")
 
-        logger.info(f"姝ｅ湪瀵煎嚭 {request.export_format} 鏍煎紡锛屾偅鑰? {case_data.get('patient_name')}")
+        logger.info(f"姝ｅ湪瀵煎嚭 {payload.export_format} 鏍煎紡锛屾偅鑰? {case_data.get('patient_name')}")
 
-        if request.export_format == "pdf":
+        if payload.export_format == "pdf":
             file_path = doc_generator.generate_pdf(case_data)
-        elif request.export_format == "html":
+        elif payload.export_format == "html":
             file_path = doc_generator.generate_html(case_data)
         else:
             file_path = doc_generator.generate_word(case_data)
@@ -337,9 +428,14 @@ async def export_document(request: ExportRequest):
         raise HTTPException(status_code=500, detail=f'瀵煎嚭澶辫触: {str(e)}')
 
 @app.post("/api/save")
-async def save_case_data(request: SaveRequest):
+async def save_case_data(payload: SaveRequest, request: Request):
     try:
-        # 涓轰簡閫傞厤 CaseManager锛屾垜浠渶瑕佺‘淇濅竴浜涘瓧娈靛瓨鍦?        case_data = request.case_data
+        auth_context = get_http_auth_context(request)
+        ensure_permission(auth_context, "case.write")
+        # 涓轰簡閫傞厤 CaseManager锛屾垜浠渶瑕佺‘淇濅竴浜涘瓧娈靛瓨鍦?
+        case_data = payload.case_data
+        case_data.setdefault("owner_user_id", auth_context["user_id"])
+        case_data.setdefault("team_id", auth_context["team_id"])
         
         # 鏄犲皠瀛楁鍚嶄互閫傞厤 CaseManager 鐨勯獙璇侀€昏緫
         if "patient_name" not in case_data and "name" in case_data:
@@ -376,6 +472,13 @@ async def save_case_data(request: SaveRequest):
 @app.websocket("/ws/stream_transcribe")
 async def websocket_stream_transcribe(websocket: WebSocket):
     await websocket.accept()
+    try:
+        auth_context = get_ws_auth_context(websocket)
+        ensure_permission(auth_context, "record.use")
+    except HTTPException as e:
+        await websocket.send_json({"status": "error", "message": e.detail})
+        await websocket.close(code=1008)
+        return
     logger.info("鏀跺埌鍓嶇娴佸紡杞綍 WebSocket 杩炴帴")
     
     # 鍑嗗 ASR
@@ -459,9 +562,21 @@ async def websocket_stream_transcribe(websocket: WebSocket):
         logger.info("娴佸紡杞綍娴佺▼缁撴潫")
 
 @app.get("/api/cases")
-async def get_cases():
+async def get_cases(request: Request):
     try:
+        auth_context = get_http_auth_context(request)
+        ensure_permission(auth_context, "case.read")
         cases = case_manager.list_cases()
+        if auth_context["role"] == "operator":
+            user_id = auth_context["user_id"]
+            team_id = auth_context["team_id"]
+            cases = [
+                case
+                for case in cases
+                if case.get("owner_user_id") == user_id
+                or case.get("assigned_to") == user_id
+                or (case.get("team_id") and case.get("team_id") == team_id)
+            ]
         return {
             'status': 'success',
             'data': {
@@ -474,10 +589,21 @@ async def get_cases():
         raise HTTPException(status_code=500, detail=f'鑾峰彇鐥呬緥鍒楄〃澶辫触: {str(e)}')
 
 @app.get("/api/cases/{case_id}")
-async def get_case_detail(case_id: str):
+async def get_case_detail(case_id: str, request: Request):
     try:
+        auth_context = get_http_auth_context(request)
+        ensure_permission(auth_context, "case.read")
         case_data = case_manager.load_case(case_id)
         if case_data:
+            if auth_context["role"] == "operator":
+                user_id = auth_context["user_id"]
+                team_id = auth_context["team_id"]
+                if not (
+                    case_data.get("owner_user_id") == user_id
+                    or case_data.get("assigned_to") == user_id
+                    or (case_data.get("team_id") and case_data.get("team_id") == team_id)
+                ):
+                    raise HTTPException(status_code=403, detail="Permission denied")
             return {
                 'status': 'success',
                 'data': {
@@ -494,6 +620,13 @@ async def get_case_detail(case_id: str):
 @app.websocket("/ws/record")
 async def websocket_record(websocket: WebSocket):
     await websocket.accept()
+    try:
+        auth_context = get_ws_auth_context(websocket)
+        ensure_permission(auth_context, "record.use")
+    except HTTPException as e:
+        await websocket.send_json({"status": "error", "message": e.detail})
+        await websocket.close(code=1008)
+        return
     logger.info("鏀跺埌鍓嶇鍚庣涓诲褰曢煶 WebSocket 杩炴帴")
     
     queue = asyncio.Queue()

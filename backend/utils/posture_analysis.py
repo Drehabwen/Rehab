@@ -376,6 +376,20 @@ def analyze_posture(
                 label="重心偏移"
             ))
 
+    # --- Fatigue & Stability Analysis (Dynamic) ---
+    # We use the time series data to calculate jitter and stability
+    if landmarks and len(landmarks) > 0:
+        # 1. Jitter Index (High-frequency tremor)
+        # In a real scenario, we would compare with previous frames
+        # For a single call, we can use the timeSeriesLandmarks if provided in the context
+        # But here analyze_posture is called per-frame.
+        # We'll calculate a 'local' jitter if timeSeriesLandmarks were passed, 
+        # but the current function signature only takes a single frame's landmarks.
+        # So we'll rely on the caller (build_time_series) or a future refactor.
+        # For now, let's add placeholder logic that can be populated if we have history.
+        metrics.jitterIndex = 0.0 
+        metrics.stabilityScore = 1.0 # 1.0 is perfect, 0.0 is total failure
+
     return {
         "metrics": metrics,
         "issues": issues,

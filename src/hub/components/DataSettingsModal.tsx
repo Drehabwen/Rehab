@@ -62,7 +62,7 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
       await usePatientStore.getState().loadPatients();
       await useSessionStore.getState().loadRecentSessions();
       await loadStats();
-      setImportResult({ success: true, message: `成功导入 ${data.patients.length} 条患者记录` });
+      setImportResult({ success: true, message: `成功导入 ${data.patients.length} 条运动员记录` });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '导入失败';
       setImportResult({ success: false, message });
@@ -145,9 +145,9 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
                 <div className="flex-1">
                   <h3 className="text-lg font-black text-slate-900">本地数据统计</h3>
                   <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
-                    <span>患者: <strong className="text-slate-900">{stats?.patients || 0}</strong></span>
-                    <span>接诊: <strong className="text-slate-900">{stats?.sessions || 0}</strong></span>
-                    <span>评估: <strong className="text-slate-900">{stats?.assessments || 0}</strong></span>
+                    <span>运动员: <strong className="text-slate-900">{stats?.patients || 0}</strong></span>
+                    <span>监控: <strong className="text-slate-900">{stats?.sessions || 0}</strong></span>
+                    <span>分析: <strong className="text-slate-900">{stats?.assessments || 0}</strong></span>
                   </div>
                 </div>
               </div>
@@ -158,7 +158,7 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
                   备份说明
                 </h4>
                 <p className="text-xs text-blue-700 leading-relaxed">
-                  数据将导出为 JSON 格式文件，包含所有患者信息、接诊记录和评估数据。
+                  数据将导出为 JSON 格式文件，包含所有运动员信息、监控记录和分析数据。
                   建议定期备份以防止数据丢失。备份文件可在任何时候导入恢复。
                 </p>
               </div>
@@ -238,7 +238,7 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
                   危险操作
                 </h4>
                 <p className="text-xs text-red-700 leading-relaxed">
-                  删除数据是不可逆的操作。所有患者信息、接诊记录和评估数据将被永久删除。
+                  删除数据是不可逆的操作。所有运动员信息、监控记录和分析数据将被永久删除。
                   请在执行此操作前确保已备份重要数据。
                 </p>
               </div>

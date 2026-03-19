@@ -8,6 +8,7 @@ import {
   VisualAnnotation 
 } from '@/utils/posture-report-utils';
 import { CONFIG } from '@/config';
+import { withAuthWebSocketUrl } from '@/auth/access';
 
 // Re-export types for backward compatibility
 export type { PostureMetrics, PostureIssue, Landmark, AnalysisResult, VisualAnnotation };
@@ -29,6 +30,7 @@ const MAX_PENDING_MESSAGES = 20;
 const STREAM_FLUSH_INTERVAL_MS = 80;
 
 export function usePostureWS(url: string = CONFIG.websocket.url) {
+  const authenticatedUrl = withAuthWebSocketUrl(url);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [jointResult, setJointResult] = useState<JointResult | null>(null);
   /** 深度报告 - LLM 解析的报告 */
@@ -42,6 +44,8 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   const [timeSeriesData, setTimeSeriesData] = useState<TemporalAnalysis['timeSeries'] | null>(null);
   const [analysisAckAt, setAnalysisAckAt] = useState<number | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
+  const [stabilityScore, setStabilityScore] = useState<number>(1.0);
+  const [jitterIndex, setJitterIndex] = useState<number>(0.0);
   // 存储最后一次分析的原始帧数据，用于深度分析请求
   const rawFramesDataRef = useRef<SteppedFrame[]>([]);
   const ws = useRef<WebSocket | null>(null);
@@ -148,8 +152,8 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     try {
       shouldReconnectRef.current = true;
       setStatus('connecting');
-      console.log('[usePostureWS] Connecting to WebSocket:', url);
-      const socket = new WebSocket(url);
+      console.log('[usePostureWS] Connecting to WebSocket:', authenticatedUrl);
+      const socket = new WebSocket(authenticatedUrl);
       ws.current = socket;
 
       const handleOpen = () => {
@@ -167,6 +171,16 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
             applyResultState(data);
             const auxReport = generateAuxiliaryReport(data);
             applyAuxiliaryDiagnosisState(auxReport);
+            
+            // 更新疲劳与稳定性状态
+            if (data.metrics) {
+              if (typeof data.metrics.stabilityScore === 'number') {
+                setStabilityScore(data.metrics.stabilityScore);
+              }
+              if (typeof data.metrics.jitterIndex === 'number') {
+                setJitterIndex(data.metrics.jitterIndex);
+              }
+            }
           } else if (data.type === 'POSTURE_ACK') {
             if (data.requestId && currentRequestIdRef.current && data.requestId !== currentRequestIdRef.current) {
               return;
@@ -317,7 +331,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       console.error('Connection error:', e);
       setStatus('error');
     }
-  }, [url, flushPending, clearStreamingBuffer, scheduleStreamingFlush, applyResultState, applyAuxiliaryDiagnosisState, normalizeReportText]); // Removed savePostureReport from dependencies as it's a stable store method
+  }, [authenticatedUrl, flushPending, clearStreamingBuffer, scheduleStreamingFlush, applyResultState, applyAuxiliaryDiagnosisState, normalizeReportText]);
 
   useEffect(() => {
     console.log('[usePostureWS] Initializing WebSocket connection');
@@ -339,7 +353,8 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     setTimeSeriesData(null);
     setIsStreamingReport(false);
     setStreamingReport('');
-    applyResultState(null);
+    // For real-time sync, don't clear result to avoid UI flickering
+    // applyResultState(null);
     currentViewRef.current = view;
     // 保存分析数据用于后续深度分析请求
     lastAnalysisDataRef.current = { view, timeSeriesLandmarks, width, height };
@@ -501,6 +516,8 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     auxiliaryDiagnosis,
     timeSeriesData,
     status,
+    stabilityScore,
+    jitterIndex,
     analyze,
     analyzeBatch,
     analyzeStepped,

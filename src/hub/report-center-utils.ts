@@ -72,10 +72,12 @@ export function getAssessmentPreview(assessment: Assessment): string | null {
   }
 
   if (assessment.data.posture?.metrics || (assessment.data.posture?.issues?.length ?? 0) > 0) {
-    return sanitizePreview(buildImmediateBasicReport({
-      metrics: assessment.data.posture.metrics,
-      issues: assessment.data.posture.issues,
-    }));
+    return sanitizePreview(
+      buildImmediateBasicReport({
+        metrics: assessment.data.posture.metrics,
+        issues: assessment.data.posture.issues,
+      }),
+    );
   }
 
   if (assessment.data.rom?.summary) {
@@ -98,58 +100,75 @@ export function hasAssessmentReportPayload(assessment: Assessment): boolean {
   return Boolean(getAssessmentPreview(assessment));
 }
 
-export function buildAssessmentOutputSummary(assessment: Assessment): AssessmentOutputSummary | null {
+export function buildAssessmentOutputSummary(assessment: Assessment): AssessmentOutputSummary[] {
   const preview = getAssessmentPreview(assessment);
 
   if (assessment.type === 'posture') {
-    return {
+    const outputs: AssessmentOutputSummary[] = [{
       assessmentId: assessment.id,
       sessionId: assessment.sessionId,
       patientId: assessment.patientId,
       type: 'posture',
-      title: '体态评估',
+      title: '体态筛查',
       status: getPostureStatus(assessment),
       createdAt: assessment.createdAt,
       preview,
       evidenceCount: Object.keys(assessment.data.posture?.metrics ?? {}).length + (assessment.data.posture?.issues?.length ?? 0),
       sourceAssessment: assessment,
-    };
+    }];
+
+    const metrics = assessment.data.posture?.metrics;
+    if (metrics?.stabilityScore !== undefined || metrics?.jitterIndex !== undefined) {
+      outputs.push({
+        assessmentId: assessment.id,
+        sessionId: assessment.sessionId,
+        patientId: assessment.patientId,
+        type: 'fatigue',
+        title: '稳定性/疲劳参考',
+        status: metrics.stabilityScore !== undefined ? 'ready' : 'partial',
+        createdAt: assessment.createdAt,
+        preview: `稳定性得分 ${((metrics.stabilityScore ?? 0) * 100).toFixed(0)}% | 抖动指数 ${metrics.jitterIndex?.toFixed(3) ?? 'N/A'}`,
+        evidenceCount: (metrics.stabilityScore !== undefined ? 1 : 0) + (metrics.jitterIndex !== undefined ? 1 : 0),
+        sourceAssessment: assessment,
+      });
+    }
+    return outputs;
   }
 
   if (assessment.type === 'rom') {
-    return {
+    return [{
       assessmentId: assessment.id,
       sessionId: assessment.sessionId,
       patientId: assessment.patientId,
       type: 'rom',
-      title: '关节活动度',
+      title: 'ROM 辅助',
       status: getRomStatus(assessment),
       createdAt: assessment.createdAt,
       preview,
       evidenceCount: assessment.data.rom?.items?.length ?? 0,
       sourceAssessment: assessment,
-    };
+    }];
   }
 
   if (assessment.type === 'medvoice') {
-    return {
+    return [{
       assessmentId: assessment.id,
       sessionId: assessment.sessionId,
       patientId: assessment.patientId,
       type: 'medvoice',
-      title: '语音病历',
+      title: '问询补充',
       status: getMedVoiceStatus(assessment),
       createdAt: assessment.createdAt,
       preview,
       evidenceCount: Object.values(assessment.data.medvoice?.structuredCase ?? {}).filter((value) => Boolean(value && String(value).trim())).length,
       sourceAssessment: assessment,
-    };
+    }];
   }
 
-  return null;
+  return [];
 }
 
-const inputTypes: SessionReportInputType[] = ['posture', 'rom', 'medvoice'];
+const inputTypes: SessionReportInputType[] = ['posture', 'rom', 'medvoice', 'fatigue'];
 
 export function buildSessionReportInputs(
   assessments: Assessment[],
@@ -158,8 +177,8 @@ export function buildSessionReportInputs(
   const grouped = new Map<string, SessionReportInput>();
 
   for (const assessment of assessments) {
-    const summary = buildAssessmentOutputSummary(assessment);
-    if (!summary) {
+    const summaries = buildAssessmentOutputSummary(assessment);
+    if (summaries.length === 0) {
       continue;
     }
 
@@ -177,9 +196,11 @@ export function buildSessionReportInputs(
       },
     };
 
-    const currentForType = existing.outputs[summary.type];
-    if (!currentForType || currentForType.createdAt < summary.createdAt) {
-      existing.outputs[summary.type] = summary;
+    for (const summary of summaries) {
+      const currentForType = existing.outputs[summary.type];
+      if (!currentForType || currentForType.createdAt < summary.createdAt) {
+        existing.outputs[summary.type] = summary;
+      }
     }
 
     if (assessment.createdAt > existing.latestCreatedAt) {
@@ -237,6 +258,14 @@ export function buildSessionReportGenerationRequest(sessionInput: SessionReportI
           status: sessionInput.outputs.medvoice.status,
           preview: sessionInput.outputs.medvoice.preview,
           evidenceCount: sessionInput.outputs.medvoice.evidenceCount,
+        }
+      : undefined,
+    fatigue: sessionInput.outputs.fatigue
+      ? {
+          title: sessionInput.outputs.fatigue.title,
+          status: sessionInput.outputs.fatigue.status,
+          preview: sessionInput.outputs.fatigue.preview,
+          evidenceCount: sessionInput.outputs.fatigue.evidenceCount,
         }
       : undefined,
   };

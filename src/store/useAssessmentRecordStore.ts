@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { AssessmentRecord } from '../types/assessment';
 import { AssessmentRecordStorage } from '../utils/assessmentRecordStorage';
-import { DataCenterService } from '../services/DataCenterService';
+import { ScreeningArchiveService } from '../services/DataCenterService';
 import { APP_CONFIG } from '../config/appConfig';
 
 interface AssessmentRecordState {
@@ -26,7 +26,7 @@ export const useAssessmentRecordStore = create<AssessmentRecordState>((set, get)
     
     addRecord: (record) => {
       AssessmentRecordStorage.saveRecord(record);
-      DataCenterService.saveRecord(record);
+      ScreeningArchiveService.saveRecord(record);
       set((state) => ({
         records: [...state.records, record],
         currentRecord: record,
@@ -42,7 +42,7 @@ export const useAssessmentRecordStore = create<AssessmentRecordState>((set, get)
         const updatedRecord = updatedRecords.find(r => r.id === id);
         if (updatedRecord) {
           AssessmentRecordStorage.saveRecord(updatedRecord);
-          DataCenterService.saveRecord(updatedRecord);
+          ScreeningArchiveService.saveRecord(updatedRecord);
         }
         
         return {
@@ -56,7 +56,7 @@ export const useAssessmentRecordStore = create<AssessmentRecordState>((set, get)
     
     deleteRecord: (id) => {
       AssessmentRecordStorage.deleteRecord(id, patientId);
-      DataCenterService.deleteRecord(id);
+      ScreeningArchiveService.deleteRecord(id);
       set((state) => ({
         records: state.records.filter(r => r.id !== id),
         currentRecord: state.currentRecord?.id === id ? null : state.currentRecord,
@@ -70,7 +70,7 @@ export const useAssessmentRecordStore = create<AssessmentRecordState>((set, get)
     
     clearRecords: () => {
       AssessmentRecordStorage.clearRecords(patientId);
-      DataCenterService.clearData(patientId);
+      ScreeningArchiveService.clearArchive(patientId);
       set({
         records: [],
         currentRecord: null,

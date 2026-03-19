@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   Maximize2,
   Minimize2,
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import BaseWebcamView from '@/components/shared/BaseWebcamView';
 import type { ActiveMeasurement } from '@/store/useMeasurementStore';
 import type { JointType, MovementDirection } from '../types';
-import { ROM_TEXTS } from '../constants/uiText';
+import { ROM_TEXTS, getROMDirectionLabel, getROMSideLabel } from '../constants/uiText';
 import { PageTitleSection, UnifiedStatusBadge } from '@/components/layout';
 import { COLORS } from '@/constants/uiStyles';
 
@@ -29,12 +29,16 @@ interface ROMCameraStageProps {
   selectedJoint: JointType;
   selectedDirection: MovementDirection;
   selectedSide: 'left' | 'right';
-  onResults: (results: any, videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement) => void;
+  onResults: (results: unknown, videoElement: HTMLVideoElement, canvasElement: HTMLCanvasElement) => void;
   startROMAssessment: () => void;
   stopROMAssessment: () => void;
   resetROMAssessment: () => void;
   setIsCameraOn: (enabled: boolean) => void;
   toggleFullscreen: () => void;
+  qualityFeedback?: {
+    tone: 'warning' | 'error' | 'success';
+    text: string;
+  } | null;
 }
 
 const formatAngle = (value: number) => {
@@ -60,6 +64,7 @@ export const ROMCameraStage: React.FC<ROMCameraStageProps> = ({
   resetROMAssessment,
   setIsCameraOn,
   toggleFullscreen,
+  qualityFeedback,
 }) => {
   const currentMeasurement = activeMeasurements[0];
   const sampleCount = currentMeasurement?.data.length ?? 0;
@@ -72,9 +77,9 @@ export const ROMCameraStage: React.FC<ROMCameraStageProps> = ({
       ? { badge: 'success' as const, text: '已测量', message: '当前动作已完成采集，可停止并查看结果' }
       : { badge: 'disabled' as const, text: '未测量', message: '点击开始测量后系统将自动记录角度曲线' };
 
-  const selectedSideLabel = selectedSide === 'left' ? '左侧' : '右侧';
+  const selectedSideLabel = getROMSideLabel(selectedJoint, selectedSide);
   const selectedJointLabel = ROM_TEXTS.joints[selectedJoint];
-  const selectedDirectionLabel = ROM_TEXTS.directions[selectedDirection];
+  const selectedDirectionLabel = getROMDirectionLabel(selectedJoint, selectedDirection);
   const captureProgress = isMeasuring ? Math.min(100, sampleCount * 2) : hasMeasuredData ? 100 : 0;
   const overlayPanelClass = 'rounded-xl border border-slate-200 bg-white/95';
   const mutedCardClass = 'rounded-20 border border-slate-200 bg-slate-50 p-4';
@@ -86,6 +91,11 @@ export const ROMCameraStage: React.FC<ROMCameraStageProps> = ({
   const iconClass = COLORS.neutral.slate600;
   const progressTrackClass = 'h-2 w-full overflow-hidden rounded-full bg-slate-100';
   const progressFillClass = isMeasuring ? 'bg-blue-600' : hasMeasuredData ? 'bg-emerald-600' : 'bg-slate-300';
+  const qualityToneClass = qualityFeedback?.tone === 'error'
+    ? 'border-rose-200 bg-rose-50 text-rose-700'
+    : qualityFeedback?.tone === 'success'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      : 'border-amber-200 bg-amber-50 text-amber-700';
 
   return (
     <div className="rehab-page custom-scrollbar">
@@ -132,9 +142,9 @@ export const ROMCameraStage: React.FC<ROMCameraStageProps> = ({
                     停止并生成结果
                   </button>
                 ) : (
-                  <button onClick={startROMAssessment} className="btn-primary" title="开始测量">
+                  <button onClick={startROMAssessment} className="btn-primary" title="发起评估">
                     <Play size={14} />
-                    开始测量
+                    发起评估
                   </button>
                 )}
 
@@ -198,6 +208,12 @@ export const ROMCameraStage: React.FC<ROMCameraStageProps> = ({
                 <p className={cn('mt-1 text-xl font-semibold', COLORS.neutral.light.text)}>{formatAngle(currentMeasurement?.minAngle ?? 0)}°</p>
               </div>
             </div>
+
+            {qualityFeedback && (
+              <div className={cn('rounded-xl border px-3 py-2 text-xs font-medium', qualityToneClass)}>
+                {qualityFeedback.text}
+              </div>
+            )}
 
             <div className={cn(mutedCardClass, 'mt-auto')}>
               <div className="flex items-center gap-2 mb-2">

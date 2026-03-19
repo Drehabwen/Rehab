@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { db } from '@/lib/db';
 import type { Session } from '@/types/session';
 import type { Assessment } from '@/types/assessment';
@@ -69,7 +69,7 @@ export const useSessionStore = create<SessionState>((set, get) => ({
 
     const existing = await db.sessions.get(id);
     if (!existing) {
-      throw new Error('接诊记录不存在');
+      throw new Error('监控记录不存在');
     }
 
     const updated = {

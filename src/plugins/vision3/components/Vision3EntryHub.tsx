@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { ArrowRight, Layers, Sparkles, Zap } from 'lucide-react';
 import { COLORS } from '@/constants/uiStyles';
 import { cn } from '@/lib/utils';
@@ -32,22 +32,22 @@ const modeCards: Array<{
   {
     id: 'standard',
     icon: Layers,
-    title: '标准评估',
-    subtitle: '三视角完整评估',
+    title: '标准监控',
+    subtitle: '三视角完整监控',
     cost: '3-5 分钟',
-    scene: '首诊、复评、报告生成',
+    scene: '初次监控、表现复评、报告生成',
     output: '完整指标 + 结构化分析报告',
-    highlights: ['数据完整', '诊断准确', '全面分析'],
+    highlights: ['数据完整', '表现准确', '全面分析'],
     accent: 'from-blue-600 to-cyan-500',
-    recommendation: '适合需要完整报告和精细复评的场景',
+    recommendation: '适合需要完整报告和表现复核的场景',
   },
   {
     id: 'quick',
     icon: Zap,
-    title: '快速评估',
+    title: '快速监控',
     subtitle: '单视角快速筛查',
     cost: '1-2 分钟',
-    scene: '门诊快速筛查、训练前后检查',
+    scene: '快速表现筛查、训练前后检查',
     output: '关键指标 + 快速结论',
     highlights: ['即时反馈', '快速筛查', '初步检查'],
     accent: 'from-emerald-600 to-teal-500',
@@ -77,10 +77,10 @@ export const Vision3EntryHub: React.FC<EntryHubProps> = ({ onSelectMode }) => {
       <section className="rehab-page-title">
         <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
           <Sparkles size={12} />
-          推荐先完成快速评估，再决定是否进入标准评估
+          推荐先完成快速监控，再决定是否进入标准监控
         </div>
-        <h1>体态分析</h1>
-        <p>先选择本次评估目标。需要快速进入拍摄时，优先使用快速评估。</p>
+        <h1>表现监控</h1>
+        <p>先选择本次监控目标。需要快速进入拍摄时，优先使用快速监控。</p>
       </section>
 
       <section className="mt-4 grid max-w-5xl grid-cols-1 gap-5 lg:grid-cols-2">

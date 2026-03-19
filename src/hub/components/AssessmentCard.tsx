@@ -29,7 +29,7 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = ({
         <div>
           <div className="flex items-center gap-3 mb-1">
             <span className="text-sm font-black text-slate-900">
-              {assessment.type === 'posture' ? '体态评估' : '关节活动度评估'}
+              {assessment.type === 'posture' ? '体态监控' : '灵活性监控'}
             </span>
             <span className={cn(
               "px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider",
@@ -47,7 +47,7 @@ export const AssessmentCard: React.FC<AssessmentCardProps> = ({
             </span>
             <span className="flex items-center gap-1">
               <User size={10} />
-              {patientName || '未知患者'}
+              {patientName || '未知运动员'}
             </span>
             {assessment.data.posture?.view && (
               <span className="flex items-center gap-1">

@@ -1,14 +1,14 @@
-﻿import type { Assessment } from '@/types/assessment';
+import type { Assessment } from '@/types/assessment';
 import type { Patient } from '@/types/patient';
 import type { Session } from '@/types/session';
 import { generateSessionId } from '@/lib/session-utils';
 
-export type WorkflowToolId = 'vision3' | 'rom' | 'medvoice';
+export type WorkflowToolId = 'vision3' | 'rom' | 'medvoice' | 'training_plan';
 export type WorkflowStatus = 'completed' | 'pending';
 
 export interface WorkflowModuleDefinition {
   toolId: WorkflowToolId;
-  assessmentType: Assessment['type'];
+  assessmentType: Assessment['type'] | 'plan';
   title: string;
   shortTitle: string;
   description: string;
@@ -44,9 +44,9 @@ export const WORKFLOW_MODULES: WorkflowModuleDefinition[] = [
   {
     toolId: 'vision3',
     assessmentType: 'posture',
-    title: '体态评估',
+    title: '体态监控',
     shortTitle: '体态',
-    description: '识别体态偏移、稳定性风险和关键异常指标。',
+    description: '识别体态偏移、运动稳定性风险和关键异常指标。',
   },
   {
     toolId: 'rom',
@@ -58,9 +58,16 @@ export const WORKFLOW_MODULES: WorkflowModuleDefinition[] = [
   {
     toolId: 'medvoice',
     assessmentType: 'medvoice',
-    title: '语音问诊',
-    shortTitle: '问诊',
-    description: '完成语音问诊并生成结构化病史信息。',
+    title: '疲劳问询',
+    shortTitle: '问询',
+    description: '通过语音交互完成主观疲劳问询并记录运动员感受。',
+  },
+  {
+    toolId: 'training_plan',
+    assessmentType: 'plan',
+    title: '个性化训练计划',
+    shortTitle: '计划',
+    description: '基于监控数据生成针对性的运动训练与恢复计划（支持青少年专项）。',
   },
 ];
 
@@ -82,6 +89,7 @@ export function buildVisitTaskSummary(
   const visitId = latestSession?.id ?? generateSessionId(patient.id, sessionSequence);
 
   const modules = WORKFLOW_MODULES.map<WorkflowModuleSummary>((module) => {
+    // For training_plan, we check if a plan has been generated (this might need a separate check, but for now we'll mock it or use a specific assessment type if exists)
     const moduleAssessments = activeAssessments.filter((assessment) => assessment.type === module.assessmentType);
     const latestAssessment = moduleAssessments[0] ?? null;
     const completed = Boolean(latestAssessment);
@@ -92,7 +100,7 @@ export function buildVisitTaskSummary(
       assessmentCount: moduleAssessments.length,
       latestAssessment,
       latestCreatedAt: latestAssessment?.createdAt ?? null,
-      actionLabel: completed ? '查看结果' : '开始评估',
+      actionLabel: module.toolId === 'training_plan' ? (completed ? '查看计划' : '生成计划') : (completed ? '查看分析' : '开始监控'),
     };
   });
 
@@ -103,7 +111,7 @@ export function buildVisitTaskSummary(
 
   return {
     patient,
-    patientName: patient.name || `患者 ${patient.id}`,
+    patientName: patient.name || `运动员 ${patient.id}`,
     visitId,
     sessionId: latestSession?.id ?? null,
     sessionSequence,
@@ -115,7 +123,7 @@ export function buildVisitTaskSummary(
     hasSession: Boolean(latestSession),
     hasAnyAssessment,
     updatedAt: latestSession?.updatedAt ?? patient.updatedAt,
-    nextStep: reportReady ? '进入报告中心' : hasAnyAssessment ? '继续完成评估' : '创建接诊并开始评估',
+    nextStep: reportReady ? '进入报告中心' : hasAnyAssessment ? '继续完成监控' : '开始分析监控数据',
     modules,
   };
 }

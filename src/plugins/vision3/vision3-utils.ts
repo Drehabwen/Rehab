@@ -1,5 +1,5 @@
 import { Results } from '@mediapipe/holistic';
-import { PostureMetrics } from '@/types/posture';
+import { PostureIssue, PostureMetrics } from '@/types/posture';
 
 export const jointNameMap: Record<string, string> = {
   cervical: '颈椎',
@@ -27,47 +27,49 @@ export const normalizeHeadAxes = (axes?: HeadAxisPoint[] | null): HeadAxes | nul
 export const scaleHeadAxes = (axes: HeadAxes, scale: number): HeadAxes => {
   const scalePoint = (point: HeadAxisPoint) => ({
     x: axes.origin.x + (point.x - axes.origin.x) * scale,
-    y: axes.origin.y + (point.y - axes.origin.y) * scale
+    y: axes.origin.y + (point.y - axes.origin.y) * scale,
   });
+
   return {
     origin: axes.origin,
     x: scalePoint(axes.x),
     y: scalePoint(axes.y),
-    z: scalePoint(axes.z)
+    z: scalePoint(axes.z),
   };
 };
 
 export const smoothHeadAxes = (prev: HeadAxes | null, next: HeadAxes, alpha: number): HeadAxes => {
   if (!prev) return next;
+
   const smoothPoint = (a: HeadAxisPoint, b: HeadAxisPoint) => ({
     x: a.x + (b.x - a.x) * alpha,
-    y: a.y + (b.y - a.y) * alpha
+    y: a.y + (b.y - a.y) * alpha,
   });
+
   return {
     origin: smoothPoint(prev.origin, next.origin),
     x: smoothPoint(prev.x, next.x),
     y: smoothPoint(prev.y, next.y),
-    z: smoothPoint(prev.z, next.z)
+    z: smoothPoint(prev.z, next.z),
   };
 };
 
 export const drawHeadAxes = (ctx: CanvasRenderingContext2D, axes: HeadAxes, mirrorWidth?: number) => {
   const mirror = (point: HeadAxisPoint) => (
-    mirrorWidth !== undefined
-      ? { x: mirrorWidth - point.x, y: point.y }
-      : point
+    mirrorWidth !== undefined ? { x: mirrorWidth - point.x, y: point.y } : point
   );
 
   const origin = mirror(axes.origin);
   const axisList = [
     { label: 'X', point: axes.x, color: '#ef4444' },
     { label: 'Y', point: axes.y, color: '#22c55e' },
-    { label: 'Z', point: axes.z, color: '#3b82f6' }
+    { label: 'Z', point: axes.z, color: '#3b82f6' },
   ];
 
   ctx.save();
   ctx.lineWidth = 3;
   ctx.font = '12px sans-serif';
+
   axisList.forEach((axis) => {
     const end = mirror(axis.point);
     ctx.beginPath();
@@ -78,6 +80,7 @@ export const drawHeadAxes = (ctx: CanvasRenderingContext2D, axes: HeadAxes, mirr
     ctx.fillStyle = axis.color;
     ctx.fillText(axis.label, end.x + 4, end.y - 4);
   });
+
   ctx.restore();
 };
 
@@ -87,13 +90,13 @@ export const getShoulderStatus = (angle: number) => {
   const absAngle = Math.abs(angle);
   if (absAngle < 1.5) return { text: '姿态端正', color: 'text-emerald-500', bgColor: 'bg-emerald-50' };
   if (absAngle < 3.5) return { text: '轻微高低肩', color: 'text-amber-500', bgColor: 'bg-amber-50' };
-  return { text: '显著高低肩', color: 'text-rose-500', bgColor: 'bg-rose-50' };
+  return { text: '明显高低肩', color: 'text-rose-500', bgColor: 'bg-rose-50' };
 };
 
 export const getHeadStatus = (angle: number) => {
   if (angle < 12) return { text: '理想体态', color: 'text-emerald-500', bgColor: 'bg-emerald-50' };
-  if (angle < 22) return { text: '轻度前倾', color: 'text-amber-500', bgColor: 'bg-amber-50' };
-  return { text: '严重前倾', color: 'text-rose-500', bgColor: 'bg-rose-50' };
+  if (angle < 22) return { text: '轻度前伸', color: 'text-amber-500', bgColor: 'bg-amber-50' };
+  return { text: '明显前伸', color: 'text-rose-500', bgColor: 'bg-rose-50' };
 };
 
 export const getHipStatus = (angle: number) => {
@@ -105,40 +108,94 @@ export const getHipStatus = (angle: number) => {
 
 export const getSeverityLabel = (severity: string) => {
   switch (severity) {
-    case 'severe': return '严重';
-    case 'moderate': return '中度';
-    case 'mild': return '轻微';
-    default: return '观察';
+    case 'severe':
+      return '严重';
+    case 'moderate':
+      return '中度';
+    case 'mild':
+      return '轻度';
+    default:
+      return '观察';
   }
 };
 
+const hasChinese = (value: string) => /[\u4e00-\u9fff]/.test(value);
+const hasEnglish = (value: string) => /[A-Za-z]/.test(value);
+const normalizeIssueType = (type: string) => type.toLowerCase().replace(/[\s_-]+/g, '');
+
+const getIssueTypeLabel = (type: string) => {
+  const normalized = normalizeIssueType(type);
+  if (normalized.includes('headforward') || normalized.includes('forwardhead')) return '头前伸';
+  if (normalized.includes('headyaw') || normalized.includes('headrotation')) return '头颈旋转';
+  if (normalized.includes('headroll') || normalized.includes('headtilt')) return '头部侧倾';
+  if (normalized.includes('headdeviation')) return '头部偏移';
+  if (normalized.includes('shoulder') || normalized.includes('highlowshoulder')) return '高低肩';
+  if (normalized.includes('hip') || normalized.includes('pelvic') || normalized.includes('pelvis')) return '骨盆倾斜';
+  if (normalized.includes('spine') || normalized.includes('scoliosis')) return '脊柱代偿';
+  return '体态异常';
+};
+
+const buildLocalizedIssueTitle = (type: string, severity: PostureIssue['severity']) => {
+  const label = getIssueTypeLabel(type);
+  if (severity === 'severe') return `${label}明显异常`;
+  if (severity === 'moderate') return `${label}需要关注`;
+  return `${label}轻度偏移`;
+};
+
+const buildLocalizedIssueDescription = (type: string, severity: PostureIssue['severity']) => {
+  const label = getIssueTypeLabel(type);
+  if (severity === 'severe') return `当前${label}偏移较大，建议尽快结合训练调整与复测持续跟踪。`;
+  if (severity === 'moderate') return `当前${label}存在中度偏移，建议在训练中优先关注并安排复测。`;
+  return `当前${label}存在轻度偏移，建议先调整日常姿势并观察变化。`;
+};
+
+const buildLocalizedIssueRecommendation = (type: string) => {
+  const label = getIssueTypeLabel(type);
+  return `该项建议已统一收敛到报告中心，请前往报告中心查看${label}的完整干预建议。`;
+};
+
+const toChineseText = (value: string, fallback: string) => {
+  const normalized = value.trim();
+  if (!normalized) return fallback;
+  if (hasChinese(normalized)) return normalized;
+  if (hasEnglish(normalized)) return fallback;
+  return normalized;
+};
+
+export const localizePostureIssue = (issue: PostureIssue): PostureIssue => ({
+  ...issue,
+  title: toChineseText(issue.title, buildLocalizedIssueTitle(issue.type, issue.severity)),
+  description: toChineseText(issue.description, buildLocalizedIssueDescription(issue.type, issue.severity)),
+  recommendation: toChineseText(issue.recommendation, buildLocalizedIssueRecommendation(issue.type)),
+});
+
 export const generateAuxiliaryReport = (metrics: PostureMetrics): string => {
   const sections: string[] = [];
-  
-  sections.push('# 辅助诊断初步结论');
-  sections.push('> **提示**：本结论由系统规则引擎自动计算生成，仅供参考。');
-  
-  sections.push('## 关键指标分析');
-  
+
+  sections.push('# 辅助结论初步摘要');
+  sections.push('> 提示：本结论由规则引擎自动生成，仅供筛查参考。');
+  sections.push('');
+  sections.push('## 关键指标');
+
   if (metrics.headForward !== undefined) {
     const status = getHeadStatus(metrics.headForward);
-    sections.push(`- **头部前倾**：${metrics.headForward.toFixed(1)}° (${status.text})`);
-  }
-  
-  if (metrics.shoulderAngle !== undefined) {
-    const status = getShoulderStatus(metrics.shoulderAngle);
-    sections.push(`- **高低肩**：${Math.abs(metrics.shoulderAngle).toFixed(1)}° (${status.text})`);
-  }
-  
-  if (metrics.hipAngle !== undefined) {
-    const status = getHipStatus(metrics.hipAngle);
-    sections.push(`- **骨盆倾斜**：${Math.abs(metrics.hipAngle).toFixed(1)}° (${status.text})`);
+    sections.push(`- 头前伸：${metrics.headForward.toFixed(1)} 度（${status.text}）`);
   }
 
-  sections.push('\n## 建议');
-  sections.push('根据初步计算结果，您可以：');
-  sections.push('1. 点击下方 **“深度分析”** 按钮，获取 AI 专家的详细生物力学推导。');
-  sections.push('2. 针对上述异常项，咨询康复科医生进行进一步核实。');
+  if (metrics.shoulderAngle !== undefined) {
+    const status = getShoulderStatus(metrics.shoulderAngle);
+    sections.push(`- 高低肩：${Math.abs(metrics.shoulderAngle).toFixed(1)} 度（${status.text}）`);
+  }
+
+  if (metrics.hipAngle !== undefined) {
+    const status = getHipStatus(metrics.hipAngle);
+    sections.push(`- 骨盆倾斜：${Math.abs(metrics.hipAngle).toFixed(1)} 度（${status.text}）`);
+  }
+
+  sections.push('');
+  sections.push('## 建议');
+  sections.push('1. 如需更完整的跨模块结果，请前往报告中心查看正式报告。');
+  sections.push('2. 如关键指标持续异常，建议安排复测并结合人工复核。');
 
   return sections.join('\n');
 };
@@ -155,18 +212,13 @@ export interface VisualAnnotation {
 
 /**
  * 绘制后端同步的视觉标注
- * @param ctx Canvas Context
- * @param annotations 标注指令数组
- * @param width Canvas 宽度
- * @param height Canvas 高度
- * @param isMirrored 是否镜像
  */
 export const drawAnnotations = (
   ctx: CanvasRenderingContext2D,
   annotations: VisualAnnotation[],
   width: number,
   height: number,
-  isMirrored: boolean
+  isMirrored: boolean,
 ) => {
   const transform = (p: { x: number; y: number }) => {
     const x = isMirrored ? (1 - p.x) * width : p.x * width;
@@ -175,19 +227,15 @@ export const drawAnnotations = (
   };
 
   ctx.save();
-  
+
   annotations.forEach((ann) => {
     const color = ann.color || '#00FF00';
     const lineWidth = ann.lineWidth || 2;
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
     ctx.lineWidth = lineWidth;
-    
-    if (ann.dashed) {
-      ctx.setLineDash(ann.dash || [5, 5]);
-    } else {
-      ctx.setLineDash([]);
-    }
+
+    ctx.setLineDash(ann.dashed ? ann.dash || [5, 5] : []);
 
     switch (ann.type) {
       case 'line':
@@ -198,7 +246,7 @@ export const drawAnnotations = (
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);
           ctx.stroke();
-          
+
           if (ann.label) {
             ctx.font = 'bold 14px sans-serif';
             ctx.fillText(ann.label, (p1.x + p2.x) / 2 + 5, (p1.y + p2.y) / 2 - 5);
@@ -222,9 +270,9 @@ export const drawAnnotations = (
       case 'angle':
         if (ann.points.length >= 3) {
           const p1 = transform(ann.points[0]);
-          const p2 = transform(ann.points[1]); // Vertex
+          const p2 = transform(ann.points[1]);
           const p3 = transform(ann.points[2]);
-          
+
           ctx.beginPath();
           ctx.moveTo(p1.x, p1.y);
           ctx.lineTo(p2.x, p2.y);

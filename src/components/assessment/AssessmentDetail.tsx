@@ -144,9 +144,9 @@ export const AssessmentDetail: React.FC = () => {
 
   const getAssessmentTypeLabel = (type: string) => {
     const labels = {
-      front: '正面',
-      side: '侧面',
-      back: '背面',
+      front: '正面视角',
+      side: '侧面视角',
+      back: '背面视角',
     };
     return labels[type as keyof typeof labels] || type;
   };
@@ -155,7 +155,7 @@ export const AssessmentDetail: React.FC = () => {
     return (
       <Card className="w-full">
         <CardContent className="py-12 text-center text-gray-500">
-          <p>请选择一条评估记录查看详情</p>
+          <p>请选择一条监控记录查看详情</p>
         </CardContent>
       </Card>
     );
@@ -177,9 +177,9 @@ export const AssessmentDetail: React.FC = () => {
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div>
-              <CardTitle>评估详情</CardTitle>
+              <CardTitle>监控场次详情</CardTitle>
               <p className="mt-1 text-sm text-gray-600">
-                {currentIndex + 1} / {records.length}
+                第 {currentIndex + 1} 项 / 共 {records.length} 项
               </p>
             </div>
             <Button
@@ -206,7 +206,7 @@ export const AssessmentDetail: React.FC = () => {
               className="flex items-center gap-2"
             >
               <Download className="w-4 h-4" />
-              下载
+              导出分析图
             </Button>
           </div>
         </div>
@@ -294,14 +294,14 @@ export const AssessmentDetail: React.FC = () => {
 
           {currentRecord.feedback ? (
             <div className="semantic-panel-soft semantic-panel-soft-info p-4">
-              <h3 className="mb-2 text-lg font-semibold">患者反馈</h3>
+              <h3 className="mb-2 text-lg font-semibold">监控反馈</h3>
               <p className="text-gray-700">{currentRecord.feedback}</p>
             </div>
           ) : null}
 
           {currentRecord.treatmentPlanId ? (
             <div className="semantic-panel-soft semantic-panel-soft-success p-4">
-              <h3 className="mb-2 text-lg font-semibold">关联治疗计划</h3>
+              <h3 className="mb-2 text-lg font-semibold">关联训练计划</h3>
               <p className="text-sm text-gray-600">计划 ID: {currentRecord.treatmentPlanId}</p>
             </div>
           ) : null}

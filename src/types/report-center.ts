@@ -1,6 +1,6 @@
 import type { Assessment } from './assessment';
 
-export type SessionReportInputType = 'posture' | 'rom' | 'medvoice';
+export type SessionReportInputType = 'posture' | 'rom' | 'medvoice' | 'fatigue';
 
 export type SessionReportInputStatus = 'ready' | 'partial' | 'missing';
 
@@ -55,9 +55,11 @@ export interface SessionReportGenerationRequest {
   sessionId: string;
   patientId: string;
   patientName?: string;
+  patientType?: 'adult' | 'adolescent';
   sourceAssessmentIds: string[];
   readiness: SessionReportReadiness;
   posture?: SessionReportSectionInput;
   rom?: SessionReportSectionInput;
   medvoice?: SessionReportSectionInput;
+  fatigue?: SessionReportSectionInput;
 }

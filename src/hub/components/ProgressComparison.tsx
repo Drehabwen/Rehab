@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   Download,
@@ -167,11 +167,11 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
   const handleExportMarkdown = () => {
     if (!comparison) return;
 
-    let markdown = '# 前后对比报告\n\n';
-    markdown += `- 患者 ID: ${comparison.patientId}\n`;
+    let markdown = '# 表现趋势对比报告\n\n';
+    markdown += `- 运动员 ID: ${comparison.patientId}\n`;
     markdown += `- 对比日期: ${new Date(comparison.comparisonDate).toLocaleString('zh-CN')}\n`;
-    markdown += `- 基线评估: ${new Date(comparison.baselineSnapshot.createdAt).toLocaleDateString('zh-CN')}\n`;
-    markdown += `- 当前评估: ${new Date(comparison.currentSnapshot.createdAt).toLocaleDateString('zh-CN')}\n\n`;
+    markdown += `- 基线监控: ${new Date(comparison.baselineSnapshot.createdAt).toLocaleDateString('zh-CN')}\n`;
+    markdown += `- 当前监控: ${new Date(comparison.currentSnapshot.createdAt).toLocaleDateString('zh-CN')}\n\n`;
     markdown += `## 综合改善率\n\n**${comparison.overallScore > 0 ? '+' : ''}${comparison.overallScore}%**\n\n`;
     markdown += '## 指标对比\n\n';
 
@@ -194,8 +194,8 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
     <div className="rehab-page custom-scrollbar">
       <div className="rehab-page-inner">
         <PageTitleSection
-          title="前后对比"
-          description={patientName ? `${patientName} · 疗效趋势分析` : '疗效趋势分析'}
+          title="表现分析对比"
+          description={patientName ? `${patientName} · 表现趋势分析` : '表现趋势分析'}
           right={
             <>
               <UnifiedStatusBadge status={pageStateBadge.status} text={pageStateBadge.text} />
@@ -209,29 +209,29 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
 
         {!hasEnoughAssessments ? (
           <StatePanel
-            title="记录不足，暂时无法对比"
-            description={`至少需要 2 次完整评估记录，当前仅有 ${completedAssessments.length} 次。`}
+            title="监控记录不足，暂时无法对比"
+            description={`至少需要 2 场完整监控记录，当前仅有 ${completedAssessments.length} 场。`}
             actions={
               <>
-                <button className="btn-primary" onClick={onBack}>去完成首次评估</button>
+                <button className="btn-primary" onClick={onBack}>去完成首次监控</button>
                 <button className="btn-secondary" onClick={onBack}>查看历史记录</button>
               </>
             }
           />
         ) : (
           <section className="bento-card p-6">
-            <h3 className={sectionTitleClass}>选择对比记录</h3>
-            <p className={cn(bodyTextClass, 'mt-1')}>基线建议选择更早记录，当前建议选择最新记录。</p>
+            <h3 className={sectionTitleClass}>选择对比场次</h3>
+            <p className={cn(bodyTextClass, 'mt-1')}>基线建议选择较早记录，当前建议选择最新监控。</p>
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className={labelTextClass}>基线记录</label>
+                <label className={labelTextClass}>基线监控</label>
                 <select
                   value={selectedBaseline}
                   onChange={(e) => setSelectedBaseline(e.target.value)}
                   className={selectInputClass}
                 >
-                  <option value="">请选择基线评估</option>
+                  <option value="">请选择基线记录</option>
                   {completedAssessments.map((a) => (
                     <option key={a.id} value={a.id}>
                       {new Date(a.createdAt).toLocaleDateString('zh-CN')} · {a.mode}
@@ -241,13 +241,13 @@ export const ProgressComparison: React.FC<ProgressComparisonProps> = ({
               </div>
 
               <div>
-                <label className={labelTextClass}>当前记录</label>
+                <label className={labelTextClass}>当前监控</label>
                 <select
                   value={selectedCurrent}
                   onChange={(e) => setSelectedCurrent(e.target.value)}
                   className={selectInputClass}
                 >
-                  <option value="">请选择当前评估</option>
+                  <option value="">请选择当前记录</option>
                   {completedAssessments.map((a) => (
                     <option key={a.id} value={a.id}>
                       {new Date(a.createdAt).toLocaleDateString('zh-CN')} · {a.mode}

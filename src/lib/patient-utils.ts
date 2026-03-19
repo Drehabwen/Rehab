@@ -1,10 +1,10 @@
-﻿import type { Patient } from '@/types/patient';
+import type { Patient } from '@/types/patient';
 
 export function getPatientDisplayName(patient: Patient): string {
   if (patient.name && patient.name.trim()) {
     return patient.name.trim();
   }
-  return `患者 ${patient.id}`;
+  return `运动员 ${patient.id}`;
 }
 
 export function getPatientDisplayId(patient: Patient): string {
@@ -58,7 +58,7 @@ export function getPatientSubtitle(patient: Patient, sessionCount?: number): str
   if (patient.name && patient.name.trim()) {
     return `ID: ${patient.id}`;
   }
-  return sessionCount !== undefined ? `接诊 ${sessionCount} 次` : '新患者';
+  return sessionCount !== undefined ? `监控 ${sessionCount} 场` : '新运动员';
 }
 
 export function formatPatientSearch(patient: Patient, query: string): boolean {

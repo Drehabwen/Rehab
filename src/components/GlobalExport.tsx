@@ -24,7 +24,7 @@ export const GlobalExport: React.FC = () => {
 
   const handleExport = async (format: 'pdf' | 'word' | 'html') => {
     if (!structuredCase) {
-      alert('请先生成病历内容后再导出');
+      alert('请先生成报告内容后再导出');
       return;
     }
 
@@ -39,12 +39,12 @@ export const GlobalExport: React.FC = () => {
           age: patientInfo.age,
           case_id: patientInfo.case_id,
           chief_complaint: structuredCase['主诉'] || structuredCase['S'] || '',
-          present_illness: structuredCase['现病史'] || structuredCase['O'] || '',
-          past_history: structuredCase['既往史'] || '',
+          present_illness: structuredCase['训练背景'] || structuredCase['O'] || '',
+          past_history: structuredCase['历史表现'] || '',
           allergies: structuredCase['过敏史'] || '',
-          physical_exam: structuredCase['体格检查'] || '',
-          diagnosis: structuredCase['诊断'] || structuredCase['A'] || '',
-          treatment_plan: structuredCase['处理意见'] || structuredCase['P'] || '',
+          physical_exam: structuredCase['身体素质评估'] || '',
+          diagnosis: structuredCase['表现分析'] || structuredCase['A'] || '',
+          treatment_plan: structuredCase['训练调整建议'] || structuredCase['P'] || '',
           ai_suggestions: structuredCase['ai_suggestions'] || '',
           export_format: format
         }),
@@ -56,7 +56,7 @@ export const GlobalExport: React.FC = () => {
         const a = document.createElement('a');
         a.href = url;
         const extension = format === 'word' ? 'docx' : format;
-        a.download = `${patientInfo.case_id}_${patientInfo.name}_病历.${extension}`;
+        a.download = `${patientInfo.case_id}_${patientInfo.name}_监控报告.${extension}`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);

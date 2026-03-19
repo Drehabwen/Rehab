@@ -14,9 +14,9 @@ export interface PostureAssessmentData {
   issues?: PostureIssue[];
   landmarks?: Landmark[];
   confidence: number;
-  /** 深度报告 - LLM解析的报告 */
+  /** 深度报告，由 LLM 基于结构化结果生成 */
   markdownReport?: string;
-  /** 基础报告 - 根据规则得出的结论 */
+  /** 基础报告，由规则与指标直接生成 */
   auxiliaryDiagnosis?: string;
   timeSeries?: TemporalAnalysis['timeSeries'];
 }
@@ -76,22 +76,23 @@ export interface AssessmentRecord {
   patientId: string;
   assessmentType: 'front' | 'side' | 'back';
   imageData: string;
-  landmarks: Array<{x: number; y: number}> | number[];
+  landmarks: Array<{ x: number; y: number }> | number[];
   angles: Record<string, number>;
-  metrics: Record<string, any>;
+  metrics: Record<string, number | string | boolean | null>;
   treatmentPlanId?: string;
   feedback?: string;
   improvement?: number;
-}
-
-export interface TimelineRecord {
-  id: string;
-  timestamp: string;
-  type: 'assessment' | 'treatment' | 'followup';
-  data: AssessmentRecord | TreatmentPlanVersion;
-}
-
-export interface TreatmentTimeline {
-  patientId: string;
-  records: TimelineRecord[];
+  fatigueMetrics?: {
+    rpe?: number;
+    stabilityScore?: number;
+    jitterIndex?: number;
+    fatigueScore?: number;
+    recoveryScore?: number;
+  };
+  intervention?: {
+    interventionId: string;
+    phase: 'before' | 'during' | 'after';
+    protocolName?: string;
+    note?: string;
+  };
 }

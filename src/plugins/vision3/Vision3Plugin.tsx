@@ -29,7 +29,11 @@ type WorkspaceFocusTarget =
   | 'data-issues'
   | 'data-head';
 
-export const Vision3Plugin: React.FC = () => {
+interface Vision3PluginProps {
+  onNavigateToReports?: () => void;
+}
+
+export const Vision3Plugin: React.FC<Vision3PluginProps> = ({ onNavigateToReports }) => {
   const [isEntryMode, setIsEntryMode] = useState(true);
   const [assessmentMode, setAssessmentMode] = useState<AssessmentMode>('stepped');
   const [view, setView] = useState<'front' | 'back' | 'side'>('front');
@@ -38,6 +42,8 @@ export const Vision3Plugin: React.FC = () => {
   const [activePanel, setActivePanel] = useState<'dashboard' | 'report'>('dashboard');
   const [focusTarget, setFocusTarget] = useState<WorkspaceFocusTarget>('workspace-summary');
   const [isContextPanelOpen, setIsContextPanelOpen] = useState(false);
+  const hasAutoSwitchedToReportRef = useRef(false);
+  const previousCaptureStatusRef = useRef<string>('idle');
 
   const {
     isCameraOn,
@@ -242,22 +248,29 @@ export const Vision3Plugin: React.FC = () => {
       auxiliaryDiagnosis: displayAuxiliaryDiagnosis ? 'exists' : 'null',
       source: reportSource,
     });
-    if (hasLiveExpandedReport || hasLiveBasicReport) {
+    if (!hasAutoSwitchedToReportRef.current && (hasLiveExpandedReport || hasLiveBasicReport)) {
       console.log('Report received, switching to report panel');
+      hasAutoSwitchedToReportRef.current = true;
       setActivePanel('report');
       setFocusTarget('report-basic');
       setCaptureStatus('completed');
     }
-  }, [hasLiveExpandedReport, hasLiveBasicReport, setActivePanel, setCaptureStatus]);
+  }, [hasLiveExpandedReport, hasLiveBasicReport, displayMarkdownReport, displayAuxiliaryDiagnosis, reportSource, setActivePanel, setCaptureStatus]);
 
   useEffect(() => {
     console.log('[Vision3Plugin] captureStatus changed:', captureStatus);
-    if (captureStatus === 'completed') {
+    const wasCompleted = previousCaptureStatusRef.current === 'completed';
+    if (!wasCompleted && captureStatus === 'completed' && !hasAutoSwitchedToReportRef.current) {
       console.log('[Vision3Plugin] Analysis completed, switching to report panel');
+      hasAutoSwitchedToReportRef.current = true;
       setActivePanel('report');
       setFocusTarget((current) => (current === 'workspace-summary' ? 'report-basic' : current));
       setIsContextPanelOpen(false);
     }
+    if (captureStatus === 'idle') {
+      hasAutoSwitchedToReportRef.current = false;
+    }
+    previousCaptureStatusRef.current = captureStatus;
   }, [captureStatus, setActivePanel]);
 
   const handleResults = React.useCallback((results: Results) => {
@@ -325,6 +338,7 @@ export const Vision3Plugin: React.FC = () => {
       assessmentType={assessmentType}
       focusTarget={focusTarget}
       onNavigate={handleNavigateWorkspace}
+      onNavigateToReports={onNavigateToReports}
     />
   );
 

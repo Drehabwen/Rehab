@@ -1,288 +1,835 @@
-# 项目设计规范
-
-## 1. 概述
-
-本文档定义了项目的统一设计规范，所有组件必须使用这些规范，**禁止硬编码 Tailwind 类名**。
-
-## 2. 样式使用规则
-
-### 2.1 核心原则
-
-✅ **正确做法**：
-```typescript
-import { COLORS, SIZES } from '@/constants/uiStyles';
-
-<div className={`${COLORS.neutral.light.bg} ${SIZES.radius.lg}`}>
-```
-
-❌ **错误做法**：
-```typescript
-<div className="bg-white rounded-lg">  // 硬编码样式
-```
-
-### 2.2 样式常量结构
-
-#### COLORS 颜色系统
-
-```typescript
-COLORS = {
-  primary: {     // 主色调（蓝色）
-    blue, blueLight, blueHover, blueText, blueBg, blueBorder, blueShadow
-  },
-  secondary: {   // 次要色（紫色）
-    purple, purpleLight, purpleHover, purpleText, purpleBg, purpleBorder, purpleShadow
-  },
-  success: {     // 成功色（翡翠绿）
-    emerald, emeraldLight, emeraldHover, emeraldText, emeraldBg, emeraldBorder, emeraldShadow
-  },
-  info: {        // 信息色（青色）
-    cyan, cyanLight, cyanText, cyanBg, cyanBorder
-  },
-  warning: {     // 警告色（琥珀色）
-    amber, amberText, amberBg, amberBorder
-  },
-  danger: {      // 危险色（玫瑰红）
-    rose, roseText, roseBg, roseBorder
-  },
-  neutral: {     // 中性色
-    // 深色主题（用于暗色界面）
-    white, whiteText, whiteBg, whiteBorder, slate, slateText, slateBg, slateBorder, ...
-    // 浅色主题（用于明亮区域如报告）
-    light: {
-      bg, bgSoft, text, textSoft, textMuted, textLight,
-      border, borderSoft, hover, selected,
-      buttonDisabled, buttonInactive, indicator, indicatorActive
-    }
-  },
-  antey: {       // 品牌色
-    primary, primaryText, primaryBg, primaryBorder, primaryShadow,
-    accent, accentText, accentBg, accentBorder, accentShadow
-  }
-}
-```
-
-#### SIZES 尺寸系统
-
-```typescript
-SIZES = {
-  gap: {      // 间距
-    xs, sm, md, lg, xl, xxl
-  },
-  padding: {  // 内边距
-    xs, sm, md, lg, xl, xxl
-  },
-  radius: {   // 圆角
-    sm, md, lg, xl, full, pill, pillLg, pillXl
-  },
-  font: {     // 字体大小
-    xs, sm, md, lg, xl, xxl, xxxl, xxxxl, xxxxxl, xxxxxxl
-  },
-  size: {     // 元素尺寸
-    xs, sm, md, lg, xl, xxl, xxxl
-  }
-}
-```
-
-#### ANIMATIONS 动画系统
-
-```typescript
-ANIMATIONS = {
-  fadeIn, slideInTop, slideInRight, slideInLeft, slideInBottom,
-  zoomIn, pulse, pulseSubtle, ping, spin, spinSlow, scan
-}
-```
-
-#### TRANSITIONS 过渡效果
-
-```typescript
-TRANSITIONS = {
-  default,  // duration-200
-  slow,     // duration-300
-  medium    // duration-500
-}
-```
+Coach AI Workspace 产品设计规范与执行 Spec
 
-#### SHADOWS 阴影系统
+一、项目概述
 
-```typescript
-SHADOWS = {
-  sm, md, lg, inner
-}
-```
+1.1 产品定位
 
-#### BACKDROP 背景模糊
+科研级循证运动训练监控平台——将运动康复科研的「PRISMA 标准化循证逻辑」，落地为职业教练/康复师/科研人员可直接使用的日常工作流工具，核心壁垒是「可追溯、可重复、循证化」的全流程数据管理。
 
-```typescript
-BACKDROP = {
-  sm, md, lg
-}
-```
+1.2 核心用户与需求
 
-## 3. 使用场景
+用户角色
 
-### 3.1 深色主题区域
+核心需求
 
-```typescript
-import { COLORS, SIZES } from '@/constants/uiStyles';
+职业带训教练
 
-// 主容器
-<div className={`${COLORS.neutral.slateBg} ${SIZES.radius.lg}`}>
+快速创建监控任务、一键完成多维度评估、自动生成训练建议
 
-// 按钮（非激活状态）
-<button className={COLORS.neutral.light.buttonInactive}>
+康复师
 
-// 文本
-<p className={COLORS.neutral.slateText}>
-```
+标准化 ROM/动作稳定性评估、数据可追溯、生成专业康复报告
 
-### 3.2 浅色主题区域（报告、卡片）
+体育科研人员
 
-```typescript
-import { COLORS, SIZES } from '@/constants/uiStyles';
+批量导出科研级原始数据、数据溯源符合学术规范、支持 Meta 分析
 
-// 报告容器
-<div className={`${COLORS.neutral.light.bg} ${SIZES.radius.xl} ${COLORS.neutral.light.border}`}>
+1.3 产品核心流程（与 PRISMA 一一对应）
 
-// 标题
-<h3 className={COLORS.neutral.light.text}>
+产品工作流
 
-// 副标题
-<p className={COLORS.neutral.light.textSoft}>
+对应 PRISMA 文献筛选流程
 
-// 弱化文本
-<span className={COLORS.neutral.light.textMuted}>
+录入运动员 → 创建监控场次
 
-// 分隔线
-<div className={COLORS.neutral.light.borderSoft}>
-```
+初步检索文献 → 去重
 
-### 3.3 按钮状态
+4 模块标准化数据采集
 
-```typescript
-// 主按钮（紫色）
-<button className={`${COLORS.secondary.purple} text-white ${COLORS.secondary.purpleShadow}`}>
+初筛（标题/摘要）→ 复筛（全文）
 
-// 禁用按钮
-<button disabled className={COLORS.neutral.light.buttonDisabled}>
+数据校验 → 进度追踪
 
-// 非激活按钮
-<button className={COLORS.neutral.light.buttonInactive}>
-```
+剔除不合格文献 → 记录排除原因
 
-### 3.4 状态指示器
+生成 AI 循证报告 → 数据沉淀
 
-```typescript
-// 激活状态
-<div className={`${COLORS.primary.blueLight} ${COLORS.neutral.light.indicatorActive}`} />
+最终纳入分析 → 生成循证结论
 
-// 非激活状态
-<div className={COLORS.neutral.light.indicator} />
-```
 
-## 4. 样式扩展
+---
+二、全局设计规范
 
-如需添加新的样式类，请在 `uiStyles.ts` 中统一添加，遵循以下命名规范：
+2.1 视觉规范
 
-```typescript
-// 新增样式示例
-neutral: {
-  light: {
-    // 添加新的浅色主题样式
-    newStyle: 'bg-slate-50 text-slate-900',
-  }
-}
-```
+2.1.1 颜色系统（全平台强制统一）
 
-## 5. 组件样式指南
+颜色用途
 
-### 5.1 面板组件
+色值
 
-```typescript
-// 浅色面板
-<div className={`${COLORS.neutral.light.bg} ${SIZES.radius.lg} ${COLORS.neutral.light.border}`}>
+使用场景
 
-// 深色面板
-<div className={`${COLORS.neutral.slateBg} ${SIZES.radius.md} ${COLORS.neutral.slateBorder}`}>
-```
+品牌主色
 
-### 5.2 文本层级
+#1677FF
 
-```typescript
-// 主标题
-<h1 className={COLORS.neutral.light.text}>
+主按钮、选中状态、进度条（进行中）
 
-// 副标题
-<h2 className={COLORS.neutral.light.textSoft}>
+成功色
 
-// 正文
-<p className={COLORS.neutral.light.text}>
+#00B42A
 
-// 辅助文本
-<span className={COLORS.neutral.light.textMuted}>
-```
+已完成标签、成功提示、进度条（已完成）
 
-### 5.3 边框和分隔线
+警告色
 
-```typescript
-// 主边框
-<div className={COLORS.neutral.light.border}>
+#FFB100
 
-// 细分隔线
-<div className={COLORS.neutral.light.borderSoft}>
-```
+待完成标签、警告提示、进度条（待启动）
 
-## 6. 检查清单
+错误色
 
-在提交代码前，请检查：
+#F53F3F
 
-- [ ] 是否使用了 `COLORS`、`SIZES` 等常量，而不是硬编码 Tailwind 类
-- [ ] 是否正确选择了深色/浅色主题
-- [ ] 是否使用了统一的间距和圆角
-- [ ] 是否遵循了组件样式指南
-- [ ] 新增样式是否在 `uiStyles.ts` 中定义
+异常标签、错误提示、失败状态
 
-## 7. 违规示例
+中性色-背景
 
-❌ **错误代码**：
-```typescript
-<div className="bg-white rounded-lg border border-slate-200">
-  <h3 className="text-slate-900 font-semibold">
-  <p className="text-slate-500">
-```
+#F5F7FA
 
-✅ **正确代码**：
-```typescript
-import { COLORS, SIZES } from '@/constants/uiStyles';
+页面背景、卡片背景
 
-<div className={`${COLORS.neutral.light.bg} ${SIZES.radius.lg} ${COLORS.neutral.light.border}`}>
-  <h3 className={`${COLORS.neutral.light.text} font-semibold`}>
-  <p className={COLORS.neutral.light.textMuted}>
-```
+中性色-边框
 
-## 8. 迁移指南
+#E5E6EB
 
-如果现有代码包含硬编码样式，请按以下步骤迁移：
+卡片边框、分割线
 
-1. 识别硬编码的 Tailwind 类（如 `bg-white`, `text-slate-900`）
-2. 查找对应的 `COLORS` 或 `SIZES` 常量
-3. 替换为模板字符串：`` `${CONSTANT.property}` ``
-4. 多个类名使用空格连接：`` `${CLASS1} ${CLASS2}` ``
-5. 条件样式使用三元运算符
+中性色-文案
 
-## 9. 常见问题
+#1D2129
 
-**Q: 为什么不能直接使用 Tailwind 类？**
-A: 统一使用常量可以：
-- 确保设计一致性
-- 便于主题切换
-- 方便维护和修改
-- 减少样式冗余
+主文案、标题
 
-**Q: 找不到对应的常量怎么办？**
-A: 在 `uiStyles.ts` 中添加新的样式类，遵循现有命名规范。
+中性色-辅助文案
 
-**Q: 动态样式怎么处理？**
-A: 使用模板字符串和条件表达式：
-```typescript
-className={`${baseClass} ${isActive ? activeClass : inactiveClass}`}
-```
+#86909C
+
+辅助说明、次要信息
+
+2.1.2 状态标签规范（全平台强制统一）
+
+状态
+
+标签文案
+
+颜色
+
+使用场景
+
+待启动
+
+待启动采集
+
+警告色（黄底黑字）
+
+未开始任何模块采集的任务
+
+进行中
+
+进度：X/4
+
+主色（蓝底白字）
+
+已启动、未完成全部模块的任务
+
+已完成
+
+可生成报告
+
+成功色（绿底白字）
+
+4 模块全完成、未生成报告的任务
+
+异常
+
+数据异常
+
+错误色（红底白字）
+
+数据校验失败、采集中断的任务
+
+2.1.3 组件规范
+
+- 按钮尺寸：主按钮 120px×40px（圆角 8px），次按钮 100px×36px（圆角 6px）
+
+- 卡片样式：圆角 12px，边框 1px 中性色-边框，背景中性色-背景，阴影 0 2px 8px rgba(0,0,0,0.05)
+
+- 字体：中文 PingFang SC，英文 Roboto，标题 18px 加粗，主文案 14px，辅助文案 12px
+
+2.2 交互规范
+
+2.2.1 导航与跳转
+
+- 左侧导航栏固定，点击模块直接切换页面，无刷新；
+
+- 页面顶部路径导航（如「运动员 -> 监控 -> 评估 -> 报告」）可点击，点击直接返回对应模块；
+
+- 所有「去完成」「继续采集」按钮，点击直接跳转到对应模块/页面，无需二次确认。
+
+2.2.2 反馈与提示
+
+- 操作成功：右上角弹出绿色 Toast 提示，2 秒后自动消失；
+
+- 操作失败：弹出红色 Toast 提示，需手动关闭；
+
+- 数据加载：卡片/按钮显示加载动画，禁用点击，加载完成后恢复。
+
+2.2.3 批量操作
+
+- 列表左上角「全选」复选框，勾选后顶部显示批量操作栏；
+
+- 批量操作支持「取消全选」「批量创建任务」「批量导出」；
+
+- 批量操作前弹出确认框，提示「即将对 X 个对象执行操作，是否继续？」。
+
+2.3 文案规范
+
+2.3.1 专业术语统一
+
+术语
+
+统一文案
+
+禁止使用
+
+关节活动度
+
+ROM 关节活动度
+
+活动范围、关节角度
+
+主观疲劳评分
+
+RPE 主观疲劳问询
+
+疲劳度、疲劳评分
+
+监控任务
+
+监控场次
+
+任务、训练任务
+
+数据沉淀
+
+数据沉淀至数据中心
+
+数据保存、数据存储
+
+2.3.2 按钮文案统一
+
+操作
+
+统一文案
+
+禁止使用
+
+启动采集
+
+开始采集
+
+开始、启动
+
+继续未完成模块
+
+继续采集
+
+继续、下一步
+
+生成报告
+
+生成监控综合报告
+
+生成报告、导出报告
+
+批量操作
+
+批量创建监控场次
+
+批量创建、批量添加
+
+
+---
+三、核心功能模块详细 Spec
+
+3.1 监控中心（首页）
+
+3.1.1 模块目标
+
+教练打开页面第一眼看到「待办任务、核心进度、下一步操作」，10 秒内启动工作。
+
+3.1.2 界面布局 Spec
+
+区域
+
+元素
+
+文案
+
+逻辑/交互
+
+顶部路径导航
+
+面包屑
+
+运动员 -> 监控 -> 评估 -> 报告
+
+可点击，点击返回对应模块
+
+顶部数据卡片（4 个，从左到右）
+
+卡片 1
+
+待启动采集<br>8
+
+点击后下方列表筛选「待启动采集」任务
+
+暂时无法在豆包文档外展示此内容
+卡片 2
+
+采集中（进度：X/4）<br>2
+
+点击后下方列表筛选「采集中」任务
+
+暂时无法在豆包文档外展示此内容
+卡片 3
+
+可生成报告<br>0
+
+点击后下方列表筛选「可生成报告」任务
+
+暂时无法在豆包文档外展示此内容
+卡片 4
+
+总运动员<br>8
+
+点击后下方列表显示所有任务
+
+搜索与操作栏
+
+搜索框
+
+搜索运动员姓名、ID 或场次 ID
+
+输入后实时筛选列表，支持联想
+
+暂时无法在豆包文档外展示此内容
+按钮 1
+
+搜索运动员
+
+点击弹出运动员搜索弹窗
+
+暂时无法在豆包文档外展示此内容
+按钮 2（主色）
+
++ 新增运动员
+
+点击弹出新增运动员表单
+
+任务列表
+
+任务卡片（每个运动员 1 张）
+
+头像、姓名、运动员 ID、状态标签、进度、已完成/未完成模块、操作按钮
+
+见下方「任务卡片详细 Spec」
+
+3.1.3 任务卡片详细 Spec
+
+元素
+
+文案
+
+逻辑/交互
+
+头像
+
+姓氏（如「文」）
+
+圆形，品牌主色背景，白色文字
+
+基本信息
+
+文羽<br>运动员 ID JBCJ
+
+主文案 14px，辅助文案 12px
+
+状态标签
+
+进度：2/4
+
+按进度显示对应颜色（0/4 黄、1-3/4 蓝、4/4 绿）
+
+模块进度
+
+已完成：体态、ROM<br>未完成：疲劳问询、神经肌肉监测
+
+已完成模块标绿色，未完成标灰色
+
+操作按钮（主色大按钮）
+
+继续采集
+
+点击直接跳转到未完成的第一个模块采集页
+
+操作按钮（灰色小按钮）
+
+查看详情
+
+点击进入任务详情页
+
+3.1.4 数据逻辑
+
+- 待启动采集：已创建场次、未启动任何模块采集的任务数；
+
+- 采集中：已启动、至少完成 1 个模块、未完成全部 4 个模块的任务数；
+
+- 可生成报告：4 个模块全完成、未生成报告的任务数；
+
+- 总运动员：系统内录入的所有运动员总数（与数据中心完全一致）。
+
+3.1.5 异常处理
+
+- 无网络：页面显示「网络异常，请检查网络连接」，提供「重试」按钮；
+
+- 数据加载失败：卡片显示「数据加载失败」，提供「刷新」按钮。
+
+
+---
+3.2 表现分析
+
+3.2.1 模块目标
+
+快速定位未完成模块的任务，支持单模块快捷直达、批量操作。
+
+3.2.2 界面布局 Spec
+
+区域
+
+元素
+
+文案
+
+逻辑/交互
+
+顶部路径导航
+
+面包屑
+
+运动员 -> 监控 -> 分析 -> 方案
+
+可点击
+
+顶部数据卡片（3 个）
+
+卡片 1
+
+待启动采集<br>6
+
+点击筛选对应任务
+
+暂时无法在豆包文档外展示此内容
+卡片 2
+
+采集中<br>2
+
+点击筛选对应任务
+
+暂时无法在豆包文档外展示此内容
+卡片 3
+
+可生成报告<br>0
+
+点击筛选对应任务
+
+核心分析模块（4 个大图标按钮）
+
+按钮 1
+
+动作稳定性<br>已完成 3/8
+
+点击后列表筛选「未完成动作稳定性」的任务
+
+暂时无法在豆包文档外展示此内容
+按钮 2
+
+活动度 (ROM)<br>已完成 4/8
+
+点击后列表筛选「未完成 ROM」的任务
+
+暂时无法在豆包文档外展示此内容
+按钮 3
+
+疲劳问询<br>已完成 0/8
+
+点击后列表筛选「未完成疲劳问询」的任务
+
+暂时无法在豆包文档外展示此内容
+按钮 4
+
+神经肌肉疲劳监测<br>已完成 0/8
+
+点击后列表筛选「未完成神经肌肉监测」的任务
+
+任务列表
+
+任务卡片
+
+头像、姓名、ID、场次、进度、模块按钮、操作按钮
+
+见下方「任务卡片详细 Spec」
+
+3.2.3 任务卡片详细 Spec
+
+元素
+
+文案
+
+逻辑/交互
+
+基本信息
+
+文羽<br>运动员 ID JBCJ · 场次 JBCJ-001
+
+主文案 14px，辅助文案 12px
+
+状态标签
+
+待完成
+
+黄色标签
+
+进度
+
+进度 2/4<br>最近更新 2026/3/14
+
+进度条颜色与状态对应
+
+模块按钮（4 个）
+
+体态、ROM、问询、计划
+
+已完成标绿色（可点击查看），未完成标灰色（可点击进入采集）
+
+操作按钮（主色）
+
+开始监控
+
+点击按顺序跳转未完成模块
+
+3.2.4 数据逻辑
+
+- 核心分析模块完成数：全平台所有任务中，该模块已完成的任务数；
+
+- 任务进度：单任务已完成模块数 / 4。
+
+
+---
+3.3 报告中心
+
+3.3.1 模块目标
+
+按流程完成数据筛选，实时预览报告，一键导出多格式专业报告。
+
+3.3.2 界面布局 Spec
+
+区域
+
+元素
+
+文案
+
+逻辑/交互
+
+顶部路径导航
+
+面包屑
+
+AI 训练监控与表现分析
+
+可点击
+
+步骤条（4 步，从左到右）
+
+步骤 1
+
+训练对象<br>（已完成标绿，未完成标灰）
+
+必填，点击可重新选择
+
+暂时无法在豆包文档外展示此内容
+步骤 2
+
+监控场次<br>（已完成标绿，未完成标灰）
+
+必填，点击可重新选择
+
+暂时无法在豆包文档外展示此内容
+步骤 3
+
+训练模式/年龄组<br>（已完成标绿，未完成标灰）
+
+必填，点击可重新选择
+
+暂时无法在豆包文档外展示此内容
+步骤 4
+
+数据就绪状态<br>（2/4，已完成标绿，未完成标黄）
+
+自动校验，显示「已完成：X、X
+
+报告预览区
+
+标题
+
+综合报告编排预览
+
+选完运动员/场次后实时渲染
+
+暂时无法在豆包文档外展示此内容
+内容
+
+监控：JBCJ-001<br>（已完成模块显示数据，未完成显示「待采集」）
+
+支持在线编辑，修改后自动保存
+
+操作按钮（右上角）
+
+按钮 1
+
+生成训练调整建议
+
+点击后将 AI 建议插入预览区
+
+暂时无法在豆包文档外展示此内容
+按钮 2（主色，仅 4 步全完成可点击）
+
+生成监控综合报告
+
+点击后弹出导出选项
+
+导出选项
+
+选项 1
+
+导出 PDF
+
+点击下载 PDF 报告
+
+暂时无法在豆包文档外展示此内容
+选项 2
+
+导出 Word
+
+点击下载 Word 报告
+
+暂时无法在豆包文档外展示此内容
+选项 3
+
+导出 PPT
+
+点击下载汇报版 PPT
+
+暂时无法在豆包文档外展示此内容
+选项 4
+
+导出科研数据表（CSV）
+
+点击下载原始数据 CSV
+
+3.3.3 数据逻辑
+
+- 数据就绪状态：单任务已完成模块数 / 4；
+
+- 报告模板：默认「教练版」，可切换「科研版」「运动员版」。
+
+
+---
+3.4 数据中心
+
+3.4.1 模块目标
+
+查看历史数据、能力变化趋势，批量导出科研级数据，支持数据溯源。
+
+3.4.2 界面布局 Spec
+
+区域
+
+元素
+
+文案
+
+逻辑/交互
+
+顶部路径导航
+
+面包屑
+
+运动员 -> 监控 -> 评估 -> 报告 -> 历史
+
+可点击
+
+顶部数据卡片（4 个）
+
+卡片 1
+
+运动员总数<br>8
+
+与首页完全一致
+
+暂时无法在豆包文档外展示此内容
+卡片 2
+
+监控总场次<br>5
+
+系统内所有监控场次总数
+
+暂时无法在豆包文档外展示此内容
+卡片 3
+
+表现记录<br>6
+
+已完成的模块采集记录总数
+
+暂时无法在豆包文档外展示此内容
+卡片 4
+
+已存报告<br>0
+
+已生成的报告总数
+
+历史记录列表
+
+记录卡片
+
+头像、姓名、场次、进度、核心指标环比、操作按钮
+
+见下方「记录卡片详细 Spec」
+
+批量操作栏
+
+按钮
+
+批量导出科研数据
+
+勾选记录后可点击，导出选中记录的原始数据
+
+3.4.3 记录卡片详细 Spec
+
+元素
+
+文案
+
+逻辑/交互
+
+基本信息
+
+文羽<br>监控场次 ID JBCJ-001
+
+主文案 14px，辅助文案 12px
+
+状态标签
+
+已完成
+
+绿色标签
+
+进度
+
+评估进度<br>2/4<br>最近更新 2026/3/14
+
+进度条绿色
+
+核心指标环比
+
+ROM 肩关节屈曲：172°→178°，+6°<br>动作稳定性评分：82→88，+7%<br>RPE 平均评分：12→9，-3分
+
+上升标绿色箭头，下降标红色箭头
+
+操作按钮
+
+趋势图
+
+点击弹出该运动员核心指标变化折线图
+
+暂时无法在豆包文档外展示此内容
+数据溯源
+
+点击查看该记录的采集时间、设备、操作人员
+
+暂时无法在豆包文档外展示此内容
+查看报告
+
+点击查看已生成的报告（仅已生成报告的记录显示）
+
+
+---
+四、全局规则
+
+4.1 数据口径统一规则（全平台强制执行）
+
+所有模块的统计数据必须从同一数据源读取，禁止单独计算，确保：
+
+- 总运动员数：首页、表现分析、数据中心完全一致；
+
+- 任务状态数：首页、表现分析完全一致；
+
+- 模块进度数：单任务在所有页面的进度显示完全一致。
+
+4.2 PRISMA 数据溯源规则
+
+所有采集数据必须包含以下溯源信息，点击「数据溯源」可查看：
+
+- 采集时间（精确到分钟）；
+
+- 采集操作人员（登录账号）；
+
+- 采集设备（如适用）；
+
+- 数据修改记录（如有修改，显示修改人、修改时间、修改前后内容）。
+
+4.3 权限规则（基础版）
+
+角色
+
+权限
+
+管理者（分析下发）
+
+全局视图，可查看/编辑所有运动员、任务、报告，可批量操作
+
+带训教练
+
+仅能查看/编辑自己负责的运动员、任务，可生成报告
+
+运动员
+
+仅能查看自己的报告、提交疲劳反馈，无编辑权限
+
+
+---
+五、验收标准
+
+每个功能模块上线前必须通过以下验收：
+
+1. 视觉验收：颜色、字体、组件、状态标签完全符合 2.1 节规范；
+
+2. 交互验收：导航、跳转、反馈、批量操作完全符合 2.2 节规范；
+
+3. 文案验收：专业术语、按钮文案完全符合 2.3 节规范；
+
+4. 数据验收：所有模块数据口径统一，与 4.1 节规则一致；
+
+5. 流程验收：从「新增运动员」到「生成报告」的全流程无断点，与 PRISMA 逻辑对应；
+
+6. 异常验收：无网络、数据加载失败等场景有明确提示，可恢复。
+
+
+---
+六、附：核心流程 Mermaid 流程图（可直接用于开发/文档）
+
+暂时无法在豆包文档外展示此内容
+需要我帮你把某个模块的 Spec 进一步细化成开发可直接用的「接口需求+字段定义」吗？

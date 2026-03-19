@@ -29,15 +29,15 @@ export const THRESHOLDS = {
   
   // 稳定性阈值 (标准差)
   stability: {
-    clinical: 10,
+    standard: 10,
   },
   
   // 置信度
   confidence: 0.85,
 } as const;
 
-// 临床参考值
-export const CLINICAL_REFERENCES = {
+// 表现参考值
+export const PERFORMANCE_REFERENCES = {
   // 关节活动度参考值 (度)
   rom: {
     shoulderFlexion: 180,

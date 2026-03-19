@@ -13,7 +13,7 @@ interface MarkdownReportProps {
   title?: string;
   subtitle?: string;
   footerNote?: string;
-  tone?: 'blue' | 'cyan' | 'violet';
+  tone?: 'blue' | 'cyan' | 'violet' | 'amber';
   emptyTitle?: string;
   emptyDescription?: string;
 }
@@ -40,10 +40,30 @@ const toneClassMap = {
     quote: 'border-violet-500 bg-violet-50 text-slate-700',
     dot: 'bg-violet-500',
   },
+  amber: {
+    iconBg: 'bg-amber-500/10',
+    iconText: 'text-amber-600',
+    strong: 'text-amber-700',
+    quote: 'border-amber-500 bg-amber-50 text-slate-700',
+    dot: 'bg-amber-500',
+  },
 } as const;
 
-const mojibakePattern = /锟|鏂|鍩|鎶|璇|瀹|缁|鍗|閲|鍐|鍚|鎵|姹囨€|寮傚父|�/u;
+const knownMojibakeFragments = [
+  '\u95c0\u7102\u95b2',
+  '\u95b8\u7f51\u60d5',
+  '\u9422\u3126\u509c',
+  '\u5a34\u5d87\u76d3',
+  '\u59dd\u8be2\u6110',
+  '\u7f01\u4ebe\u6bb0',
+  '\u95c2\u558c\u662b',
+  '\u6d5c\u5d86\u58d8',
+  '\u93c8\u5d84\u6ad8',
+] as const;
+
+const mojibakePattern = new RegExp(knownMojibakeFragments.join('|'), 'u');
 const suspiciousPhoneticPattern = /[\u3100-\u312F]/u;
+
 const viewLabelMap = {
   front: '正面',
   side: '侧面',
@@ -55,8 +75,12 @@ const normalizeMarkdownLine = (line: string) => {
   const withHeadingSpace = withoutControlChars.replace(/^(#{1,6})([^\s#].*)$/, '$1 $2');
 
   return withHeadingSpace
-    .replace(/^(#{1,6})\s*(front|side|back)\b.*$/i, (_, hashes: string, view: keyof typeof viewLabelMap) => `${hashes} ${viewLabelMap[view]}评估`)
-    .replace(/^评估视角[:：]\s*(front|side|back)\b.*$/i, (_, view: keyof typeof viewLabelMap) => `评估视角：${viewLabelMap[view]}`);
+    .replace(/^(#{1,6})\s*(front|side|back)\b.*$/i, (_, hashes: string, view: keyof typeof viewLabelMap) => {
+      return `${hashes} ${viewLabelMap[view]}评估`;
+    })
+    .replace(/^评估视角[:：]?\s*(front|side|back)\b.*$/i, (_, view: keyof typeof viewLabelMap) => {
+      return `评估视角：${viewLabelMap[view]}`;
+    });
 };
 
 const shouldDropMarkdownLine = (line: string) => {
@@ -79,14 +103,12 @@ export const sanitizeMarkdownContent = (content?: string | null) => {
     .map(normalizeMarkdownLine)
     .filter((line) => !shouldDropMarkdownLine(line));
 
-  return cleanedLines
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return cleanedLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 };
 
-export const sanitizeReadableText = (content?: string | null) =>
-  sanitizeMarkdownContent(content).replace(/\n{2,}/g, '\n\n').trim();
+export const sanitizeReadableText = (content?: string | null) => {
+  return sanitizeMarkdownContent(content).replace(/\n{2,}/g, '\n\n').trim();
+};
 
 export const MarkdownReport: React.FC<MarkdownReportProps> = ({
   content,
@@ -94,12 +116,12 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
   className = '',
   animate = true,
   showChrome = true,
-  title = 'AI 康复评估报告',
-  subtitle = '基于当前采集数据生成',
-  footerNote = '报告由 Rehab-AI 生成，仅供临床参考。',
+  title = 'AI 筛查报告',
+  subtitle = '基于多模态采集结果自动生成',
+  footerNote = '该报告由 Rehab-AI 自动生成，仅供专业人员参考。',
   tone = 'blue',
   emptyTitle = '暂无报告内容',
-  emptyDescription = '完成评估后，报告会显示在这里。',
+  emptyDescription = '完成采集或分析后，系统会在这里展示结构化报告。',
 }) => {
   const [displayedContent, setDisplayedContent] = useState('');
   const rawContent = typeof content === 'string' ? content.trim() : '';
@@ -118,11 +140,11 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
       return;
     }
 
-    let currentIdx = 0;
+    let currentIndex = 0;
     const interval = setInterval(() => {
-      if (currentIdx < normalizedContent.length) {
-        setDisplayedContent(normalizedContent.substring(0, currentIdx + 1));
-        currentIdx += 10;
+      if (currentIndex < normalizedContent.length) {
+        setDisplayedContent(normalizedContent.substring(0, currentIndex + 1));
+        currentIndex += 10;
       } else {
         clearInterval(interval);
       }
@@ -133,10 +155,10 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
 
   if (loading) {
     return (
-      <div className={`flex flex-col items-center justify-center p-10 min-h-[240px] rounded-2xl border border-slate-200 bg-slate-50 ${className}`}>
+      <div className={`flex min-h-[240px] flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-10 ${className}`}>
         <Loader2 className={`mb-4 h-9 w-9 animate-spin ${toneClasses.iconText}`} />
-        <p className="text-sm font-semibold text-slate-900">{'\u6b63\u5728\u751f\u6210\u62a5\u544a'}</p>
-        <p className="mt-2 text-center text-sm text-slate-500">{'\u7cfb\u7edf\u6b63\u5728\u6574\u7406\u5f53\u524d\u4f53\u6001\u6570\u636e\uff0c\u8bf7\u7a0d\u5019\u3002'}</p>
+        <p className="text-sm font-semibold text-slate-900">正在生成报告</p>
+        <p className="mt-2 text-center text-sm text-slate-500">系统正在整理当前分析结果，请稍候。</p>
       </div>
     );
   }
@@ -147,21 +169,21 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
         <FileText className="mb-4 h-10 w-10 text-slate-300" />
         <p className="text-sm font-semibold text-slate-900">{emptyTitle}</p>
         <p className="mt-2 max-w-md text-sm text-slate-500">
-          {contentFiltered ? '报告内容存在异常字符，已自动过滤；请稍后查看清洗后的内容。' : emptyDescription}
+          {contentFiltered ? '原始报告包含异常字符，系统已自动过滤不可读内容。' : emptyDescription}
         </p>
       </div>
     );
   }
 
   const contentBody = (
-    <div className={showChrome ? 'flex-1 overflow-y-auto p-5 lg:p-6 custom-scrollbar' : 'p-5 lg:p-6'}>
+    <div className={showChrome ? 'custom-scrollbar flex-1 overflow-y-auto p-5 lg:p-6' : 'p-5 lg:p-6'}>
       <div className={`max-w-none leading-relaxed ${COLORS.neutral.light.text}`}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            h1: ({ ...props }) => <h1 className="mb-4 mt-6 border-b border-slate-200 pb-2 text-2xl font-bold first:mt-0" {...props} />,
-            h2: ({ ...props }) => <h2 className="mb-3 mt-6 text-xl font-bold first:mt-0" {...props} />,
-            h3: ({ ...props }) => <h3 className={`mb-2 mt-5 text-lg font-bold first:mt-0 ${toneClasses.strong}`} {...props} />,
+            h1: ({ ...props }) => <h1 className="first:mt-0 mb-4 mt-6 border-b border-slate-200 pb-2 text-2xl font-bold" {...props} />,
+            h2: ({ ...props }) => <h2 className="first:mt-0 mb-3 mt-6 text-xl font-bold" {...props} />,
+            h3: ({ ...props }) => <h3 className={`first:mt-0 mb-2 mt-5 text-lg font-bold ${toneClasses.strong}`} {...props} />,
             p: ({ ...props }) => <p className="mb-4 leading-7 text-slate-700" {...props} />,
             ul: ({ ...props }) => <ul className="mb-4 list-disc space-y-1 pl-5 text-slate-700" {...props} />,
             ol: ({ ...props }) => <ol className="mb-4 list-decimal space-y-1 pl-5 text-slate-700" {...props} />,
@@ -186,11 +208,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({
   );
 
   if (!showChrome) {
-    return (
-      <div className={`min-h-[220px] rounded-2xl border border-slate-200 bg-white ${className}`}>
-        {contentBody}
-      </div>
-    );
+    return <div className={`min-h-[220px] rounded-2xl border border-slate-200 bg-white ${className}`}>{contentBody}</div>;
   }
 
   return (

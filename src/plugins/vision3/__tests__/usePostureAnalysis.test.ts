@@ -39,6 +39,8 @@ describe('usePostureAnalysis', () => {
     result: null,
     jointResult: null,
     status: 'connected' as const,
+    stabilityScore: 1,
+    jitterIndex: 0,
     analyze: mockAnalyze,
     analyzeJoint: vi.fn(),
     analyzeBatch: mockAnalyzeBatch,

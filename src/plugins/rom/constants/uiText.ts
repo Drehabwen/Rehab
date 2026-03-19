@@ -1,6 +1,6 @@
-﻿export const ROM_TEXTS = {
-  title: '关节活动度评估',
-  description: '评估患者各关节的活动范围与左右侧差异。',
+export const ROM_TEXTS = {
+  title: '关节活动度筛查',
+  description: '面向筛查场景记录各关节活动范围，比较左右差异并为后续复测留档。',
   joints: {
     cervical: '颈椎',
     shoulder: '肩关节',
@@ -24,9 +24,39 @@
     excessive: '活动过度',
   },
   messages: {
-    start: '准备就绪，点击开始测量',
-    measuring: '正在测量，请保持动作稳定',
-    completed: '测量完成',
-    save: '保存评估',
+    start: '准备就绪后开始采集。',
+    measuring: '正在采集中，请保持动作稳定。',
+    completed: '本次测量已完成。',
+    save: '保存筛查结果',
   },
+} as const;
+
+export const getROMDirectionLabel = (
+  joint: keyof typeof ROM_TEXTS.joints,
+  direction: keyof typeof ROM_TEXTS.directions,
+) => {
+  if (joint === 'cervical') {
+    if (direction === 'internal_rotation') {
+      return '左旋';
+    }
+    if (direction === 'external_rotation') {
+      return '右旋';
+    }
+    if (direction === 'abduction') {
+      return '左侧屈';
+    }
+    if (direction === 'adduction') {
+      return '右侧屈';
+    }
+  }
+
+  return ROM_TEXTS.directions[direction];
+};
+
+export const getROMSideLabel = (joint: keyof typeof ROM_TEXTS.joints, side: 'left' | 'right') => {
+  if (joint === 'cervical') {
+    return '中线位';
+  }
+
+  return side === 'left' ? '左侧' : '右侧';
 };

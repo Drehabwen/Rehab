@@ -5,7 +5,7 @@ import { JointType, MovementDirection } from '@/types/posture';
 const JOINTS: { label: string; value: JointType }[] = [
   { label: '颈椎', value: 'cervical' },
   { label: '肩关节', value: 'shoulder' },
-  { label: '胸腰椎', value: 'thoracolumbar' },
+  { label: '胸腰段', value: 'thoracolumbar' },
   { label: '肘关节', value: 'elbow' },
   { label: '腕关节', value: 'wrist' },
   { label: '髋关节', value: 'hip' },
@@ -49,9 +49,7 @@ const DIRECTIONS: Record<JointType, { label: string; value: MovementDirection }[
     { label: '外展', value: 'abduction' },
     { label: '内收', value: 'adduction' },
   ],
-  knee: [
-    { label: '前屈', value: 'flexion' },
-  ],
+  knee: [{ label: '前屈', value: 'flexion' }],
   ankle: [
     { label: '背屈', value: 'dorsiflexion' },
     { label: '跖屈', value: 'plantarflexion' },
@@ -59,17 +57,11 @@ const DIRECTIONS: Record<JointType, { label: string; value: MovementDirection }[
 };
 
 export default function JointSelector() {
-  const { 
-    setSingleMeasurement, isMeasuring, activeMeasurements 
-  } = useMeasurementStore();
-
-  // Initialize state based on store or default
-  // We want to persist the selection even if store updates, but initial state should match store
+  const { setSingleMeasurement, isMeasuring, activeMeasurements } = useMeasurementStore();
   const [localJoint, setLocalJoint] = useState<JointType>('cervical');
   const [localSide, setLocalSide] = useState<'left' | 'right'>('left');
   const [localDirection, setLocalDirection] = useState<MovementDirection>('flexion');
 
-  // Sync local state with store on mount (if store has a measurement)
   useEffect(() => {
     if (activeMeasurements.length > 0) {
       const current = activeMeasurements[0];
@@ -79,43 +71,41 @@ export default function JointSelector() {
     }
   }, [activeMeasurements]);
 
-  // Helper to check if side is needed
   const isSpinal = localJoint === 'cervical' || localJoint === 'thoracolumbar';
 
-  // Helper to get sideToSave logic
-  const getSideToSave = (joint: JointType, dir: MovementDirection, side: 'left' | 'right'): 'left' | 'right' | null => {
+  const getSideToSave = (
+    joint: JointType,
+    direction: MovementDirection,
+    side: 'left' | 'right',
+  ): 'left' | 'right' | null => {
     const isSpinalJoint = joint === 'cervical' || joint === 'thoracolumbar';
-    if (isSpinalJoint && (dir === 'flexion' || dir === 'extension')) {
+    if (isSpinalJoint && (direction === 'flexion' || direction === 'extension')) {
       return null;
     }
     return side;
   };
 
-  // Logic to filter directions based on side/joint
   const getDisplayOptions = () => {
-    const rawDirs = DIRECTIONS[localJoint] || [];
-    
-    if (!isSpinal) return rawDirs;
+    const rawDirections = DIRECTIONS[localJoint] || [];
+    if (!isSpinal) return rawDirections;
 
-    // For spinal joints, we consolidate Left/Right Rotation/Lateral Flexion
     const baseMotions = [];
-    
-    const hasFlex = rawDirs.find(d => d.value === 'flexion');
+    const hasFlex = rawDirections.find((direction) => direction.value === 'flexion');
     if (hasFlex) baseMotions.push(hasFlex);
-    
-    const hasExt = rawDirs.find(d => d.value === 'extension');
+
+    const hasExt = rawDirections.find((direction) => direction.value === 'extension');
     if (hasExt) baseMotions.push(hasExt);
-    
-    const hasRot = rawDirs.some(d => d.value.includes('rotation'));
-    if (hasRot) {
+
+    const hasRotation = rawDirections.some((direction) => direction.value.includes('rotation'));
+    if (hasRotation) {
       baseMotions.push({ label: '旋转', value: 'rotation' });
     }
-    
-    const hasLat = rawDirs.some(d => d.value.includes('lateral-flexion'));
-    if (hasLat) {
+
+    const hasLateralFlexion = rawDirections.some((direction) => direction.value.includes('lateral-flexion'));
+    if (hasLateralFlexion) {
       baseMotions.push({ label: '侧屈', value: 'lateral-flexion' });
     }
-    
+
     return baseMotions;
   };
 
@@ -134,34 +124,26 @@ export default function JointSelector() {
     return localDirection;
   };
 
-  // Handlers
-  const handleJointChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newJoint = e.target.value as JointType;
+  const handleJointChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newJoint = event.target.value as JointType;
     setLocalJoint(newJoint);
 
-    // Determine default direction for new joint
     let newDirection = 'flexion' as MovementDirection;
     const isNewSpinal = newJoint === 'cervical' || newJoint === 'thoracolumbar';
-    
-    if (isNewSpinal) {
-      newDirection = 'flexion';
-    } else {
-      const firstDir = DIRECTIONS[newJoint]?.[0]?.value;
-      if (firstDir) newDirection = firstDir;
+    if (!isNewSpinal) {
+      const firstDirection = DIRECTIONS[newJoint]?.[0]?.value;
+      if (firstDirection) newDirection = firstDirection;
     }
-    
-    setLocalDirection(newDirection);
 
-    // Update store immediately
+    setLocalDirection(newDirection);
     const sideToSave = getSideToSave(newJoint, newDirection, localSide);
     setSingleMeasurement(newJoint, newDirection, sideToSave);
   };
 
-  const handleSideChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newSide = e.target.value as 'left' | 'right';
+  const handleSideChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const newSide = event.target.value as 'left' | 'right';
     setLocalSide(newSide);
 
-    // If spinal and rotation/lateral-flexion, update direction value (e.g. left-rotation -> right-rotation)
     let newDirection = localDirection;
     if (isSpinal) {
       if (localDirection.includes('rotation')) {
@@ -170,45 +152,42 @@ export default function JointSelector() {
         newDirection = newSide === 'left' ? 'left-lateral-flexion' : 'right-lateral-flexion';
       }
     }
-    
+
     if (newDirection !== localDirection) {
       setLocalDirection(newDirection);
     }
 
-    // Update store immediately
     const sideToSave = getSideToSave(localJoint, newDirection, newSide);
     setSingleMeasurement(localJoint, newDirection, sideToSave);
   };
 
-  const handleDirectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    let newDirection = val as MovementDirection;
+  const handleDirectionChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    let newDirection = value as MovementDirection;
 
     if (isSpinal) {
-      if (val === 'rotation') {
+      if (value === 'rotation') {
         newDirection = localSide === 'left' ? 'left-rotation' : 'right-rotation';
-      } else if (val === 'lateral-flexion') {
+      } else if (value === 'lateral-flexion') {
         newDirection = localSide === 'left' ? 'left-lateral-flexion' : 'right-lateral-flexion';
       }
     }
-    
-    setLocalDirection(newDirection);
 
-    // Update store immediately
+    setLocalDirection(newDirection);
     const sideToSave = getSideToSave(localJoint, newDirection, localSide);
     setSingleMeasurement(localJoint, newDirection, sideToSave);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <h3 className="text-xl font-bold text-gray-900">测量配置</h3>
-        <div className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+        <div className="h-2 w-2 animate-pulse rounded-full bg-blue-600" />
       </div>
-      
+
       <div className="space-y-5">
         <div className="group">
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
+          <label className="mb-2 block px-1 text-xs font-bold uppercase tracking-wider text-gray-500">
             选择关节部位
           </label>
           <div className="relative">
@@ -216,56 +195,62 @@ export default function JointSelector() {
               value={localJoint}
               onChange={handleJointChange}
               disabled={isMeasuring}
-              className="block w-full appearance-none rounded-2xl border-gray-200 bg-gray-50/50 px-4 py-3.5 text-sm font-medium text-gray-900 transition-all focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 border cursor-pointer"
+              className="block w-full cursor-pointer appearance-none rounded-2xl border border-gray-200 bg-gray-50/50 px-4 py-3.5 text-sm font-medium text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50"
             >
-              {JOINTS.map(j => (
-                <option key={j.value} value={j.value}>{j.label}</option>
+              {JOINTS.map((joint) => (
+                <option key={joint.value} value={joint.value}>
+                  {joint.label}
+                </option>
               ))}
             </select>
             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-              <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+              <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+              </svg>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="group">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
-              侧别
-            </label>
+            <label className="mb-2 block px-1 text-xs font-bold uppercase tracking-wider text-gray-500">侧别</label>
             <div className="relative">
               <select
                 value={localSide}
                 onChange={handleSideChange}
                 disabled={isMeasuring || isSideDisabled()}
-                className="block w-full appearance-none rounded-2xl border-gray-200 bg-gray-50/50 px-4 py-3.5 text-sm font-medium text-gray-900 transition-all focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 disabled:bg-gray-100/50 border cursor-pointer"
+                className="block w-full cursor-pointer appearance-none rounded-2xl border border-gray-200 bg-gray-50/50 px-4 py-3.5 text-sm font-medium text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:bg-gray-100/50 disabled:opacity-50"
               >
                 <option value="left">左侧</option>
                 <option value="right">右侧</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-                <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                  <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                </svg>
               </div>
             </div>
           </div>
 
           <div className="group">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
-              运动方向
-            </label>
+            <label className="mb-2 block px-1 text-xs font-bold uppercase tracking-wider text-gray-500">动作方向</label>
             <div className="relative">
               <select
                 value={getDirectionSelectValue()}
                 onChange={handleDirectionChange}
                 disabled={isMeasuring}
-                className="block w-full appearance-none rounded-2xl border-gray-200 bg-gray-50/50 px-4 py-3.5 text-sm font-medium text-gray-900 transition-all focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 border cursor-pointer"
+                className="block w-full cursor-pointer appearance-none rounded-2xl border border-gray-200 bg-gray-50/50 px-4 py-3.5 text-sm font-medium text-gray-900 transition-all focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50"
               >
-                {getDisplayOptions().map((d, idx) => (
-                  <option key={d.value || idx} value={d.value}>{d.label}</option>
+                {getDisplayOptions().map((direction, index) => (
+                  <option key={direction.value || index} value={direction.value}>
+                    {direction.label}
+                  </option>
                 ))}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-400">
-                <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
+                <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                  <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                </svg>
               </div>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { COLORS } from '@/constants/uiStyles';
 import { AssessmentType } from '../store/usePostureAssessmentStore';
 import { ASSESSMENT_TEXTS } from '../constants/uiText';
 import { buildImmediateBasicReport } from '../report-insights';
+import { localizePostureIssue } from '../vision3-utils';
 
 type WorkspaceFocusTarget =
   | 'workspace-summary'
@@ -39,6 +40,7 @@ interface Vision3AnalysisPanelProps {
   assessmentType: AssessmentType;
   focusTarget?: WorkspaceFocusTarget;
   onNavigate?: (panel: 'dashboard' | 'report', target: WorkspaceFocusTarget) => void;
+  onNavigateToReports?: () => void;
 }
 
 const panelButtonClass = (active: boolean, tone: 'blue' | 'violet') => {
@@ -56,13 +58,11 @@ const panelButtonClass = (active: boolean, tone: 'blue' | 'violet') => {
     : 'h-9 rounded-lg border border-violet-100 bg-violet-50 px-3 text-sm font-semibold text-violet-700 shadow-sm';
 };
 
-const assessmentBadgeClass = (assessmentType: AssessmentType) => {
-  if (assessmentType === 'quick') {
-    return 'border border-cyan-100 bg-cyan-50 text-cyan-700';
-  }
-
-  return 'border border-emerald-100 bg-emerald-50 text-emerald-700';
-};
+const assessmentBadgeClass = (assessmentType: AssessmentType) => (
+  assessmentType === 'quick'
+    ? 'border border-cyan-100 bg-cyan-50 text-cyan-700'
+    : 'border border-emerald-100 bg-emerald-50 text-emerald-700'
+);
 
 const panelShellClass = cn(
   'flex min-h-0 flex-col gap-4 rounded-[2rem] border p-4 shadow-sm backdrop-blur-sm lg:p-6',
@@ -117,6 +117,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
   assessmentType,
   focusTarget,
   onNavigate,
+  onNavigateToReports,
 }) => {
   const isCompleted = captureStatus === 'completed';
   const safeAuxiliaryDiagnosis = sanitizeReportSource(auxiliaryDiagnosis);
@@ -136,37 +137,51 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
   const basicReportRef = useRef<HTMLElement | null>(null);
   const showPanelToggle = !isCompleted || activePanel === 'dashboard';
 
-  const reportLines = useMemo(() => {
-    return readableBasicReport
-      .split(/\r?\n/)
-      .map((line) => line.replace(/\*\*/g, '').trim())
-      .filter(Boolean);
-  }, [readableBasicReport]);
+  const reportLines = useMemo(
+    () => readableBasicReport.split(/\r?\n/).map((line) => line.replace(/\*\*/g, '').trim()).filter(Boolean),
+    [readableBasicReport],
+  );
 
-  const reportHighlights = useMemo(() => {
-    return reportLines
+  const reportHighlights = useMemo(
+    () => reportLines
       .map((line) => line.replace(/^#{1,6}\s*/, '').replace(/^[-*+]\s*/, '').trim())
       .filter((line) => line.length > 0)
-      .filter((line) => !['基础报告', '即时基础结论', '正面评估', '侧面评估', '背面评估', '建议动作'].includes(line))
-      .slice(0, 6);
-  }, [reportLines]);
+      .slice(0, 6),
+    [reportLines],
+  );
 
-  const findingCards = (result?.issues || []).slice(0, 3);
-  const actionCards = findingCards
-    .map((issue) => issue.recommendation?.trim())
-    .filter((value): value is string => Boolean(value))
-    .slice(0, 3);
+  const findingCards = (result?.issues || []).map(localizePostureIssue).slice(0, 3);
   const summaryCards = reportHighlights.slice(0, 3);
-  const visibleActionCards = actionCards.length > 0 ? actionCards : ['建议保持当前训练与日常姿势管理，并结合后续复测持续观察。'];
   const reportIntro = hasBasicReportContent
-    ? '基础报告会在当前界面完整展开，首屏先看结论，再向下继续阅读完整正文。'
-    : '完成评估后，这里会立即承接本次体态评估的基础报告。';
+    ? '基础报告会在当前界面完整展开，建议先看结论摘要，再继续阅读完整正文。'
+    : '完成评估后，这里会直接承接本次体态筛查的基础报告。';
 
-  useEffect(() => {
-    if (activePanel !== 'report') {
+  const handleOpenDashboard = () => {
+    if (onNavigate) {
+      onNavigate('dashboard', 'data-overview');
       return;
     }
+    setActivePanel('dashboard');
+  };
 
+  const handleOpenBasicReport = () => {
+    if (onNavigate) {
+      onNavigate('report', 'report-basic');
+      return;
+    }
+    setActivePanel('report');
+  };
+
+  const handleGoReportArchive = () => {
+    if (onNavigateToReports) {
+      onNavigateToReports();
+      return;
+    }
+    handleOpenBasicReport();
+  };
+
+  useEffect(() => {
+    if (activePanel !== 'report') return;
     if (focusTarget === 'report-basic') {
       basicReportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
@@ -189,22 +204,16 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <h3 className={titleClass}>{activePanel === 'report' ? '基础报告' : '量化指标'}</h3>
-              <p className={subtitleClass}>{activePanel === 'report' ? reportIntro : '查看本次姿态量化结果与结构化指标。'}</p>
+              <p className={subtitleClass}>
+                {activePanel === 'report' ? reportIntro : '查看本次体态筛查的量化结果与结构化指标。'}
+              </p>
             </div>
 
             <div className={headerToggleClass}>
-              <button
-                type="button"
-                onClick={() => setActivePanel('dashboard')}
-                className={panelButtonClass(activePanel === 'dashboard', 'blue')}
-              >
+              <button type="button" onClick={handleOpenDashboard} className={panelButtonClass(activePanel === 'dashboard', 'blue')}>
                 量化指标
               </button>
-              <button
-                type="button"
-                onClick={() => setActivePanel('report')}
-                className={panelButtonClass(activePanel === 'report', 'violet')}
-              >
+              <button type="button" onClick={handleOpenBasicReport} className={panelButtonClass(activePanel === 'report', 'violet')}>
                 基础报告
               </button>
             </div>
@@ -220,7 +229,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                 <div className="rounded-[24px] border border-cyan-100 bg-cyan-50/75 p-4">
                   <div className="text-xs font-semibold tracking-[0.12em] text-cyan-700">结论摘要</div>
                   <div className="mt-3 space-y-2">
-                    {(summaryCards.length > 0 ? summaryCards : ['本次基础报告已经生成，下面可直接继续阅读完整正文。']).map((item) => (
+                    {(summaryCards.length > 0 ? summaryCards : ['本次基础报告已经生成，可继续阅读完整正文。']).map((item) => (
                       <p key={item} className="rounded-xl bg-white/85 px-3 py-2 text-sm leading-6 text-slate-700">
                         {item}
                       </p>
@@ -241,20 +250,19 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                     </div>
                   ) : (
                     <div className="mt-3 rounded-xl bg-white/90 px-3 py-3 text-sm leading-6 text-emerald-700">
-                      当前未见明显高风险异常，整体表现偏稳定。
+                      当前未见明显高风险异常，整体表现相对稳定。
                     </div>
                   )}
                 </div>
 
                 <div className="rounded-[24px] border border-violet-100 bg-violet-50/75 p-4">
-                  <div className="text-xs font-semibold tracking-[0.12em] text-violet-700">建议动作</div>
-                  <div className="mt-3 space-y-2">
-                    {visibleActionCards.map((action) => (
-                      <p key={action} className="rounded-xl bg-white/90 px-3 py-2 text-sm leading-6 text-slate-700">
-                        {action}
-                      </p>
-                    ))}
-                  </div>
+                  <div className="text-xs font-semibold tracking-[0.12em] text-violet-700">报告中心</div>
+                  <p className="mt-3 rounded-xl bg-white/90 px-3 py-2 text-sm leading-6 text-slate-700">
+                    完整建议和跨模块汇总会统一沉淀到报告中心，请前往报告中心查看正式归档结果。
+                  </p>
+                  <button type="button" className={cn('mt-3 w-full', quickJumpButtonClass('violet'))} onClick={handleGoReportArchive}>
+                    前往报告中心
+                  </button>
                 </div>
               </div>
 
@@ -262,23 +270,15 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                 <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h4 className="text-xl font-semibold text-slate-900">基础报告正文</h4>
-                    <p className="mt-1 text-sm leading-6 text-slate-500">这里直接保留完整基础报告，不折叠，不使用内部滚动条。</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-500">这里直接展示本次筛查的基础报告，不再使用嵌套滚动区域。</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {result ? (
-                      <button
-                        type="button"
-                        className={quickJumpButtonClass('blue')}
-                        onClick={() => setActivePanel('dashboard')}
-                      >
+                      <button type="button" className={quickJumpButtonClass('blue')} onClick={handleOpenDashboard}>
                         查看量化指标
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      className={quickJumpButtonClass('violet')}
-                      onClick={() => onNavigate?.('report', 'report-basic')}
-                    >
+                    <button type="button" className={quickJumpButtonClass('violet')} onClick={handleGoReportArchive}>
                       前往报告中心
                     </button>
                   </div>
@@ -303,7 +303,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                   <div>
                     <h4 className="text-base font-semibold text-slate-900">报告流转</h4>
                     <p className="mt-1 text-sm leading-6 text-slate-500">
-                      当前页优先阅读基础报告，报告中心会自动汇总本次基础报告；如需跨模块深度报告，再前往报告中心统一查看。
+                      当前页优先阅读基础报告，报告中心会自动汇总本次结果；如需跨模块深度报告，再前往报告中心统一查看。
                     </p>
                   </div>
                   {hasDeepReport ? (

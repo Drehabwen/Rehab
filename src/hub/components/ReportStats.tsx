@@ -16,7 +16,7 @@ export const ReportStats: React.FC<ReportStatsProps> = ({
 }) => {
   const stats: Array<{ label: string; value: number; icon: LucideIcon; color: string; bg: string }> = [
     { label: '总评估数', value: assessmentsCount, icon: Database, color: 'text-blue-500', bg: 'bg-blue-50' },
-    { label: '患者总数', value: patientsCount, icon: User, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+    { label: '运动员总数', value: patientsCount, icon: User, color: 'text-emerald-500', bg: 'bg-emerald-50' },
     { label: '本周新增', value: recentCount, icon: Activity, color: 'text-amber-500', bg: 'bg-amber-50' },
   ];
 

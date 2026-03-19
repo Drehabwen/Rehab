@@ -1,31 +1,15 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ArrowRight, Clock3, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { JointType, MovementDirection } from '../types';
+import { getROMDirectionLabel, getROMSideLabel, ROM_TEXTS } from '../constants/uiText';
 import { PageTitleSection, UnifiedStatusBadge } from '@/components/layout';
 
 interface ROMEntryHubProps {
   onStartAssessment: (joint: JointType, direction: MovementDirection, side: 'left' | 'right') => void;
 }
 
-const jointLabels: Record<JointType, string> = {
-  shoulder: '肩关节',
-  elbow: '肘关节',
-  wrist: '腕关节',
-  hip: '髋关节',
-  knee: '膝关节',
-  ankle: '踝关节',
-  cervical: '颈椎',
-};
-
-const directionLabels: Record<MovementDirection, string> = {
-  flexion: '屈曲',
-  extension: '伸展',
-  abduction: '外展',
-  adduction: '内收',
-  internal_rotation: '内旋',
-  external_rotation: '外旋',
-};
+const jointLabels: Record<JointType, string> = ROM_TEXTS.joints;
 
 const defaultDirectionsByJoint: Record<JointType, MovementDirection[]> = {
   shoulder: ['flexion', 'extension', 'abduction', 'external_rotation'],
@@ -51,7 +35,7 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
   const joints: JointType[] = ['shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle', 'cervical'];
 
   const summaryText = useMemo(
-    () => (selectedSide === 'left' ? '当前将执行左侧关节测量' : '当前将执行右侧关节测量'),
+    () => (selectedSide === 'left' ? '当前将执行左侧关节筛查' : '当前将执行右侧关节筛查'),
     [selectedSide],
   );
 
@@ -59,8 +43,8 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
     <div className="rehab-page custom-scrollbar">
       <div className="rehab-page-inner">
         <PageTitleSection
-          title="关节活动度评估"
-          description="先选侧别，再从动作列表开始测量。单项流程可在 2 秒内启动。"
+          title={ROM_TEXTS.title}
+          description="先选择关节和动作，再发起单项活动度测量。每次发起都会生成一条新的筛查记录。"
           right={
             <div className="flex items-center gap-2">
               <UnifiedStatusBadge status="processing" text={summaryText} className="hidden xl:inline-flex" />
@@ -82,32 +66,32 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
           }
         />
 
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="bento-card p-4">
-            <div className="flex items-center gap-2 text-slate-900 mb-1">
+            <div className="mb-1 flex items-center gap-2 text-slate-900">
               <Sparkles size={14} className="text-emerald-600" />
-              <span className="text-sm font-semibold">流程建议</span>
+              <span className="text-sm font-semibold">筛查建议</span>
             </div>
-            <p className="text-xs text-slate-600">优先肩关节与髋关节，可快速识别代偿模式。</p>
+            <p className="text-xs text-slate-600">优先检查肩关节与髋关节，便于快速发现代偿模式和左右差异。</p>
           </div>
           <div className="bento-card p-4">
-            <div className="flex items-center gap-2 text-slate-900 mb-1">
+            <div className="mb-1 flex items-center gap-2 text-slate-900">
               <Clock3 size={14} className="text-blue-600" />
               <span className="text-sm font-semibold">单项耗时</span>
             </div>
-            <p className="text-xs text-slate-600">每个动作约 30-50 秒，动作越稳定结果越可靠。</p>
+            <p className="text-xs text-slate-600">单个动作通常需要 30 到 50 秒，动作越稳定，结果越可用。</p>
           </div>
           <div className="bento-card p-4">
-            <div className="flex items-center gap-2 text-slate-900 mb-1">
+            <div className="mb-1 flex items-center gap-2 text-slate-900">
               <ArrowRight size={14} className="text-cyan-600" />
-              <span className="text-sm font-semibold">下一步</span>
+              <span className="text-sm font-semibold">结果去向</span>
             </div>
-            <p className="text-xs text-slate-600">开始测量后可实时查看角度，并在结果页导出报告。</p>
+            <p className="text-xs text-slate-600">完成测量后可直接查看结果，并导出到报告归档用于复测对比。</p>
           </div>
         </section>
 
-        <section className="bento-card p-0 overflow-hidden">
-          <div className="grid grid-cols-[1.2fr_2.2fr_0.8fr_1fr] gap-3 px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+        <section className="bento-card overflow-hidden p-0">
+          <div className="grid grid-cols-[1.2fr_2.2fr_0.8fr_1fr] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
             <span>关节</span>
             <span>动作</span>
             <span>预计时长</span>
@@ -120,10 +104,10 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
               const defaultDirection = directions[0];
 
               return (
-                <div key={joint} className="grid grid-cols-[1.2fr_2.2fr_0.8fr_1fr] gap-3 items-center px-4 py-3 hover:bg-slate-50/80">
+                <div key={joint} className="grid grid-cols-[1.2fr_2.2fr_0.8fr_1fr] items-center gap-3 px-4 py-3 hover:bg-slate-50/80">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{jointLabels[joint]}</p>
-                    <p className="text-xs text-slate-500 mt-1">{selectedSide === 'left' ? '左侧' : '右侧'}测量</p>
+                    <p className="mt-1 text-xs text-slate-500">{getROMSideLabel(joint, selectedSide)}测量</p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
@@ -131,9 +115,9 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
                       <button
                         key={`${joint}-${direction}`}
                         onClick={() => onStartAssessment(joint, direction, selectedSide)}
-                        className="h-8 px-3 rounded-lg border border-slate-300 bg-white text-xs text-slate-700 hover:bg-slate-100"
+                        className="h-8 rounded-lg border border-slate-300 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100"
                       >
-                        {directionLabels[direction]}
+                        {getROMDirectionLabel(joint, direction)}
                       </button>
                     ))}
                   </div>
@@ -145,7 +129,7 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
                       onClick={() => onStartAssessment(joint, defaultDirection, selectedSide)}
                       className="btn-primary h-8 px-3 text-xs"
                     >
-                      开始
+                      发起
                       <ArrowRight size={12} />
                     </button>
                   </div>

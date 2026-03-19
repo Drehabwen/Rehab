@@ -53,7 +53,7 @@ export const AssessmentOverlay: React.FC = () => {
         <div className={topGlassClass}>
           <div className={cn('flex items-center gap-3 pr-6 border-r', `${COLORS.neutral.light.border}/60`)}>
             <LayoutGrid className="text-antey-primary" size={18} />
-            <span className={cn('text-[10px] font-black uppercase tracking-[0.2em]', COLORS.neutral.light.text)}>分段拼图评估</span>
+            <span className={cn('text-[10px] font-black uppercase tracking-[0.2em]', COLORS.neutral.light.text)}>分段拼图监控</span>
           </div>
           
           <div className="flex items-center gap-6">
@@ -112,7 +112,7 @@ export const AssessmentOverlay: React.FC = () => {
             {step === 'prep_lower' && '请向后退 (下半身)'}
             {step.includes('capturing') && '保持静止 采样中'}
             {step === 'stitching' && '骨骼拼合中...'}
-            {step === 'analyzing' && 'AI 深度诊断中'}
+            {step === 'analyzing' && 'AI 深度分析中'}
           </h2>
           <div className="flex items-center justify-center gap-3 mt-4">
             <div className="w-1.5 h-1.5 rounded-full bg-antey-primary animate-pulse" />

@@ -1,4 +1,4 @@
-﻿import {
+import {
   Activity,
   Mic,
   Scale,
@@ -21,8 +21,8 @@ export interface Tool {
 export const tools: Tool[] = [
   {
     id: 'medvoice',
-    name: '语音接诊',
-    description: '实时语音转写并结构化生成病历要点。',
+    name: '疲劳问询',
+    description: '实时语音转写并结构化提炼主观疲劳与训练反馈。',
     icon: Mic,
     color: 'from-violet-600 to-purple-500',
     category: 'record',

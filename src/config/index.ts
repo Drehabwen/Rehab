@@ -2,6 +2,20 @@ const DEFAULT_API_BASE_URL = 'http://localhost:8002';
 const DEFAULT_WS_URL = 'ws://localhost:8002/ws/analyze';
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
+const trimLeadingSlash = (value: string) => value.replace(/^\/+/, '');
+const getRuntimeHost = () => {
+  if (typeof window === 'undefined') {
+    return 'localhost';
+  }
+  const host = window.location.hostname?.trim();
+  return host || 'localhost';
+};
+const getRuntimeOrigin = () => {
+  if (typeof window === 'undefined') {
+    return 'http://localhost:5173';
+  }
+  return window.location.origin;
+};
 
 const toWebSocketBaseUrl = (value: string) => {
   const normalized = trimTrailingSlash(value);
@@ -10,10 +24,23 @@ const toWebSocketBaseUrl = (value: string) => {
   return normalized;
 };
 
-const apiBaseUrl = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL);
-const websocketUrl = import.meta.env.VITE_WS_URL ?? DEFAULT_WS_URL;
-const medvoiceBaseUrl = trimTrailingSlash(import.meta.env.VITE_MEDVOICE_BASE_URL ?? `${apiBaseUrl}/medvoice`);
-const medvoiceWsBaseUrl = toWebSocketBaseUrl(medvoiceBaseUrl);
+const runtimeApiBaseUrl = `http://${getRuntimeHost()}:8002`;
+const runtimeDevOrigin = getRuntimeOrigin();
+const runtimeDevWsBaseUrl = toWebSocketBaseUrl(runtimeDevOrigin);
+const apiBaseUrl = trimTrailingSlash(
+  import.meta.env.VITE_API_BASE_URL
+  ?? (import.meta.env.DEV ? '' : runtimeApiBaseUrl)
+  ?? DEFAULT_API_BASE_URL,
+);
+const websocketUrl = import.meta.env.VITE_WS_URL
+  ?? (import.meta.env.DEV ? `${runtimeDevWsBaseUrl}/ws/analyze` : DEFAULT_WS_URL);
+const medvoiceBaseUrl = trimTrailingSlash(
+  import.meta.env.VITE_MEDVOICE_BASE_URL
+  ?? (import.meta.env.DEV ? '/medvoice' : `${apiBaseUrl}/medvoice`),
+);
+const medvoiceWsBaseUrl = medvoiceBaseUrl.startsWith('/')
+  ? `${runtimeDevWsBaseUrl}/${trimLeadingSlash(medvoiceBaseUrl)}`
+  : toWebSocketBaseUrl(medvoiceBaseUrl);
 
 export const CONFIG = {
   websocket: {

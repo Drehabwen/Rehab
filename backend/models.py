@@ -45,6 +45,8 @@ class PostureMetrics(BaseModel):
     headRoll: Optional[float] = None
     head_axes: Optional[List[Dict[str, float]]] = None  # Added for head pose visualization
     swayOffset: Optional[float] = None  # Added for stability tracking
+    jitterIndex: Optional[float] = None # Added for fatigue tracking (high frequency tremor)
+    stabilityScore: Optional[float] = None # Added for fatigue tracking (overall technical quality)
 
 class JointMeasurementRequest(BaseModel):
     id: str
@@ -133,6 +135,7 @@ class TreatmentPlanRequest(BaseModel):
 
 class SessionTreatmentPlanRequest(BaseModel):
     patientId: str
+    patientType: Optional[str] = "adult"  # 'adult' or 'adolescent'
     sessionId: str
     sessionReportId: str
     sessionReportMarkdown: str
@@ -178,11 +181,13 @@ class SessionReportRequest(BaseModel):
     sessionId: str
     patientId: str
     patientName: Optional[str] = None
+    patientType: Optional[str] = "adult"  # 'adult' or 'adolescent'
     sourceAssessmentIds: List[str] = []
     readiness: SessionReportReadiness
     posture: Optional[SessionReportSectionInput] = None
     rom: Optional[SessionReportSectionInput] = None
     medvoice: Optional[SessionReportSectionInput] = None
+    fatigue: Optional[SessionReportSectionInput] = None
 
 
 class SessionReportResponse(BaseModel):

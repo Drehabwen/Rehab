@@ -1,12 +1,12 @@
 ﻿import { create } from 'zustand';
-import { TreatmentPlanApi } from '../api/treatmentPlanApi';
+import { InterventionPlanApi } from '../api/treatmentPlanApi';
 import type { SessionTreatmentPlanRequest } from '../api/treatmentPlanApi';
 import type { AssessmentRecord, TreatmentPlanVersion } from '../types/assessment';
-import { TreatmentPlanStorage } from '../utils/treatmentPlanStorage';
-import { AssessmentRecordStorage } from '../utils/assessmentRecordStorage';
+import { InterventionPlanStorage } from '../utils/treatmentPlanStorage';
+import { ScreeningRecordStorage } from '../utils/assessmentRecordStorage';
 import { APP_CONFIG } from '../config/appConfig';
 
-interface TreatmentPlanState {
+interface InterventionPlanState {
   currentContent: string;
   isGenerating: boolean;
   error: string | null;
@@ -50,11 +50,11 @@ function buildVersionBase(versionCount: number, content: string, patientId: stri
   };
 }
 
-export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
-  const savedVersions = TreatmentPlanStorage.loadVersions();
+export const useTreatmentPlanStore = create<InterventionPlanState>((set, get) => {
+  const savedVersions = InterventionPlanStorage.loadVersions();
   const currentVersion = savedVersions.find((version) => version.isCurrent);
   const patientId = APP_CONFIG.CURRENT_PATIENT_ID;
-  const savedAssessmentRecords = AssessmentRecordStorage.loadRecords(patientId);
+  const savedAssessmentRecords = ScreeningRecordStorage.loadRecords(patientId);
 
   return {
     currentContent: currentVersion?.content || '',
@@ -80,7 +80,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
 
       try {
         let fullContent = '';
-        await TreatmentPlanApi.generateStream(assessmentId, patientId, (chunk) => {
+        await InterventionPlanApi.generateStream(assessmentId, patientId, (chunk) => {
           fullContent += chunk;
           set((state) => ({
             currentContent: state.currentContent + chunk,
@@ -103,10 +103,10 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
           };
         });
 
-        TreatmentPlanStorage.saveVersions(get().versions);
+        InterventionPlanStorage.saveVersions(get().versions);
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : '生成康复建议失败',
+          error: error instanceof Error ? error.message : '生成干预建议失败',
         });
       } finally {
         set({ isGenerating: false });
@@ -125,7 +125,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
 
       try {
         let fullContent = '';
-        await TreatmentPlanApi.generateStreamFromSessionReport(payload, (chunk) => {
+        await InterventionPlanApi.generateStreamFromSessionReport(payload, (chunk) => {
           fullContent += chunk;
           set((state) => ({
             currentContent: state.currentContent + chunk,
@@ -149,10 +149,10 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
           };
         });
 
-        TreatmentPlanStorage.saveVersions(get().versions);
+        InterventionPlanStorage.saveVersions(get().versions);
       } catch (error) {
         set({
-          error: error instanceof Error ? error.message : '生成康复建议失败',
+          error: error instanceof Error ? error.message : '生成干预建议失败',
         });
       } finally {
         set({ isGenerating: false });
@@ -171,7 +171,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
           sourceType: 'assessment',
         };
         const versions = state.versions.map((version) => ({ ...version, isCurrent: false })).concat(nextVersion);
-        TreatmentPlanStorage.saveVersions(versions);
+        InterventionPlanStorage.saveVersions(versions);
         return {
           versions,
           currentVersionId: nextVersion.id,
@@ -191,7 +191,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
           sourceType: 'session-report',
         };
         const versions = state.versions.map((version) => ({ ...version, isCurrent: false })).concat(nextVersion);
-        TreatmentPlanStorage.saveVersions(versions);
+        InterventionPlanStorage.saveVersions(versions);
         return {
           versions,
           currentVersionId: nextVersion.id,
@@ -212,7 +212,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
           isCurrent: item.id === versionId,
         }));
 
-        TreatmentPlanStorage.saveVersions(versions);
+        InterventionPlanStorage.saveVersions(versions);
 
         return {
           versions,
@@ -233,7 +233,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
           isCurrent: version.id === nextCurrent?.id,
         }));
 
-        TreatmentPlanStorage.saveVersions(finalVersions);
+        InterventionPlanStorage.saveVersions(finalVersions);
 
         return {
           versions: finalVersions,
@@ -250,7 +250,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
         const versions = state.versions.map((version) =>
           version.id === versionId ? { ...version, tags, updatedAt: new Date().toISOString() } : version,
         );
-        TreatmentPlanStorage.saveVersions(versions);
+        InterventionPlanStorage.saveVersions(versions);
         return { versions };
       }),
 
@@ -259,7 +259,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
         const versions = state.versions.map((version) =>
           version.id === versionId ? { ...version, notes, updatedAt: new Date().toISOString() } : version,
         );
-        TreatmentPlanStorage.saveVersions(versions);
+        InterventionPlanStorage.saveVersions(versions);
         return { versions };
       }),
 
@@ -287,11 +287,11 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
           record.id === assessmentId ? { ...record, treatmentPlanId: planId } : record,
         );
 
-        TreatmentPlanStorage.saveVersions(versions);
+        InterventionPlanStorage.saveVersions(versions);
 
         const updatedRecord = assessmentRecords.find((record) => record.id === assessmentId);
         if (updatedRecord) {
-          AssessmentRecordStorage.saveRecord(updatedRecord);
+          ScreeningRecordStorage.saveRecord(updatedRecord);
         }
 
         return {
@@ -304,7 +304,7 @@ export const useTreatmentPlanStore = create<TreatmentPlanState>((set, get) => {
       }),
 
     loadAssessmentRecords: (patientId) => {
-      set({ assessmentRecords: AssessmentRecordStorage.loadRecords(patientId) });
+      set({ assessmentRecords: ScreeningRecordStorage.loadRecords(patientId) });
     },
 
     setLinkedAssessment: (assessmentId) =>

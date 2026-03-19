@@ -143,6 +143,7 @@ backend/
 - 项目说明优先更新：
   - [README.md](C:/Users/DORAT/Desktop/Rehab-main/README.md)
   - [docs/API_SPECIFICATION.md](C:/Users/DORAT/Desktop/Rehab-main/docs/API_SPECIFICATION.md)
+  - [docs/ROLE_PERMISSION_EXECUTION_SPEC.md](C:/Users/DORAT/Desktop/Rehab-main/docs/ROLE_PERMISSION_EXECUTION_SPEC.md)
   - [PROJECT_INFO_MAP.md](C:/Users/DORAT/Desktop/Rehab-main/PROJECT_INFO_MAP.md)
 - 若接口、端口、入口文件发生变化，上述文档必须同步。
 - 历史复盘、工时报告、阶段性设计稿不应再充当“当前真相文档”。

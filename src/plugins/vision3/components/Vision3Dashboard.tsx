@@ -12,6 +12,7 @@ import MeasurementChart from '@/components/MeasurementChart';
 import { PostureMetrics } from '@/hooks/usePostureWS';
 import { COLORS } from '@/constants/uiStyles';
 import { cn } from '@/lib/utils';
+import { localizePostureIssue } from '../vision3-utils';
 
 type DataFocusTarget =
   | 'workspace-summary'
@@ -84,7 +85,6 @@ const scoreClass = (score: number) => {
 const sectionClass = cn('rounded-[26px] border p-5 shadow-sm', COLORS.neutral.light.border, COLORS.neutral.light.bg);
 const subCardClass = cn('rounded-20 border p-4', COLORS.neutral.light.border, COLORS.neutral.light.bgSoft);
 const compactCardClass = cn('rounded-xl border p-3', COLORS.neutral.light.border, COLORS.neutral.light.bgSoft);
-const nestedCardClass = cn('rounded-lg border p-2', COLORS.neutral.light.border, COLORS.neutral.light.bg);
 const titleClass = cn('text-lg font-semibold', COLORS.neutral.light.text);
 const bodyClass = cn('text-sm', COLORS.neutral.slate500);
 const eyebrowClass = cn('text-[11px] font-semibold tracking-[0.18em]', COLORS.neutral.light.textLight);
@@ -127,15 +127,14 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
   onNavigateToReport,
 }) => {
   const healthScore = result ? Math.max(0, 100 - result.issues.length * 15) : null;
+  const localizedIssues = result?.issues.map(localizePostureIssue) ?? [];
   const overviewRef = useRef<HTMLDivElement | null>(null);
   const metricsRef = useRef<HTMLDivElement | null>(null);
   const issuesRef = useRef<HTMLDivElement | null>(null);
   const headRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (activeTab !== 'posture') {
-      return;
-    }
+    if (activeTab !== 'posture') return;
 
     const targetMap = {
       'data-overview': overviewRef,
@@ -144,9 +143,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
       'data-head': headRef,
     } as const;
 
-    if (!focusTarget || !(focusTarget in targetMap)) {
-      return;
-    }
+    if (!focusTarget || !(focusTarget in targetMap)) return;
 
     targetMap[focusTarget as keyof typeof targetMap].current?.scrollIntoView({
       behavior: 'smooth',
@@ -161,7 +158,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
           <div className="mb-3 flex items-center justify-between">
             <h3 className={cn('flex items-center gap-2 text-sm font-semibold', COLORS.neutral.light.text)}>
               <Settings2 size={14} className={COLORS.neutral.light.textMuted} />
-              ROM 评估配置
+              ROM 配置
             </h3>
             <span className="status-badge status-processing h-6">ROM</span>
           </div>
@@ -176,38 +173,14 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1 custom-scrollbar">
+    <div className="custom-scrollbar flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1">
       <div className="sticky top-0 z-10 -mx-1 rounded-[1.25rem] bg-white/95 px-1 pb-1 backdrop-blur-sm">
         <div className={cn('flex flex-wrap items-center gap-2 rounded-[1.1rem] border px-3 py-2', COLORS.neutral.light.border, 'bg-slate-50/90')}>
           <span className={eyebrowClass}>量化分区</span>
-          <button
-            type="button"
-            className={sectionJumpButtonClass('blue')}
-            onClick={() => overviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          >
-            总览
-          </button>
-          <button
-            type="button"
-            className={sectionJumpButtonClass('cyan')}
-            onClick={() => metricsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          >
-            指标
-          </button>
-          <button
-            type="button"
-            className={sectionJumpButtonClass('slate')}
-            onClick={() => headRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          >
-            头部姿态
-          </button>
-          <button
-            type="button"
-            className={sectionJumpButtonClass('amber')}
-            onClick={() => issuesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          >
-            风险
-          </button>
+          <button type="button" className={sectionJumpButtonClass('blue')} onClick={() => overviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>总览</button>
+          <button type="button" className={sectionJumpButtonClass('cyan')} onClick={() => metricsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>指标</button>
+          <button type="button" className={sectionJumpButtonClass('slate')} onClick={() => headRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>头部姿态</button>
+          <button type="button" className={sectionJumpButtonClass('amber')} onClick={() => issuesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>风险</button>
         </div>
       </div>
 
@@ -215,7 +188,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
         <div className="state-panel flex min-h-[340px] flex-1 flex-col items-center justify-center gap-3">
           <Activity size={40} className={COLORS.neutral.light.textLight} />
           <h3>等待评估数据</h3>
-          <p>完成拍摄后，这里会展示量化指标、风险提示和可追溯的姿态数据。</p>
+          <p>完成拍摄后，这里会展示量化指标、风险提示和可复核的姿态数据。</p>
         </div>
       ) : (
         <>
@@ -225,24 +198,16 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                 <p className={eyebrowClass}>量化总览</p>
                 <h3 className={cn('mt-1', titleClass)}>量化指标概览</h3>
                 <p className={cn('mt-1', bodyClass)}>
-                  这里只展示支撑结论的关键指标、风险提示和姿态观察，不再重复报告正文。
+                  这里集中展示支撑筛查结论的关键指标、风险数量和阅读路径，不重复基础报告正文。
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className="btn-secondary h-9 px-3"
-                  onClick={() => onNavigateToReport?.('report-basic')}
-                >
+                <button type="button" className="btn-secondary h-9 px-3" onClick={() => onNavigateToReport?.('report-basic')}>
                   <FileText size={14} />
                   查看基础报告
                 </button>
-                <button
-                  type="button"
-                  className="btn-secondary h-9 px-3"
-                  onClick={() => onNavigateToReport?.('report-deep')}
-                >
+                <button type="button" className="btn-secondary h-9 px-3" onClick={() => onNavigateToReport?.('report-deep')}>
                   <TrendingUp size={14} />
                   查看深度报告
                 </button>
@@ -256,7 +221,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                   <span className={cardValueClass}>{healthScore}</span>
                   {healthScore !== null ? (
                     <span className={cn('status-badge h-6', scoreClass(healthScore))}>
-                      {healthScore >= 80 ? '良好' : healthScore >= 60 ? '关注' : '高风险'}
+                      {healthScore >= 80 ? '稳定' : healthScore >= 60 ? '关注' : '高风险'}
                     </span>
                   ) : null}
                 </div>
@@ -274,7 +239,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
               <div className={subCardClass}>
                 <p className={cardLabelClass}>阅读路径</p>
                 <p className={cn('mt-2 text-sm font-medium', COLORS.neutral.light.text)}>先看指标，再看风险，最后回到报告。</p>
-                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>这样更容易定位问题来源和对应结论。</p>
+                <p className={cn('mt-1 text-xs', COLORS.neutral.slate500)}>这样更容易定位问题来源和对应建议。</p>
               </div>
             </div>
           </section>
@@ -285,11 +250,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                 <h3 className={titleClass}>核心指标</h3>
                 <p className={cn('mt-1', bodyClass)}>优先展示最常用的体态偏移指标，便于快速复核。</p>
               </div>
-              <button
-                type="button"
-                className="btn-secondary h-9 px-3 self-start"
-                onClick={() => onNavigateToReport?.('report-basic')}
-              >
+              <button type="button" className="btn-secondary h-9 px-3 self-start" onClick={() => onNavigateToReport?.('report-basic')}>
                 <FileText size={14} />
                 对照基础报告
               </button>
@@ -305,7 +266,7 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
               </div>
 
               <div className={subCardClass}>
-                <p className={cardLabelClass}>头前引</p>
+                <p className={cardLabelClass}>头前伸</p>
                 <MetricValue value={result.metrics.headForward || 0} unit="deg" className={COLORS.neutral.light.text} />
                 <span className={cn('status-badge mt-2 h-6', getHeadStatus(result.metrics.headForward || 0).bgColor, getHeadStatus(result.metrics.headForward || 0).color)}>
                   {getHeadStatus(result.metrics.headForward || 0).text}
@@ -406,25 +367,21 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h3 className={titleClass}>风险列表</h3>
-                <p className={cn('mt-1', bodyClass)}>按影响程度查看问题描述、建议动作和报告跳转入口。</p>
+                <p className={cn('mt-1', bodyClass)}>按影响程度查看问题描述，并前往报告区查看完整建议。</p>
               </div>
-              <button
-                type="button"
-                className="btn-secondary h-9 px-3 self-start"
-                onClick={() => onNavigateToReport?.('report-deep')}
-              >
+              <button type="button" className="btn-secondary h-9 px-3 self-start" onClick={() => onNavigateToReport?.('report-deep')}>
                 <FileText size={14} />
                 查看深度报告
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
-              {result.issues.length === 0 ? (
+            <div className="custom-scrollbar min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+              {localizedIssues.length === 0 ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
                   当前未发现明显异常，建议结合病史和复测结果持续观察。
                 </div>
               ) : (
-                result.issues.map((issue, idx) => (
+                localizedIssues.map((issue, idx) => (
                   <div key={`${issue.type}-${idx}`} className={compactCardClass}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-2">
@@ -438,18 +395,10 @@ export const Vision3Dashboard: React.FC<Vision3DashboardProps> = ({
                         {getSeverityLabel(issue.severity)}
                       </span>
                     </div>
-                    <div className={cn('mt-2', nestedCardClass)}>
-                      <p className={cardLabelClass}>建议动作</p>
-                      <p className={cn('mt-1 text-xs', COLORS.neutral.light.textSoft)}>{issue.recommendation}</p>
-                    </div>
                     <div className="mt-2 flex justify-end">
-                      <button
-                        type="button"
-                        className="btn-secondary h-8 px-3"
-                        onClick={() => onNavigateToReport?.('report-deep')}
-                      >
+                      <button type="button" className="btn-secondary h-8 px-3" onClick={() => onNavigateToReport?.('report-deep')}>
                         <FileText size={14} />
-                        查看报告
+                        查看建议
                       </button>
                     </div>
                   </div>

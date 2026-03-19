@@ -39,6 +39,8 @@ describe('WebcamView', () => {
     mockedUsePostureWS.mockReturnValue({
       result: { metrics: {}, issues: [], timestamp: 0 },
       status: 'connected',
+      stabilityScore: 1,
+      jitterIndex: 0,
       analyze: vi.fn(),
       analyzeJoint: mockAnalyzeJoint,
       analyzeBatch: vi.fn(),

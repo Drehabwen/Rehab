@@ -82,19 +82,31 @@ export const ROMService = {
   },
 
   generateRecommendations(data: ROMData[]): string[] {
-    const recommendations: string[] = [];
+    const recommendationSet = new Set<string>();
 
     data.forEach((item) => {
       const status = calculateROMStatus(item.joint, item.direction, getROMReferenceAngle(item));
       if (status === 'limited') {
-        recommendations.push(
+        recommendationSet.add(
           `${jointNameMap[item.joint]}${item.side === 'left' ? '左' : '右'}侧${directionNameMap[item.direction]}活动受限，建议进行针对性康复训练`,
+        );
+      }
+
+      if (status === 'excessive') {
+        recommendationSet.add(
+          `${jointNameMap[item.joint]}${item.side === 'left' ? '左' : '右'}侧${directionNameMap[item.direction]}活动过度，建议增加稳定性训练并控制动作边界`,
+        );
+      }
+
+      if (item.confidence < 0.6) {
+        recommendationSet.add(
+          `${jointNameMap[item.joint]}${item.side === 'left' ? '左' : '右'}侧${directionNameMap[item.direction]}数据置信度偏低，建议在稳定光照与完整入镜条件下复测`,
         );
       }
     });
 
-    return recommendations.length > 0
-      ? recommendations
+    return recommendationSet.size > 0
+      ? Array.from(recommendationSet)
       : ['关节活动度正常，建议保持适当运动'];
   },
 

@@ -1,8 +1,8 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { FileText, Download, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import type { ROMAssessment } from '../types';
 import { ROMService } from '../services/ROMService';
-import { calculateROMStatus, directionNameMap, getROMReferenceAngle, jointNameMap } from '../utils/rom-utils';
+import { calculateROMStatus, directionNameMap, getROMReferenceAngle, jointNameMap, normalROMRanges } from '../utils/rom-utils';
 import { ROM_TEXTS } from '../constants/uiText';
 import { UnifiedStatusBadge } from '@/components/layout';
 
@@ -22,12 +22,24 @@ export const ROMReport: React.FC<ROMReportProps> = ({ assessment, onExport }) =>
 
   const analyzedItems = useMemo(() => {
     return assessment.data.map((item) => {
-      const status = calculateROMStatus(item.joint, item.direction, getROMReferenceAngle(item));
+      const referenceAngle = getROMReferenceAngle(item);
+      const status = calculateROMStatus(item.joint, item.direction, referenceAngle);
+      const referenceRange = normalROMRanges[item.joint]?.[item.direction];
+      const romRange =
+        Number.isFinite(item.maxAngle) && Number.isFinite(item.minAngle)
+          ? Math.max(0, item.maxAngle - item.minAngle)
+          : 0;
+      const targetMax = referenceRange?.max ?? 0;
+      const deviation = referenceRange ? referenceAngle - targetMax : 0;
       return {
         ...item,
         status,
         jointLabel: jointNameMap[item.joint],
         directionLabel: directionNameMap[item.direction],
+        referenceAngle,
+        targetMax,
+        romRange,
+        deviation,
       };
     });
   }, [assessment.data]);
@@ -40,6 +52,11 @@ export const ROMReport: React.FC<ROMReportProps> = ({ assessment, onExport }) =>
   }, [analyzedItems]);
 
   const recommendations = useMemo(() => ROMService.generateRecommendations(assessment.data), [assessment.data]);
+  const averageConfidence = useMemo(() => {
+    if (analyzedItems.length === 0) return 0;
+    const total = analyzedItems.reduce((sum, item) => sum + item.confidence, 0);
+    return Math.round((total / analyzedItems.length) * 100);
+  }, [analyzedItems]);
 
   return (
     <div className="space-y-4">
@@ -77,26 +94,43 @@ export const ROMReport: React.FC<ROMReportProps> = ({ assessment, onExport }) =>
         </div>
       </section>
 
+      <section className="bento-card p-4 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">数据质量</p>
+          <p className="text-sm font-semibold text-slate-900 mt-1">平均置信度 {averageConfidence}%</p>
+        </div>
+        <UnifiedStatusBadge
+          status={averageConfidence >= 80 ? 'success' : averageConfidence >= 60 ? 'warning' : 'error'}
+          text={averageConfidence >= 80 ? '数据可靠' : averageConfidence >= 60 ? '建议复核' : '建议重测'}
+        />
+      </section>
+
       <section className="bento-card p-0 overflow-hidden">
-        <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+        <div className="grid grid-cols-[1.2fr_0.9fr_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_0.8fr] gap-3 px-4 py-3 border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
           <span>动作项</span>
           <span>当前角度</span>
-          <span>最大角度</span>
-          <span>最小角度</span>
+          <span>参考角度</span>
+          <span>ROM 幅度</span>
+          <span>参考上限</span>
+          <span>偏差</span>
           <span>置信度</span>
           <span>状态</span>
         </div>
 
         <div className="divide-y divide-slate-200">
           {analyzedItems.map((item, index) => (
-            <div key={`${item.joint}-${item.direction}-${index}`} className="grid grid-cols-[1.4fr_1fr_1fr_1fr_1fr_0.8fr] gap-3 px-4 py-3 items-center hover:bg-slate-50/80">
+            <div key={`${item.joint}-${item.direction}-${index}`} className="grid grid-cols-[1.2fr_0.9fr_0.9fr_0.9fr_0.9fr_0.9fr_0.8fr_0.8fr] gap-3 px-4 py-3 items-center hover:bg-slate-50/80">
               <div>
                 <p className="text-sm font-medium text-slate-900">{item.jointLabel} · {item.directionLabel}</p>
                 <p className="text-xs text-slate-500 mt-1">{item.side === 'left' ? '左侧' : '右侧'}</p>
               </div>
               <span className="text-sm text-slate-800 tabular-nums">{item.angle.toFixed(1)}°</span>
-              <span className="text-sm text-slate-800 tabular-nums">{item.maxAngle.toFixed(1)}°</span>
-              <span className="text-sm text-slate-800 tabular-nums">{item.minAngle.toFixed(1)}°</span>
+              <span className="text-sm text-slate-800 tabular-nums">{item.referenceAngle.toFixed(1)}°</span>
+              <span className="text-sm text-slate-800 tabular-nums">{item.romRange.toFixed(1)}°</span>
+              <span className="text-sm text-slate-600 tabular-nums">{item.targetMax.toFixed(1)}°</span>
+              <span className={item.deviation > 0 ? 'text-sm tabular-nums text-rose-600' : 'text-sm tabular-nums text-emerald-600'}>
+                {item.deviation > 0 ? '+' : ''}{item.deviation.toFixed(1)}°
+              </span>
               <span className="text-sm text-slate-600 tabular-nums">{Math.round(item.confidence * 100)}%</span>
               <UnifiedStatusBadge status={statusToneMap[item.status]} text={ROM_TEXTS.status[item.status]} />
             </div>

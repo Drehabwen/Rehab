@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
@@ -49,8 +49,8 @@ interface StatusBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className, ...props }) => {
   const statusConfig = {
-    pending: { label: '待接诊', variant: 'warning' as const },
-    assessing: { label: '评估中', variant: 'info' as const },
+    pending: { label: '待监控', variant: 'warning' as const },
+    assessing: { label: '监控中', variant: 'info' as const },
     report: { label: '待报告', variant: 'primary' as const },
     completed: { label: '已完成', variant: 'success' as const },
   };

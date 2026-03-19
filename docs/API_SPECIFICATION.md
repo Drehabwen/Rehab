@@ -338,7 +338,20 @@ Current frontend API clients:
 - [src/api/sessionReportApi.ts](C:/Users/DORAT/Desktop/Rehab-main/src/api/sessionReportApi.ts)
 - [src/hooks/usePostureWS.ts](C:/Users/DORAT/Desktop/Rehab-main/src/hooks/usePostureWS.ts)
 
-## 6. Error Handling
+## 6. Access Control Mapping
+
+接口权限落地基线见：
+
+- [docs/ROLE_PERMISSION_EXECUTION_SPEC.md](C:/Users/DORAT/Desktop/Rehab-main/docs/ROLE_PERMISSION_EXECUTION_SPEC.md)
+- [docs/API_PERMISSION_MAPPING_DRAFT.md](C:/Users/DORAT/Desktop/Rehab-main/docs/API_PERMISSION_MAPPING_DRAFT.md)
+
+建议实现规则：
+
+- 后端接口必须绑定 `required_permission`
+- 查询接口必须绑定 `scope_strategy`
+- 高危动作必须启用审计日志
+
+## 7. Error Handling
 
 HTTP routes use FastAPI `HTTPException`. Typical cases:
 
@@ -348,7 +361,7 @@ HTTP routes use FastAPI `HTTPException`. Typical cases:
 
 WebSocket failures are not normalized into one global envelope yet; callers should treat malformed payloads, disconnects, or missing acks as transport failures and handle retry/reconnect on the frontend.
 
-## 7. Drift Warning
+## 8. Drift Warning
 
 If this document conflicts with older notes or screenshots, trust the following first:
 

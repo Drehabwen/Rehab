@@ -1,4 +1,4 @@
-﻿import { useMemo } from 'react';
+import { useMemo } from 'react';
 import { getRelativeTime } from '@/lib/session-utils';
 import type { Patient } from '@/types/patient';
 import type { Session } from '@/types/session';
@@ -61,14 +61,14 @@ export function usePatientList({ patients, assessments, getPatientSessions }: Us
     getVisitTaskByPatientId: (patientId: string) => taskByPatientId.get(patientId) ?? null,
     getPatientLabel: (patient: PatientWithStatus) =>
       patient.lastSession
-        ? `最近接诊：${getRelativeTime(patient.lastSession.createdAt)}`
-        : '尚未开始接诊',
+        ? `最近监控：${getRelativeTime(patient.lastSession.createdAt)}`
+        : '尚未开始监控',
   };
 }
 
 export function getStatusLabel(status: PatientStatus): string {
   const labels: Record<PatientStatus, string> = {
-    pending: '待接诊',
+    pending: '待监控',
     assessing: '评估中',
     report: '待报告',
     completed: '已完成',

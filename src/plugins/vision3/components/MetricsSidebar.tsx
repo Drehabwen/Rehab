@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Activity, TrendingUp } from 'lucide-react';
 import { COLORS } from '@/constants/uiStyles';
 import { cn } from '@/lib/utils';
@@ -114,7 +114,7 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
     THRESHOLDS.hipAngle.acceptable,
   );
 
-  const isStabilityGood = Boolean(stability && stability.sd < THRESHOLDS.stability.clinical);
+  const isStabilityGood = Boolean(stability && stability.sd < THRESHOLDS.stability.standard);
 
   return (
     <aside className="absolute right-6 top-[100px] bottom-6 z-30 hidden xl:flex w-[320px] pointer-events-none">
@@ -124,8 +124,8 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
             <TrendingUp size={18} />
           </div>
           <div>
-            <h3 className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>核心生物力学指标</h3>
-            <p className={cn('text-xs', COLORS.neutral.slate500)}>用于快速判断姿态风险等级</p>
+            <h3 className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>核心运动学指标</h3>
+            <p className={cn('text-xs', COLORS.neutral.slate500)}>用于快速判断动作风险等级</p>
           </div>
         </div>
 
@@ -135,7 +135,7 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
             value={metrics.swayOffset || 0}
             unit="mm"
             reference="0-15 mm"
-            meaning="重心偏离中线越大，站姿稳定性风险越高。"
+            meaning="重心偏离中线越大，动作稳定性风险越高。"
             state={swayState}
             progress={clampProgress(Math.abs(metrics.swayOffset || 0) * SYSTEM_CONFIG.chartScaling.swayOffset)}
           />
@@ -145,7 +145,7 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
             value={metrics.shoulderAngle || 0}
             unit="deg"
             reference="0-3°"
-            meaning="反映左右肩高差，提示颈肩代偿风险。"
+            meaning="反映左右肩高差，提示颈肩部代偿风险。"
             state={shoulderState}
             progress={clampProgress(Math.abs(metrics.shoulderAngle || 0) * SYSTEM_CONFIG.chartScaling.shoulderAngle)}
           />
@@ -155,7 +155,7 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
             value={metrics.hipAngle || 0}
             unit="deg"
             reference="0-2°"
-            meaning="骨盆倾斜会影响下肢受力与躯干稳定。"
+            meaning="骨盆倾斜会影响下肢发力与躯干稳定。"
             state={hipState}
             progress={clampProgress(Math.abs(metrics.hipAngle || 0) * 12)}
           />
@@ -165,10 +165,10 @@ export const MetricsSidebar: React.FC<MetricsSidebarProps> = ({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Activity size={14} className={COLORS.neutral.light.textMuted} />
-              <span className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>临床稳定性</span>
+              <span className={cn('text-sm font-semibold', COLORS.neutral.light.text)}>动作稳定性</span>
             </div>
             <span className={cn('status-badge h-6', isStabilityGood ? 'status-success' : 'status-warning')}>
-              {isStabilityGood ? '稳定' : '建议复测'}
+              {isStabilityGood ? '稳定' : '建议重新监控'}
             </span>
           </div>
           <p className={cn('mt-2 text-xs leading-relaxed', COLORS.neutral.light.textMuted)}>
