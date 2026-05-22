@@ -24,6 +24,8 @@ import {
 } from '@/services/integrationService';
 import { usePatientStore } from '@/store/usePatientStore';
 import { Button } from '@/components/ui';
+import { verifySUC } from '@/utils/suc-utils';
+
 
 interface SquatLabSyncPanelProps {
   isOpen: boolean;
@@ -161,7 +163,8 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
     if (!q) return syncedList;
     return syncedList.filter(s => 
       s.subject_display_name.toLowerCase().includes(q) || 
-      s.session_id.toLowerCase().includes(q)
+      s.session_id.toLowerCase().includes(q) ||
+      (s.subject_id && s.subject_id.toLowerCase().includes(q))
     );
   }, [syncedList, searchQuery]);
 
@@ -176,6 +179,9 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
   }, [patients, patientSearchQuery]);
 
   if (!isOpen) return null;
+
+  const isSUCLike = searchQuery.trim().startsWith('QY-') || searchQuery.split('-').length === 5;
+  const isInvalidSUC = isSUCLike && !verifySUC(searchQuery.trim());
 
   return (
     <div className="fixed inset-0 z-[999] flex justify-end overflow-hidden bg-slate-900/30 backdrop-blur-sm animate-fade-in">
@@ -259,9 +265,19 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索受试者姓名..."
-                className="w-full rounded-xl border border-slate-200/80 bg-white/70 py-2 pl-9 pr-4 text-sm focus:border-blue-500 focus:outline-none"
+                placeholder="搜索姓名、早筛ID或SUC编码..."
+                className={`w-full rounded-xl border bg-white/70 py-2 pl-9 pr-4 text-sm focus:outline-none transition-all ${
+                  isInvalidSUC 
+                    ? 'border-red-400 focus:border-red-500 text-red-900 bg-red-50/30' 
+                    : 'border-slate-200/80 focus:border-blue-500'
+                }`}
               />
+              {isInvalidSUC && (
+                <p className="mt-1 text-[11px] text-red-600 flex items-center gap-1 pl-1 animate-pulse">
+                  <AlertTriangle size={12} className="shrink-0" />
+                  <span>统一编码校验位(Luhn-10)有误，请核对</span>
+                </p>
+              )}
             </div>
 
             {/* List entries */}

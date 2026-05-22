@@ -48,7 +48,7 @@ from utils.treatment_plan_service import (
 )
 from utils.session_reporter import generate_session_report
 import uuid
-from routers import integration
+from routers import integration, wechat_chatbot
 
 app = FastAPI(
     title="Vision3 AI Backend",
@@ -56,6 +56,7 @@ app = FastAPI(
     version="1.0.0"
 )
 app.include_router(integration.router)
+app.include_router(wechat_chatbot.router)
 
 # Initialize Camera Manager
 camera_manager = CameraManager()
