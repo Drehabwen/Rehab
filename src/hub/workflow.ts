@@ -1,9 +1,9 @@
-﻿import type { Assessment } from '@/types/assessment';
+import type { Assessment } from '@/types/assessment';
 import type { Patient } from '@/types/patient';
 import type { Session } from '@/types/session';
 import { generateSessionId } from '@/lib/session-utils';
 
-export type WorkflowToolId = 'vision3' | 'rom' | 'medvoice';
+export type WorkflowToolId = 'vision3' | 'rom' | 'medvoice' | 'scale';
 export type WorkflowStatus = 'completed' | 'pending';
 
 export interface WorkflowModuleDefinition {
@@ -61,6 +61,13 @@ export const WORKFLOW_MODULES: WorkflowModuleDefinition[] = [
     title: '语音问诊',
     shortTitle: '问诊',
     description: '完成语音问诊并生成结构化病史信息。',
+  },
+  {
+    toolId: 'scale',
+    assessmentType: 'scale',
+    title: '量表评估',
+    shortTitle: '量表',
+    description: '通过临床量表(SRS-22/ODI/VAS)评估主观疼痛与生活质量。',
   },
 ];
 

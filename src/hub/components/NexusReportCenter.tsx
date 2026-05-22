@@ -129,26 +129,40 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
   const selectedAssessmentPreview = selectedAssessment ? getAssessmentPreview(selectedAssessment) : null;
   const selectedReportContent = sanitizeReadableText(selectedReportMarkdown);
 
+  // 初始化数据加载
   useEffect(() => {
-    loadPatients();
-    loadAssessments();
-    loadSessionReports();
+    const loadInitialData = async () => {
+      await Promise.all([
+        loadPatients(),
+        loadAssessments(),
+        loadSessionReports(),
+      ]);
+    };
+    loadInitialData();
   }, [loadPatients, loadAssessments, loadSessionReports]);
 
+  // 响应外部传入的patientId变化
   useEffect(() => {
-    setSelectedPatientId(patientId);
+    if (patientId !== undefined) {
+      setSelectedPatientId(patientId);
+    }
   }, [patientId]);
 
+  // 响应外部传入的sessionId变化
   useEffect(() => {
-    setSelectedSessionId(sessionId);
+    if (sessionId !== undefined) {
+      setSelectedSessionId(sessionId);
+    }
   }, [sessionId]);
 
+  // 患者映射，用于快速查找患者名称
   const patientMap = useMemo(() => {
     const map = new Map<string, string>();
     patients.forEach((patient) => map.set(patient.id, patient.name || `患者 ${patient.id}`));
     return map;
   }, [patients]);
 
+  // 可用患者列表，基于有评估或报告的患者
   const availablePatients = useMemo(() => {
     const patientIds = new Set<string>();
     assessments.forEach((assessment) => patientIds.add(assessment.patientId));
@@ -156,49 +170,61 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     return patients.filter((patient) => patientIds.has(patient.id));
   }, [assessments, patients, sessionReports]);
 
+  // 当前患者的评估列表
   const patientScopedAssessments = useMemo(() => {
     return selectedPatientId
       ? assessments.filter((assessment) => assessment.patientId === selectedPatientId)
       : assessments;
   }, [assessments, selectedPatientId]);
 
+  // 构建会话报告输入
   const sessionInputs = useMemo(
     () => buildSessionReportInputs(patientScopedAssessments, patientMap),
     [patientScopedAssessments, patientMap],
   );
 
+  // 确保选择的会话ID有效
   useEffect(() => {
-    if (selectedSessionId && sessionInputs.some((input) => input.sessionId === selectedSessionId)) {
-      return;
+    if (sessionInputs.length > 0) {
+      if (!selectedSessionId || !sessionInputs.some((input) => input.sessionId === selectedSessionId)) {
+        setSelectedSessionId(sessionInputs[0].sessionId);
+      }
+    } else {
+      setSelectedSessionId(null);
     }
-    setSelectedSessionId(sessionInputs[0]?.sessionId ?? null);
   }, [selectedSessionId, sessionInputs]);
 
+  // 当前活动的会话输入
   const activeSessionInput = useMemo<SessionReportInput | null>(() => {
     if (sessionInputs.length === 0) return null;
     return sessionInputs.find((input) => input.sessionId === selectedSessionId) ?? sessionInputs[0] ?? null;
   }, [selectedSessionId, sessionInputs]);
 
-  const generatedSessionReport = useMemo(
-    () => activeSessionInput ? getLatestReportBySessionId(activeSessionInput.sessionId) : undefined,
-    [activeSessionInput, getLatestReportBySessionId, sessionReports],
-  );
+  // 生成的会话报告
+  const generatedSessionReport = useMemo(() => {
+    if (!activeSessionInput) return undefined;
+    return getLatestReportBySessionId(activeSessionInput.sessionId);
+  }, [activeSessionInput, getLatestReportBySessionId, sessionReports]);
 
+  // 是否有可见的治疗计划
   const hasVisibleTreatmentPlan = Boolean(currentTreatmentPlanContent)
     && Boolean(activeSessionInput)
     && linkedSessionId === activeSessionInput?.sessionId
     && linkedSessionReportId === generatedSessionReport?.id;
 
-  const insightCards = useMemo(
-    () => activeSessionInput ? buildSessionInsightCards(activeSessionInput) : [],
-    [activeSessionInput],
-  );
+  // 洞察卡片
+  const insightCards = useMemo(() => {
+    if (!activeSessionInput) return [];
+    return buildSessionInsightCards(activeSessionInput);
+  }, [activeSessionInput]);
 
-  const draftReport = useMemo(
-    () => activeSessionInput ? buildSessionDraftReport(activeSessionInput) : null,
-    [activeSessionInput],
-  );
+  // 草稿报告
+  const draftReport = useMemo(() => {
+    if (!activeSessionInput) return null;
+    return buildSessionDraftReport(activeSessionInput);
+  }, [activeSessionInput]);
 
+  // 建议卡片
   const recommendationCards = useMemo(() => {
     if (generatedSessionReport?.recommendations?.length) {
       return generatedSessionReport.recommendations.slice(0, 4);
@@ -209,6 +235,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     return [];
   }, [generatedSessionReport, hasVisibleTreatmentPlan, currentTreatmentPlanContent]);
 
+  // 报告归档
   const reportArchive = useMemo(() => {
     return sessionReports.filter((report) => {
       if (selectedPatientId && report.patientId !== selectedPatientId) return false;
@@ -217,9 +244,11 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     });
   }, [selectedPatientId, selectedSessionId, sessionReports]);
 
+  // 评估输出
   const assessmentOutputs = useMemo(() => {
+    if (!activeSessionInput) return [];
     return (['posture', 'rom', 'medvoice'] as const).map((type) => {
-      const output = activeSessionInput?.outputs[type];
+      const output = activeSessionInput.outputs[type];
       const presentation = modulePresentation[type];
       const summary = output ? buildAssessmentOutputSummary(output.sourceAssessment) : null;
       return {
@@ -232,6 +261,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     });
   }, [activeSessionInput]);
 
+  // 导出为JSON
   const exportToJson = (assessment: Assessment) => {
     const dataStr = JSON.stringify(assessment, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
@@ -243,6 +273,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     URL.revokeObjectURL(url);
   };
 
+  // 导出为CSV
   const exportToCsv = (assessment: Assessment) => {
     let csvContent = '';
 
@@ -272,6 +303,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     URL.revokeObjectURL(url);
   };
 
+  // 导出会话报告为JSON
   const exportSessionReportJson = (report: SessionReportOutput) => {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -282,6 +314,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     URL.revokeObjectURL(url);
   };
 
+  // 导出会话报告为文本
   const exportSessionReportText = (report: SessionReportOutput) => {
     const blob = new Blob([report.markdown], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -292,6 +325,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     URL.revokeObjectURL(url);
   };
 
+  // 导出报告为PDF
   const handleExportReportPdf = async ({
     markdown,
     fileName,
@@ -324,23 +358,33 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     }
   };
 
+  // 生成会话报告
   const handleGenerateSessionReport = async () => {
     if (!activeSessionInput) return;
-    const report = await generateReport(buildSessionReportGenerationRequest(activeSessionInput));
-    setSelectedReportMarkdown(report.markdown);
+    try {
+      const report = await generateReport(buildSessionReportGenerationRequest(activeSessionInput));
+      setSelectedReportMarkdown(report.markdown);
+    } catch (error) {
+      console.error('生成报告失败:', error);
+    }
   };
 
+  // 生成治疗计划
   const handleGenerateTreatmentPlan = async () => {
     if (!generatedSessionReport || !activeSessionInput) return;
 
-    await generatePlanFromSessionReport({
-      patientId: generatedSessionReport.patientId,
-      sessionId: generatedSessionReport.sessionId,
-      sessionReportId: generatedSessionReport.id,
-      sessionReportMarkdown: generatedSessionReport.markdown,
-      insights: generatedSessionReport.insights,
-      recommendations: generatedSessionReport.recommendations,
-    });
+    try {
+      await generatePlanFromSessionReport({
+        patientId: generatedSessionReport.patientId,
+        sessionId: generatedSessionReport.sessionId,
+        sessionReportId: generatedSessionReport.id,
+        sessionReportMarkdown: generatedSessionReport.markdown,
+        insights: generatedSessionReport.insights,
+        recommendations: generatedSessionReport.recommendations,
+      });
+    } catch (error) {
+      console.error('生成治疗计划失败:', error);
+    }
   };
 
   return (
@@ -563,7 +607,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
             </div>
 
             <div className="space-y-4">
-              <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_30px_rgba(15,23,42,0.05)] xl:sticky xl:top-4">
+              <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <SectionHeading
                     eyebrow="当前接诊"

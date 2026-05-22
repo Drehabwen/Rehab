@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -69,9 +69,10 @@ def load_runtime_env():
     repo_root = os.path.dirname(project_root)
 
     possible_env_paths = [
-        os.path.join(repo_root, "backend", ".env"),
+        os.path.join(repo_root, ".env"),
         os.path.join(project_root, ".env"),
         os.path.join(current_dir, ".env"),
+        os.path.join(repo_root, "backend", ".env"),
     ]
 
     for env_path in possible_env_paths:

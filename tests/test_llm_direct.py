@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load env vars
-load_dotenv()
+repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(repo_root, ".env"), override=False)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

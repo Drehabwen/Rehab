@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, Clock, Search, Stethoscope, X } from 'lucide-react';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';

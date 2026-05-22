@@ -16,6 +16,7 @@ interface AssessmentState {
   error: string | null;
   
   setCurrentAssessment: (assessment: Assessment | null) => void;
+  clearCurrentAssessment: () => void;
   addAssessment: (data: {
     sessionId: string;
     patientId: string;
@@ -43,6 +44,7 @@ export const useAssessmentStore = create<AssessmentState>((set, get) => ({
   error: null,
   
   setCurrentAssessment: (assessment) => set({ currentAssessment: assessment }),
+  clearCurrentAssessment: () => set({ currentAssessment: null }),
   
   addAssessment: async (input) => {
     set({ isLoading: true, error: null });

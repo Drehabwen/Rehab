@@ -1,5 +1,5 @@
-﻿import React from 'react';
-import { Activity, ArrowLeft, BarChart3, FileText, Layers, Mic } from 'lucide-react';
+import React from 'react';
+import { Activity, ArrowLeft, BarChart3, ClipboardList, FileText, Layers, Mic } from 'lucide-react';
 import { AssessmentCard, PageHeader, ProgressBar, StatusTag } from '@/components/workflow';
 import { Button, Card } from '@/components/ui';
 import type { Patient } from '@/types/patient';
@@ -26,12 +26,14 @@ const iconMap = {
   vision3: Activity,
   rom: Layers,
   medvoice: Mic,
+  scale: ClipboardList,
 } as const;
 
 const accentMap = {
   vision3: 'bg-blue-600 text-white',
   rom: 'bg-emerald-600 text-white',
   medvoice: 'bg-violet-600 text-white',
+  scale: 'bg-amber-600 text-white',
 } as const;
 
 export const PatientToolbox: React.FC<PatientToolboxProps> = ({

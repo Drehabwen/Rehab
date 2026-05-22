@@ -35,17 +35,45 @@ export interface MedVoiceAssessmentData {
   viewMode: 'standard' | 'soap';
 }
 
+export interface ScaleAnswer {
+  questionId: number;
+  questionText: string;
+  category: 'pain' | 'function' | 'self_image' | 'mental_health' | 'satisfaction';
+  score: number;      // 1 - 5 分
+  answerText: string; // 选项文字
+}
+
+export interface ScaleAssessmentData {
+  scaleId: 'SRS-22' | 'ODI' | 'VAS';
+  scaleName: string;
+  filledBy: 'therapist' | 'patient' | 'parent';
+  totalScore: number;
+  maxScore: number;
+  percentageScore: number; // 功能障碍率或百分比
+  dimensions: {
+    functionActive: number; // 功能活动维度分
+    pain: number;           // 疼痛维度分
+    selfImage: number;      // 自我形象维度分
+    mentalHealth: number;   // 精神健康维度分
+    satisfaction?: number;  // 治疗满意度分
+  };
+  answers: ScaleAnswer[];
+  aiInterpretation?: string; // AI 对量表得分的多维医学解读
+  createdAt: number;
+}
+
 export interface Assessment {
   id: string;
   sessionId: string;
   patientId: string;
-  type: 'posture' | 'rom' | 'medvoice' | 'combined';
+  type: 'posture' | 'rom' | 'medvoice' | 'combined' | 'scale';
   mode: AssessmentMode;
   createdAt: number;
   data: {
     posture?: PostureAssessmentData;
     rom?: RomAssessmentData;
     medvoice?: MedVoiceAssessmentData;
+    scale?: ScaleAssessmentData;
   };
   notes?: string;
   status: 'pending' | 'completed' | 'reviewed';

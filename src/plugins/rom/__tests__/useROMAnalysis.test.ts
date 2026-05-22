@@ -36,6 +36,9 @@ describe('useROMAnalysis', () => {
 
     act(() => {
       result.current.configureAssessment('hip', 'flexion', 'right');
+    });
+
+    act(() => {
       result.current.startROMAssessment();
     });
 

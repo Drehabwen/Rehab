@@ -55,6 +55,7 @@ interface MeasurementState {
   deleteSavedMeasurement: (id: string) => void;
   savePostureReport: (view: string, html: string, markdown?: string, timeSeries?: TemporalAnalysis['timeSeries'], metrics?: PostureMetrics, issues?: PostureIssue[], auxiliaryDiagnosis?: string) => void;
   deletePostureReport: (id: string) => void;
+  clearPostureReports: () => void;
 }
 
 const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#db2777'];
@@ -245,5 +246,6 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
 
   deletePostureReport: (id) => set((state) => ({
     postureReports: state.postureReports.filter(r => r.id !== id)
-  }))
+  })),
+  clearPostureReports: () => set({ postureReports: [] })
 }));

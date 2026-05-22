@@ -1,5 +1,5 @@
-﻿import React, { useMemo, useState } from 'react';
-import { ClipboardList, FileText, Plus, Search, Stethoscope, Users } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ClipboardList, FileText, Plus, Search, Stethoscope, Users, Cloud } from 'lucide-react';
 import type { Patient } from '@/types/patient';
 import type { VisitTaskSummary } from '../workflow';
 import { PageHeader, VisitCard } from '@/components/workflow';
@@ -20,6 +20,7 @@ interface DashboardViewProps {
   onSelectPatient: (patient: Patient) => void;
   onNewPatient: () => void;
   onSearchPatient: () => void;
+  onOpenSyncPanel: () => void;
 }
 
 const summaryCards = [
@@ -56,6 +57,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectPatient,
   onNewPatient,
   onSearchPatient,
+  onOpenSyncPanel,
 }) => {
   const [keyword, setKeyword] = useState('');
 
@@ -87,6 +89,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           }
           actions={
             <>
+              <Button variant="secondary" icon={<Cloud size={16} />} onClick={onOpenSyncPanel}>早筛同步</Button>
               <Button variant="secondary" icon={<Users size={16} />} onClick={onSearchPatient}>搜索患者</Button>
               <Button variant="primary" icon={<Plus size={16} />} onClick={onNewPatient}>新建患者</Button>
             </>

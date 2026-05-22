@@ -5,10 +5,12 @@ import { HubSidebar } from './components/HubSidebar';
 import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
 import { MedVoicePlugin } from '@/plugins/medvoice/MedVoicePlugin';
 import { ROMPlugin } from '@/plugins/rom/ROMPlugin';
+import { ScaleAssessmentPanel } from '@/components/patient/ScaleAssessmentPanel';
 import { NexusReportCenter } from './components/NexusReportCenter';
 import { NewSessionModal } from './components/NewSessionModal';
 import { PatientSearchModal } from './components/PatientSearchModal';
 import { DataSettingsModal } from './components/DataSettingsModal';
+import { SquatLabSyncPanel } from '@/components/SquatLabSyncPanel';
 import { PatientToolbox } from './components/PatientToolbox';
 import { ProgressComparison } from './components/ProgressComparison';
 import { WorkspaceToolbar } from './components/WorkspaceToolbar';
@@ -18,6 +20,7 @@ import { DataCenterView } from './views/DataCenterView';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
+import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { usePatientList } from './hooks/usePatientList';
 import type { Patient } from '@/types/patient';
 import { getPatientAvatar, getPatientDisplayName } from '@/lib/patient-utils';
@@ -25,7 +28,7 @@ import { PatientHeaderBar, StatePanel } from '@/components/layout';
 
 type CenterId = 'dashboard' | 'assessment' | 'reports' | 'datacenter';
 type AssessmentStage = 'overview' | 'workspace';
-type AssessmentTool = 'vision3' | 'medvoice' | 'comparison' | 'rom';
+type AssessmentTool = 'vision3' | 'medvoice' | 'comparison' | 'rom' | 'scale';
 
 export const NexusHub: React.FC = () => {
   const [activeCenter, setActiveCenter] = useState<CenterId>('dashboard');
@@ -36,10 +39,12 @@ export const NexusHub: React.FC = () => {
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showDataSettings, setShowDataSettings] = useState(false);
+  const [showSyncPanel, setShowSyncPanel] = useState(false);
 
   const { patients, loadPatients, setCurrentPatient, getPatientById } = usePatientStore();
   const { sessions, loadSessions, getPatientSessions } = useSessionStore();
   const { assessments, loadAssessments } = useAssessmentStore();
+  const { resetMeasurement, clearPostureReports } = useMeasurementStore();
 
   useEffect(() => {
     loadPatients();
@@ -61,6 +66,8 @@ export const NexusHub: React.FC = () => {
   const handleSelectPatient = (patient: Patient) => {
     setSelectedPatient(patient);
     setCurrentPatient(patient);
+    clearPostureReports();
+    resetMeasurement();
     setActiveCenter('assessment');
     setAssessmentStage('overview');
   };
@@ -76,6 +83,8 @@ export const NexusHub: React.FC = () => {
     setActiveCenter('assessment');
     setSelectedPatient(null);
     setCurrentPatient(null);
+    clearPostureReports();
+    resetMeasurement();
   };
 
   const handleBackFromWorkspace = () => {
@@ -119,6 +128,24 @@ export const NexusHub: React.FC = () => {
         return <MedVoicePlugin />;
       case 'rom':
         return <ROMPlugin />;
+      case 'scale':
+        return selectedPatient && selectedVisitTask?.sessionId ? (
+          <ScaleAssessmentPanel
+            patientId={selectedPatient.id}
+            sessionId={selectedVisitTask.sessionId}
+            onBack={handleBackFromWorkspace}
+          />
+        ) : (
+          <div className="rehab-page">
+            <div className="rehab-page-inner">
+              <StatePanel
+                title="暂时无法进行量表评定"
+                description="未关联有效的治疗会话。"
+                actions={<button className="btn-primary" onClick={handleBackFromWorkspace}>返回</button>}
+              />
+            </div>
+          </div>
+        );
       case 'comparison':
         return selectedPatient ? (
           <ProgressComparison
@@ -158,6 +185,7 @@ export const NexusHub: React.FC = () => {
             onSelectPatient={handleSelectPatient}
             onNewPatient={() => setShowNewSessionModal(true)}
             onSearchPatient={() => setShowSearchModal(true)}
+            onOpenSyncPanel={() => setShowSyncPanel(true)}
           />
         );
       case 'assessment':
@@ -255,6 +283,14 @@ export const NexusHub: React.FC = () => {
         <DataSettingsModal
           isOpen={showDataSettings}
           onClose={() => setShowDataSettings(false)}
+        />
+
+        <SquatLabSyncPanel
+          isOpen={showSyncPanel}
+          onClose={() => setShowSyncPanel(false)}
+          onImportSuccess={(name) => {
+            loadPatients();
+          }}
         />
       </main>
     </div>

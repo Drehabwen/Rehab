@@ -5,13 +5,13 @@ import os
 from dotenv import load_dotenv
 
 # 加载环境变量
-dotenv_path = os.path.join(os.path.dirname(__file__), 'backend', '.env')
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 
 from openai import OpenAI
 
-api_key = os.getenv("DEEPSEEK_API_KEY")
+api_key = (os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY") or "").strip()
 print(f"API Key: {api_key[:10]}..." if api_key else "No API Key")
 
 client = OpenAI(

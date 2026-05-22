@@ -23,9 +23,9 @@ def test_real_llm_report():
     root_env = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
     load_dotenv(root_env)
     
-    api_key = os.getenv("DEEPSEEK_API_KEY")
+    api_key = (os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY") or "").strip()
     if not api_key:
-        log_step("ERROR: DEEPSEEK_API_KEY not found in .env")
+        log_step("ERROR: DEEPSEEK_API_KEY (or VITE_DEEPSEEK_API_KEY) not found in .env")
         return
 
     log_step(f"SUCCESS: Found API Key: {api_key[:6]}...{api_key[-4:]}")

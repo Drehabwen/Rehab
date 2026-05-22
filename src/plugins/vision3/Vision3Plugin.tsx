@@ -94,8 +94,6 @@ export const Vision3Plugin: React.FC = () => {
     setIsEntryMode,
     setSteppedResults,
     setIsCameraOn,
-    toggleFullscreen,
-    isFullscreen,
     view,
     steppedResults,
     analyzeStepped,

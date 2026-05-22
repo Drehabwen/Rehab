@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.concurrency import run_in_threadpool
@@ -48,12 +48,14 @@ from utils.treatment_plan_service import (
 )
 from utils.session_reporter import generate_session_report
 import uuid
+from routers import integration
 
 app = FastAPI(
     title="Vision3 AI Backend",
     description="Python backend for Vision3 Posture Analysis",
     version="1.0.0"
 )
+app.include_router(integration.router)
 
 # Initialize Camera Manager
 camera_manager = CameraManager()
@@ -70,10 +72,10 @@ def debug_print(*args, **kwargs):
 def load_cors_origins() -> List[str]:
     raw = os.getenv(
         "CORS_ALLOW_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175",
     )
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    return origins or ["http://localhost:5173"]
+    return origins or ["http://localhost:5173", "http://localhost:5174"]
 
 def build_time_series(frames):
     series = []

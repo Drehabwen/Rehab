@@ -10,7 +10,7 @@ import { VisualAnnotation, HeadAxes, PoseLandmark } from '../vision3-utils';
 import { ActiveMeasurement } from '@/store/useMeasurementStore';
 import { AssessmentType } from '../store/usePostureAssessmentStore';
 import { BUTTON_TEXTS, CAPTURE_STATUS_TEXTS, CAMERA_TEXTS, MEASUREMENT_TEXTS } from '../constants/uiText';
-import { COLORS, SIZES, ANIMATIONS, TRANSITIONS, SHADOWS, BACKDROP } from '@/constants/uiStyles';
+import { COLORS, SIZES, TRANSITIONS, SHADOWS, BACKDROP } from '@/constants/uiStyles';
 
 export type ViewType = 'front' | 'side' | 'back';
 export type CaptureStatus = 'idle' | 'scanning' | 'countdown' | 'recording' | 'analyzing' | 'completed' | 'error';

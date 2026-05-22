@@ -6,10 +6,26 @@ import statistics
 from typing import Dict, Any, List, Optional
 
 # 加载环境变量
-dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
-if os.path.exists(dotenv_path):
-    from dotenv import load_dotenv
-    load_dotenv(dotenv_path)
+def _load_env() -> None:
+    try:
+        from dotenv import load_dotenv
+    except Exception:
+        return
+
+    utils_dir = os.path.dirname(os.path.abspath(__file__))
+    backend_dir = os.path.dirname(utils_dir)
+    repo_root = os.path.dirname(backend_dir)
+
+    root_env = os.path.join(repo_root, ".env")
+    backend_env = os.path.join(backend_dir, ".env")
+
+    if os.path.exists(root_env):
+        load_dotenv(root_env, override=False)
+    if os.path.exists(backend_env):
+        load_dotenv(backend_env, override=False)
+
+
+_load_env()
 
 from openai import OpenAI
 
@@ -26,7 +42,7 @@ if not DEBUG_LLM_LOGS:
 
 # Initialize Deepseek client (OpenAI compatible)
 client = None
-api_key = os.getenv("DEEPSEEK_API_KEY")
+api_key = (os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY") or "").strip()
 if api_key:
     client = OpenAI(
         api_key=api_key,

@@ -10,8 +10,6 @@ interface UseVision3EventHandlerProps {
   setIsEntryMode: (entryMode: boolean) => void;
   setSteppedResults: React.Dispatch<React.SetStateAction<SteppedResults>>;
   setIsCameraOn: (on: boolean) => void;
-  toggleFullscreen: () => void;
-  isFullscreen: boolean;
   view: 'front' | 'side' | 'back';
   steppedResults: SteppedResults;
   analyzeStepped: (frames: SteppedFrame[], assessmentType?: AssessmentType) => void;
@@ -25,8 +23,6 @@ export const useVision3EventHandler = ({
   setIsEntryMode,
   setSteppedResults,
   setIsCameraOn,
-  toggleFullscreen,
-  isFullscreen,
   view,
   steppedResults,
   analyzeStepped,
@@ -35,18 +31,6 @@ export const useVision3EventHandler = ({
   const handleStartCapture = useCallback(() => {
     setCaptureStatus('scanning');
   }, [setCaptureStatus]);
-
-  const handleNextView = useCallback((assessmentType?: AssessmentType) => {
-    const viewOrder: ('front' | 'side' | 'back')[] = ['front', 'side', 'back'];
-    const currentIndex = viewOrder.indexOf(view);
-    
-    if (assessmentType === 'quick') {
-      handleFinishStepped(assessmentType);
-    } else if (currentIndex < viewOrder.length - 1) {
-      setView(viewOrder[currentIndex + 1]);
-      setCaptureStatus('idle');
-    }
-  }, [view, setView, setCaptureStatus, steppedResults, analyzeStepped, setCaptureStatus, setStep, isFullscreen, toggleFullscreen]);
 
   const handleFinishStepped = useCallback(async (assessmentType?: AssessmentType) => {
     console.log('[handleFinishStepped] ===== START =====');
@@ -85,6 +69,21 @@ export const useVision3EventHandler = ({
       console.error('[handleFinishStepped] ERROR: No frames to analyze!');
     }
   }, [steppedResults, analyzeStepped, setCaptureStatus, setStep]);
+
+  const handleNextView = useCallback((assessmentType?: AssessmentType) => {
+    const viewOrder: ('front' | 'side' | 'back')[] = ['front', 'side', 'back'];
+    const currentIndex = viewOrder.indexOf(view);
+
+    if (assessmentType === 'quick') {
+      handleFinishStepped(assessmentType);
+      return;
+    }
+
+    if (currentIndex < viewOrder.length - 1) {
+      setView(viewOrder[currentIndex + 1]);
+      setCaptureStatus('idle');
+    }
+  }, [view, setView, setCaptureStatus, handleFinishStepped]);
 
   const handleResetToEntry = useCallback(() => {
     setIsEntryMode(true);
