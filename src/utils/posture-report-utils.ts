@@ -21,12 +21,13 @@ export interface AnalysisResult {
   timestamp: number;
 }
 
-/**
- * Generates a rule-based auxiliary report from analysis metrics and issues.
- * This provides immediate feedback while waiting for LLM deep analysis.
- */
-export function generateAuxiliaryReport(data: AnalysisResult): string {
-  const { metrics, issues } = data;
+export function generateAuxiliaryReport(data: AnalysisResult | null | undefined): string {
+  if (!data) {
+    return `### 🩺 辅助诊断报告 (基于规则引擎)\n\n*暂无评估数据，请开始拍摄或等待分析结果。*\n\n---\n*注：此报告由规则引擎自动生成，仅供参考。点击“深度分析”以获取 AI 详细评估。*`;
+  }
+  
+  const metrics = data.metrics || {};
+  const issues = data.issues || [];
   let report = `### 🩺 辅助诊断报告 (基于规则引擎)\n\n`;
   
   report += `#### 📊 生物力学指标\n`;

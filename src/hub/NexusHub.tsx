@@ -43,8 +43,8 @@ export const NexusHub: React.FC = () => {
 
   const { patients, loadPatients, setCurrentPatient, getPatientById } = usePatientStore();
   const { sessions, loadSessions, getPatientSessions } = useSessionStore();
-  const { assessments, loadAssessments } = useAssessmentStore();
-  const { resetMeasurement, clearPostureReports } = useMeasurementStore();
+  const { assessments, loadAssessments, clearCurrentAssessment } = useAssessmentStore();
+  const { resetMeasurement } = useMeasurementStore();
 
   useEffect(() => {
     loadPatients();
@@ -66,7 +66,7 @@ export const NexusHub: React.FC = () => {
   const handleSelectPatient = (patient: Patient) => {
     setSelectedPatient(patient);
     setCurrentPatient(patient);
-    clearPostureReports();
+    clearCurrentAssessment();
     resetMeasurement();
     setActiveCenter('assessment');
     setAssessmentStage('overview');
@@ -83,7 +83,7 @@ export const NexusHub: React.FC = () => {
     setActiveCenter('assessment');
     setSelectedPatient(null);
     setCurrentPatient(null);
-    clearPostureReports();
+    clearCurrentAssessment();
     resetMeasurement();
   };
 

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { PostureMetrics, PostureIssue, Landmark } from '@/types/posture';
 import { TemporalAnalysis } from '@/lib/posture-processor';
-import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { 
   generateAuxiliaryReport, 
   AnalysisResult, 
@@ -50,8 +49,6 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   const shouldReconnectRef = useRef<boolean>(true);
   const streamingBufferRef = useRef<string>('');
   const streamingFlushTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const savePostureReport = useMeasurementStore(state => state.savePostureReport);
-  const savePostureReportRef = useRef(savePostureReport);
   const resultRef = useRef<AnalysisResult | null>(null);
   const auxiliaryDiagnosisRef = useRef<string | null>(null);
   const currentViewRef = useRef<'front' | 'side' | 'back'>('front');
@@ -68,10 +65,6 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
   const normalizeReportText = useCallback((value: unknown) => (
     typeof value === 'string' ? value.trim() : ''
   ), []);
-
-  useEffect(() => {
-    savePostureReportRef.current = savePostureReport;
-  }, [savePostureReport]);
 
   useEffect(() => {
     resultRef.current = result;
@@ -243,25 +236,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
               applyAuxiliaryDiagnosisState(effectiveAuxiliaryDiagnosis);
             }
             
-            console.log('[usePostureWS] Saving posture report:', {
-              view: currentViewRef.current,
-              hasMarkdown: !!normalized,
-              hasTimeSeries: timeSeries && timeSeries.length > 0,
-              timeSeriesLength: timeSeries ? timeSeries.length : 0,
-              hasAuxiliaryDiagnosis: !!effectiveAuxiliaryDiagnosis,
-              isDeepReport
-            });
-            
-            savePostureReportRef.current(
-              currentViewRef.current, 
-              effectiveAuxiliaryDiagnosis || normalized, 
-              hasStandaloneExpandedReport ? normalized : null,
-              timeSeries,
-              effectiveMetrics,
-              effectiveIssues,
-              effectiveAuxiliaryDiagnosis || undefined
-            );
-            console.log('[usePostureWS] Posture report saved successfully');
+            console.log('[usePostureWS] Posture report received in hook. Unified store will auto-save.');
           } else if (data.type === 'DEEP_REPORT_STREAM') {
             // Handle streaming chunks from LLM
             console.log('[usePostureWS] Received DEEP_REPORT_STREAM chunk');
@@ -307,7 +282,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
       console.error('Connection error:', e);
       setStatus('error');
     }
-  }, [url, flushPending, clearStreamingBuffer, scheduleStreamingFlush, applyResultState, applyAuxiliaryDiagnosisState, normalizeReportText]); // Removed savePostureReport from dependencies as it's a stable store method
+  }, [url, flushPending, clearStreamingBuffer, scheduleStreamingFlush, applyResultState, applyAuxiliaryDiagnosisState, normalizeReportText]);
 
   useEffect(() => {
     console.log('[usePostureWS] Initializing WebSocket connection');
@@ -331,7 +306,7 @@ export function usePostureWS(url: string = CONFIG.websocket.url) {
     setStreamingReport('');
     applyResultState(null);
     currentViewRef.current = view;
-    // 保存分析数据用于后续深度分析请求
+    // 保存分析数据用于后续深度 analysis 请求
     lastAnalysisDataRef.current = { view, timeSeriesLandmarks, width, height };
     const message = {
       type: 'POSTURE_SYNC',

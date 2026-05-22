@@ -10,8 +10,6 @@ describe('usePostureWS', () => {
   let mockWebSocket: any;
 
   beforeEach(() => {
-    useMeasurementStore.setState({ postureReports: [] });
-
     mockWebSocket = {
       readyState: 1,
       send: vi.fn(),
@@ -183,7 +181,6 @@ describe('usePostureWS', () => {
 
       expect(result.current.markdownReport).toBeNull();
       expect(result.current.auxiliaryDiagnosis).toBe('### Test Report');
-      expect(useMeasurementStore.getState().postureReports[0]?.markdown).toBeNull();
     });
 
     it('should preserve base recommendations when deep report returns without them', () => {
@@ -234,12 +231,6 @@ describe('usePostureWS', () => {
       expect(result.current.result?.metrics).toEqual(baseResponse.metrics);
       expect(result.current.result?.issues).toEqual(baseResponse.issues);
       expect(result.current.auxiliaryDiagnosis).toBe(baseResponse.auxiliaryDiagnosis);
-
-      const latestReport = useMeasurementStore.getState().postureReports[0];
-      expect(latestReport.markdown).toBe('### Deep Report');
-      expect(latestReport.metrics).toEqual(baseResponse.metrics);
-      expect(latestReport.issues).toEqual(baseResponse.issues);
-      expect(latestReport.auxiliaryDiagnosis).toBe(baseResponse.auxiliaryDiagnosis);
     });
 
     it('should handle unknown message types', () => {

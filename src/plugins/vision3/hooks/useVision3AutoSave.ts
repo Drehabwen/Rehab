@@ -3,7 +3,6 @@ import { PostureMetrics, PostureIssue } from '@/hooks/usePostureWS';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
-import { useMeasurementStore } from '@/store/useMeasurementStore';
 import type { TemporalAnalysis } from '@/lib/posture-processor';
 import { AssessmentMode } from '../components/Vision3CameraStage';
 
@@ -34,18 +33,15 @@ export const useVision3AutoSave = ({
   const isSavingDeepRef = useRef(false);
   const { currentPatient, patients } = usePatientStore();
   const { currentSession, sessions, startSession } = useSessionStore();
-  const { addAssessment, updateAssessment } = useAssessmentStore();
-  const { postureReports } = useMeasurementStore();
+  const { addAssessment, updateAssessment, currentAssessment } = useAssessmentStore();
   const currentAssessmentIdRef = useRef<string | null>(null);
-  const pickLatestReport = () => (
-    postureReports.find((report) => report.view === view && (report.markdown || report.auxiliaryDiagnosis || report.metrics || (report.issues?.length ?? 0) > 0))
-    ?? postureReports.find((report) => report.markdown || report.auxiliaryDiagnosis || report.metrics || (report.issues?.length ?? 0) > 0)
-    ?? null
-  );
 
   useEffect(() => {
     const saveAssessment = async () => {
       const hasReport = Boolean(auxiliaryDiagnosis || markdownReport);
+      const patientId = currentPatient?.id;
+      if (!patientId) return;
+
       if (
         step === 'completed'
         && hasReport
@@ -53,9 +49,6 @@ export const useVision3AutoSave = ({
         && !isSavingAuxiliaryRef.current
       ) {
         try {
-          const patientId = currentPatient?.id;
-          if (!patientId) return;
-
           isSavingAuxiliaryRef.current = true;
           
           let sessionId =
@@ -66,14 +59,14 @@ export const useVision3AutoSave = ({
             sessionId = newSession.id;
           }
           
-          const latestReport = pickLatestReport();
+          const existingPosture = currentAssessment?.patientId === patientId ? currentAssessment?.data?.posture : undefined;
           
-          // Use data from latestReport if available, otherwise fall back to wsResult
-          const reportMetrics = latestReport?.metrics || wsResult?.metrics;
-          const reportIssues = latestReport?.issues || wsResult?.issues;
-          const reportMarkdown = latestReport?.markdown || markdownReport || undefined;
-          const reportAuxiliary = latestReport?.auxiliaryDiagnosis || auxiliaryDiagnosis || undefined;
-          const reportTimeSeries = latestReport?.timeSeries || timeSeriesData || undefined;
+          // Merge incoming props with existing posture assessment data if present
+          const reportMetrics = wsResult?.metrics || existingPosture?.metrics;
+          const reportIssues = wsResult?.issues || existingPosture?.issues;
+          const reportMarkdown = markdownReport || existingPosture?.markdownReport || undefined;
+          const reportAuxiliary = auxiliaryDiagnosis || existingPosture?.auxiliaryDiagnosis || undefined;
+          const reportTimeSeries = timeSeriesData || existingPosture?.timeSeries || undefined;
           
           console.log('[useVision3AutoSave] Saving assessment with data:', {
             hasMetrics: !!reportMetrics,
@@ -82,7 +75,7 @@ export const useVision3AutoSave = ({
             hasMarkdown: !!reportMarkdown,
             hasAuxiliary: !!reportAuxiliary,
             hasTimeSeries: !!reportTimeSeries,
-            source: latestReport ? 'latestReport' : 'wsResult'
+            hasExistingPosture: !!existingPosture
           });
           
           const assessment = await addAssessment({
@@ -124,14 +117,13 @@ export const useVision3AutoSave = ({
       ) {
         isSavingDeepRef.current = true;
         try {
-          const latestReport = pickLatestReport();
+          const existingPosture = currentAssessment?.patientId === patientId ? currentAssessment?.data?.posture : undefined;
           
-          // Use data from latestReport if available, otherwise fall back to props
-          const reportMetrics = latestReport?.metrics || wsResult?.metrics;
-          const reportIssues = latestReport?.issues || wsResult?.issues;
-          const reportMarkdown = latestReport?.markdown || markdownReport;
-          const reportAuxiliary = latestReport?.auxiliaryDiagnosis || auxiliaryDiagnosis || undefined;
-          const reportTimeSeries = latestReport?.timeSeries || timeSeriesData || undefined;
+          const reportMetrics = wsResult?.metrics || existingPosture?.metrics;
+          const reportIssues = wsResult?.issues || existingPosture?.issues;
+          const reportMarkdown = markdownReport || existingPosture?.markdownReport;
+          const reportAuxiliary = auxiliaryDiagnosis || existingPosture?.auxiliaryDiagnosis || undefined;
+          const reportTimeSeries = timeSeriesData || existingPosture?.timeSeries || undefined;
           
           await updateAssessment(currentAssessmentIdRef.current, {
             data: {
@@ -158,7 +150,7 @@ export const useVision3AutoSave = ({
     };
     
     saveAssessment();
-  }, [step, wsResult, markdownReport, auxiliaryDiagnosis, timeSeriesData, currentPatient, patients, currentSession, sessions, startSession, addAssessment, updateAssessment, assessmentMode, view, postureReports]);
+  }, [step, wsResult, markdownReport, auxiliaryDiagnosis, timeSeriesData, currentPatient, patients, currentSession, sessions, startSession, addAssessment, updateAssessment, assessmentMode, view, currentAssessment]);
 
   useEffect(() => {
     if (step !== 'completed') {

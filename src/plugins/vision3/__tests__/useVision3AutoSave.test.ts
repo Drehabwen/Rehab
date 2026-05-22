@@ -133,11 +133,7 @@ describe('useVision3AutoSave', () => {
       expect(mockAddAssessment).toHaveBeenCalledTimes(1);
     });
 
-    measurementStoreState = {
-      postureReports: [],
-    };
-
-    rerender(defaultProps);
+    rerender({ ...defaultProps, wsResult: { ...defaultProps.wsResult } });
 
     await waitFor(() => {
       expect(mockAddAssessment).toHaveBeenCalledTimes(2);

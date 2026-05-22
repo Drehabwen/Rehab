@@ -41,7 +41,6 @@ interface MeasurementState {
     date: number;
     measurements: ActiveMeasurement[];
   }>;
-  postureReports: PostureReport[];
 
   // Actions
   addMeasurement: (joint: JointType, direction: MovementDirection, side: 'left' | 'right' | null) => void;
@@ -53,9 +52,6 @@ interface MeasurementState {
   resetMeasurement: () => void;
   saveMeasurement: () => void;
   deleteSavedMeasurement: (id: string) => void;
-  savePostureReport: (view: string, html: string, markdown?: string, timeSeries?: TemporalAnalysis['timeSeries'], metrics?: PostureMetrics, issues?: PostureIssue[], auxiliaryDiagnosis?: string) => void;
-  deletePostureReport: (id: string) => void;
-  clearPostureReports: () => void;
 }
 
 const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#db2777'];
@@ -75,7 +71,6 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
   isMeasuring: false,
   startTime: null,
   savedMeasurements: [],
-  postureReports: [],
 
   addMeasurement: (joint, direction, side) => set((state) => {
     // Check if already exists to prevent duplicates (optional, but good UX)
@@ -196,56 +191,5 @@ export const useMeasurementStore = create<MeasurementState>((set, get) => ({
 
   deleteSavedMeasurement: (id) => set((state) => ({
     savedMeasurements: state.savedMeasurements.filter(m => m.id !== id)
-  })),
-
-  savePostureReport: (view, html, markdown, timeSeries, metrics, issues, auxiliaryDiagnosis) => {
-    console.log('[useMeasurementStore] savePostureReport called:', {
-      view,
-      htmlLength: html.length,
-      hasMarkdown: !!markdown,
-      markdownLength: markdown ? markdown.length : 0,
-      hasTimeSeries: timeSeries && timeSeries.length > 0,
-      timeSeriesLength: timeSeries ? timeSeries.length : 0,
-      hasMetrics: !!metrics,
-      hasIssues: issues && issues.length > 0,
-      issuesCount: issues ? issues.length : 0,
-      hasAuxiliaryDiagnosis: !!auxiliaryDiagnosis
-    });
-    
-    set((state) => {
-      const newReport = {
-        id: crypto.randomUUID(),
-        date: Date.now(),
-        view,
-        html,
-        markdown,
-        timeSeries,
-        metrics,
-        issues,
-        auxiliaryDiagnosis
-      };
-      
-      console.log('[useMeasurementStore] New report created:', {
-        id: newReport.id,
-        date: new Date(newReport.date).toLocaleString(),
-        view: newReport.view,
-        hasMetrics: !!newReport.metrics,
-        hasIssues: newReport.issues && newReport.issues.length > 0
-      });
-      
-      const updatedReports = [newReport, ...state.postureReports];
-      console.log('[useMeasurementStore] Updated postureReports length:', updatedReports.length);
-      
-      return {
-        postureReports: updatedReports
-      };
-    });
-    
-    console.log('[useMeasurementStore] Report saved to Zustand store (UI cache)');
-  },
-
-  deletePostureReport: (id) => set((state) => ({
-    postureReports: state.postureReports.filter(r => r.id !== id)
-  })),
-  clearPostureReports: () => set({ postureReports: [] })
+  }))
 }));

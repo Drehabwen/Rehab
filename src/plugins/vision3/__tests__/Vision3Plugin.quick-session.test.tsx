@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Vision3Plugin } from '../Vision3Plugin';
-import { useMeasurementStore } from '@/store/useMeasurementStore';
+import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { usePostureAssessmentStore } from '../store/usePostureAssessmentStore';
 
 vi.mock('../hooks/useVision3Camera', () => ({
@@ -74,29 +74,37 @@ vi.mock('@/components/shared/Vision3ErrorBoundary', () => ({
 
 describe('Vision3Plugin quick assessment session state', () => {
   beforeEach(() => {
-    useMeasurementStore.setState({
-      postureReports: [
-        {
-          id: 'cached-report',
-          date: Date.now(),
-          view: 'front',
-          html: '<p>cached</p>',
-          auxiliaryDiagnosis: '历史缓存报告',
-          markdown: '历史扩展报告',
-          metrics: {
-            shoulderAngle: 1,
-            hipAngle: 0,
-            headDeviation: 0,
-            headForward: 0,
-            shoulderRounded: 0,
-            headPitch: 0,
-            headYaw: 0,
-            headRoll: 0,
-            head_axes: [],
-          },
-          issues: [],
-        },
-      ],
+    useAssessmentStore.setState({
+      currentAssessment: {
+        id: 'cached-assessment',
+        sessionId: 'test-session',
+        patientId: 'test-patient',
+        type: 'posture',
+        mode: 'stepped',
+        createdAt: Date.now(),
+        status: 'completed',
+        data: {
+          posture: {
+            mode: 'stepped',
+            view: 'front',
+            metrics: {
+              shoulderAngle: 1,
+              hipAngle: 0,
+              headDeviation: 0,
+              headForward: 0,
+              shoulderRounded: 0,
+              headPitch: 0,
+              headYaw: 0,
+              headRoll: 0,
+              head_axes: [],
+            },
+            issues: [],
+            confidence: 0.85,
+            auxiliaryDiagnosis: '历史缓存报告',
+            markdownReport: '历史扩展报告',
+          }
+        }
+      }
     });
     usePostureAssessmentStore.getState().reset();
   });
