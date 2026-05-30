@@ -19,6 +19,7 @@ import { Vision3Header } from './components/Vision3Header';
 import { Vision3CameraStage } from './components/Vision3CameraStage';
 import { Vision3AnalysisPanel } from './components/Vision3AnalysisPanel';
 import { Vision3Workspace } from './components/Vision3Workspace';
+import { AdamsWorkspace } from './components/AdamsWorkspace';
 import Vision3ErrorBoundary from '@/components/shared/Vision3ErrorBoundary';
 
 type WorkspaceFocusTarget =
@@ -313,6 +314,8 @@ export const Vision3Plugin: React.FC = () => {
                   handleSelectMode(mode, nextView, nextAssessmentType);
                 }}
               />
+            ) : assessmentType === 'adams' ? (
+              <AdamsWorkspace onBack={handleResetToEntry} />
             ) : isCompletedView ? (
               <Vision3Workspace
                 currentViewLabel={currentViewLabel}

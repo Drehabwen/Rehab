@@ -44,7 +44,7 @@ export interface ScaleAnswer {
 }
 
 export interface ScaleAssessmentData {
-  scaleId: 'SRS-22' | 'ODI' | 'VAS';
+  scaleId: 'SRS-22' | 'ODI' | 'VAS' | 'MBI' | 'Berg' | 'MMT' | 'MAS';
   scaleName: string;
   filledBy: 'therapist' | 'patient' | 'parent';
   totalScore: number;
@@ -62,11 +62,24 @@ export interface ScaleAssessmentData {
   createdAt: number;
 }
 
+export interface AdamsAssessmentData {
+  atrDegrees: number;                       // ATR 躯干旋转度数 (0-30)
+  atrDirection: 'left' | 'right' | 'none'; // 隆起方向 (左侧/右侧/无)
+  shoulderAsymmetry: 'symmetrical' | 'left-higher' | 'right-higher'; // 双肩对称性 (对称/左侧偏高/右侧偏高)
+  scapulaAsymmetry: 'symmetrical' | 'left-prominent' | 'right-prominent'; // 肩胛骨隆起 (对称/左侧隆起/右侧隆起)
+  waistCreaseAsymmetry: 'symmetrical' | 'left-deeper' | 'right-deeper'; // 腰折痕对称性 (对称/左侧折痕深/右侧折痕深)
+  spineCurveEstimate: 'straight' | 'c-shape-left' | 'c-shape-right' | 's-shape'; // 脊柱弯曲大致形态
+  cobbAngleEstimate?: number;              // 估计 Cobb 角 (选填, 0-90)
+  snapshotImage?: string;                  // 融合铅垂网格的 Base64 图像
+  remarks?: string;                        // 康复师临床备注
+  createdAt: number;                       // 评估时间戳
+}
+
 export interface Assessment {
   id: string;
   sessionId: string;
   patientId: string;
-  type: 'posture' | 'rom' | 'medvoice' | 'combined' | 'scale';
+  type: 'posture' | 'rom' | 'medvoice' | 'combined' | 'scale' | 'adams';
   mode: AssessmentMode;
   createdAt: number;
   data: {
@@ -74,6 +87,7 @@ export interface Assessment {
     rom?: RomAssessmentData;
     medvoice?: MedVoiceAssessmentData;
     scale?: ScaleAssessmentData;
+    adams?: AdamsAssessmentData;
   };
   notes?: string;
   status: 'pending' | 'completed' | 'reviewed';

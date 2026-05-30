@@ -178,7 +178,7 @@ export const ComparisonService = {
       const assessments = await this.loadAssessmentsByPatient(patientId);
       
       const trendData = assessments
-        .filter(a => a.type === 'posture' && a.status === 'completed')
+        .filter(a => (a.type === 'posture' || a.type === 'combined') && a.status === 'completed')
         .map(a => ({
           timestamp: a.createdAt,
           date: new Date(a.createdAt).toLocaleDateString('zh-CN'),

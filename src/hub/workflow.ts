@@ -67,7 +67,7 @@ export const WORKFLOW_MODULES: WorkflowModuleDefinition[] = [
     assessmentType: 'scale',
     title: '量表评估',
     shortTitle: '量表',
-    description: '通过临床量表(SRS-22/ODI/VAS)评估主观疼痛与生活质量。',
+    description: '通过临床量表(SRS-22/ODI/VAS/MBI/Berg/MMT/MAS)评估主观平衡、肌力、痉挛、疼痛与自理能力。',
   },
 ];
 
@@ -107,6 +107,7 @@ export function buildVisitTaskSummary(
   const totalModules = modules.length;
   const hasAnyAssessment = completedModules > 0;
   const reportReady = completedModules === totalModules && totalModules > 0;
+  const isSessionCompleted = latestSession?.status === 'completed';
 
   return {
     patient,
@@ -114,15 +115,21 @@ export function buildVisitTaskSummary(
     visitId,
     sessionId: latestSession?.id ?? null,
     sessionSequence,
-    status: reportReady ? 'completed' : 'pending',
+    status: isSessionCompleted ? 'completed' : (reportReady ? 'completed' : 'pending'),
     completedModules,
     totalModules,
     progressRatio: totalModules === 0 ? 0 : completedModules / totalModules,
-    reportReady,
+    reportReady: isSessionCompleted || reportReady,
     hasSession: Boolean(latestSession),
     hasAnyAssessment,
     updatedAt: latestSession?.updatedAt ?? patient.updatedAt,
-    nextStep: reportReady ? '进入报告中心' : hasAnyAssessment ? '继续完成评估' : '创建接诊并开始评估',
+    nextStep: isSessionCompleted
+      ? '进入报告中心查看报告与居家处方'
+      : reportReady
+      ? '进入报告中心'
+      : hasAnyAssessment
+      ? '继续完成评估'
+      : '创建接诊并开始评估',
     modules,
   };
 }

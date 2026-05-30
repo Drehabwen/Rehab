@@ -52,6 +52,17 @@ export const NexusHub: React.FC = () => {
     loadAssessments();
   }, [loadPatients, loadSessions, loadAssessments]);
 
+  useEffect(() => {
+    const handleNavigateToReports = () => {
+      console.log('[NexusHub] Switching active center to reports');
+      setActiveCenter('reports');
+    };
+    window.addEventListener('rehab-navigate-to-reports', handleNavigateToReports);
+    return () => {
+      window.removeEventListener('rehab-navigate-to-reports', handleNavigateToReports);
+    };
+  }, []);
+
   const { stats, visitTasks, getVisitTaskByPatientId } = usePatientList({
     patients,
     assessments,

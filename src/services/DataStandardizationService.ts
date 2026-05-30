@@ -4,7 +4,7 @@ import { PostureMetrics, PostureIssue } from '../types/posture';
 interface StandardizedAssessment {
   id: string;
   patientId: string;
-  type: 'posture' | 'rom' | 'medvoice' | 'combined' | 'scale';
+  type: 'posture' | 'rom' | 'medvoice' | 'combined' | 'scale' | 'adams';
   createdAt: number;
   metrics: Record<string, number | string | boolean>;
   issues: Array<{

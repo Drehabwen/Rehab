@@ -11,7 +11,7 @@ export interface SyncSubject {
 
 export interface SyncProtocolResult {
   result_id: string;
-  protocol: 'static_posture' | 'adams_forward_bend' | 'squat';
+  protocol: 'static_posture' | 'adams_forward_bend' | 'squat' | 'squat_screening';
   status: string;
   capture_quality: string;
   metrics: Record<string, any>;
@@ -125,7 +125,7 @@ export class IntegrationService {
     patient_id: string;
     patient_name?: string;
     session_id: string;
-    scale_id: 'SRS-22' | 'ODI' | 'VAS';
+    scale_id: 'SRS-22' | 'ODI' | 'VAS' | 'MBI' | 'Berg' | 'MMT' | 'MAS';
     therapist_name: string;
   }): Promise<{ task_id: string; status: string }> {
     const response = await fetch(`${BASE_URL}/scale/push`, {

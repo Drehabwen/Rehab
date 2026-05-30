@@ -81,6 +81,9 @@ export const METRIC_DIRECTIONS: Record<string, boolean> = {
   hipAngle: false,
   swayOffset: false,
   shoulderRounded: false,
+  leftKneeValgus: false,
+  rightKneeValgus: false,
+  atrAngle: false,
 };
 
 /**
@@ -97,6 +100,9 @@ export const METRIC_LABELS: Record<string, { label: string; unit: string }> = {
   swayOffset: { label: '摇摆偏移', unit: 'cm' },
   stabilityScore: { label: '稳定性评分', unit: '分' },
   shoulderRounded: { label: '圆肩程度', unit: '°' },
+  leftKneeValgus: { label: '左膝动力外翻', unit: '°' },
+  rightKneeValgus: { label: '右膝动力外翻', unit: '°' },
+  atrAngle: { label: 'ATR脊柱侧弯角', unit: '°' },
 };
 
 /**

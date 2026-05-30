@@ -13,7 +13,7 @@ export type MessageType =
   | 'ERROR';
 
 // 评估类型
-export type AssessmentType = 'standard' | 'quick';
+export type AssessmentType = 'standard' | 'quick' | 'adams';
 
 // 视角类型
 export type ViewType = 'front' | 'side' | 'back';

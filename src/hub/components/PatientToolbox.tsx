@@ -1,16 +1,17 @@
-import React from 'react';
-import { Activity, ArrowLeft, BarChart3, ClipboardList, FileText, Layers, Mic } from 'lucide-react';
-import { AssessmentCard, PageHeader, ProgressBar, StatusTag } from '@/components/workflow';
-import { Button, Card } from '@/components/ui';
+import React, { useState } from 'react';
+import { Activity, ArrowLeft, BarChart3, ClipboardList, FileText, Layers, Mic, CheckCircle } from 'lucide-react';
+import { AssessmentCard, PageHeader, StatusTag } from '@/components/workflow';
+import { Button } from '@/components/ui';
 import type { Patient } from '@/types/patient';
+import type { Assessment } from '@/types/assessment';
 import type { VisitTaskSummary, WorkflowToolId } from '../workflow';
-import {
-  getPatientAvatar,
-  getPatientColor,
-  getPatientDisplayName,
-} from '@/lib/patient-utils';
 import { formatDate } from '@/lib/session-utils';
-import { cn } from '@/lib/utils';
+import { useSessionStore } from '@/store/useSessionStore';
+import { useAssessmentStore } from '@/store/useAssessmentStore';
+
+// Sub-components
+import { PatientInfoCard } from './patient-toolbox/PatientInfoCard';
+import { CompleteSessionModal } from './patient-toolbox/CompleteSessionModal';
 
 interface PatientToolboxProps {
   patient: Patient;
@@ -33,7 +34,7 @@ const accentMap = {
   vision3: 'bg-blue-600 text-white',
   rom: 'bg-emerald-600 text-white',
   medvoice: 'bg-violet-600 text-white',
-  scale: 'bg-amber-600 text-white',
+  scale: 'bg-teal-600 text-white',
 } as const;
 
 export const PatientToolbox: React.FC<PatientToolboxProps> = ({
@@ -47,17 +48,50 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
 }) => {
   const comparisonEnabled = sessionCount > 1;
 
+  const { updateSession } = useSessionStore();
+  const { updateAssessment } = useAssessmentStore();
+
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+
   if (!visitTask) {
     return (
       <div className="rehab-page custom-scrollbar">
         <div className="rehab-page-inner">
-          <Card variant="default" padding="lg">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="text-sm text-slate-500">未能加载当前接诊信息，请返回接诊中心后重试。</div>
-          </Card>
+          </div>
         </div>
       </div>
     );
   }
+
+  const handleConfirmComplete = async (notes: string, isBaseline: boolean) => {
+    try {
+      await updateSession(visitTask.visitId, {
+        status: 'completed',
+        notes: notes,
+        isBaseline: isBaseline,
+      });
+
+      if (isBaseline) {
+        const sessionAssessments = visitTask.modules
+          .map(m => m.latestAssessment)
+          .filter(Boolean) as Assessment[];
+        
+        await Promise.all(
+          sessionAssessments.map(async (ast) => {
+            await updateAssessment(ast.id, { isBaseline: true });
+          })
+        );
+      }
+    } catch (err) {
+      console.error('Failed to complete session:', err);
+    }
+
+    onOpenReports();
+  };
+
+  const isCompleted = visitTask.status === 'completed';
 
   return (
     <div className="rehab-page custom-scrollbar">
@@ -79,41 +113,28 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
               <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>返回评估中心</Button>
               <Button variant="secondary" icon={<BarChart3 size={16} />} onClick={onOpenComparison} disabled={!comparisonEnabled}>进度对比</Button>
               <Button variant="primary" icon={<FileText size={16} />} onClick={onOpenReports}>进入报告中心</Button>
+              {!isCompleted && (
+                <Button 
+                  variant="primary" 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_4px_12px_rgba(16,185,129,0.2)]" 
+                  icon={<CheckCircle size={16} />} 
+                  onClick={() => setIsCompleteModalOpen(true)}
+                  disabled={visitTask.completedModules === 0}
+                >
+                  完成本次评估
+                </Button>
+              )}
             </>
           }
         />
 
-        <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
-          <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="flex min-w-0 items-start gap-4">
-              <div className={cn('flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-semibold text-white shadow-sm', getPatientColor(patient))}>
-                {getPatientAvatar(patient)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-semibold text-slate-900">{getPatientDisplayName(patient)}</h2>
-                  <span className="text-sm text-slate-400">ID {patient.id}</span>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  当前围绕本次接诊完成体态评估、ROM 评估和语音问诊。页面只负责完成评估任务，报告查看与导出统一在报告中心完成。
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                  <span>接诊编号 {visitTask.visitId}</span>
-                  <span>接诊次数 {Math.max(sessionCount, 1)}</span>
-                  <span>最近更新 {formatDate(visitTask.updatedAt)}</span>
-                </div>
-              </div>
-            </div>
+        <PatientInfoCard 
+          patient={patient} 
+          visitTask={visitTask} 
+          sessionCount={sessionCount} 
+        />
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">本次接诊进度</div>
-              <p className="mt-1 text-sm leading-6 text-slate-500">{visitTask.nextStep}</p>
-              <ProgressBar value={visitTask.completedModules} total={visitTask.totalModules} className="mt-4" />
-            </div>
-          </div>
-        </Card>
-
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-4">
           {visitTask.modules.map((module) => {
             const Icon = iconMap[module.toolId];
             return (
@@ -139,6 +160,13 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
           })}
         </section>
       </div>
+
+      <CompleteSessionModal 
+        isOpen={isCompleteModalOpen} 
+        onClose={() => setIsCompleteModalOpen(false)} 
+        visitTask={visitTask} 
+        onConfirm={handleConfirmComplete} 
+      />
     </div>
   );
 };

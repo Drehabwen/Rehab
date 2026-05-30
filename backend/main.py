@@ -48,7 +48,7 @@ from utils.treatment_plan_service import (
 )
 from utils.session_reporter import generate_session_report
 import uuid
-from routers import integration, wechat_chatbot
+from routers import integration
 
 app = FastAPI(
     title="Vision3 AI Backend",
@@ -56,7 +56,6 @@ app = FastAPI(
     version="1.0.0"
 )
 app.include_router(integration.router)
-app.include_router(wechat_chatbot.router)
 
 # Initialize Camera Manager
 camera_manager = CameraManager()
@@ -677,6 +676,5 @@ except Exception as e:
 
 if __name__ == "__main__":
     import uvicorn
-    # Use port from config to avoid conflicts with zombie processes on 8000
-    uvicorn.run(app, host="0.0.0.0", port=8002)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 

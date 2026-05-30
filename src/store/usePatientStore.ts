@@ -127,13 +127,14 @@ export const usePatientStore = create<PatientState>((set, get) => ({
   importSquatLabScreening: async (payload: SyncScreeningPayload, patientId?: string): Promise<Patient> => {
     set({ isLoading: true, error: null });
     try {
+      const screeningTime = new Date(payload.created_at).getTime();
       let patient: Patient;
 
-      if (patientId) {
+      const targetId = patientId || ((verifySUC(payload.subject.subject_id) || /^[A-Z]{4}$/.test(payload.subject.subject_id)) ? payload.subject.subject_id : null);
+      let existing = targetId ? await db.patients.get(targetId) : null;
+
+      if (existing) {
         // Associate with existing patient
-        const existing = await db.patients.get(patientId);
-        if (!existing) throw new Error('关联患者不存在');
-        
         const tags = Array.from(new Set([...(existing.tags || []), '来自早筛', '已关联早筛']));
         let updatedNotes = existing.notes || '';
         if (payload.integrated_report) {
@@ -144,23 +145,20 @@ export const usePatientStore = create<PatientState>((set, get) => ({
           ...existing,
           tags,
           notes: updatedNotes,
-          updatedAt: Date.now()
+          updatedAt: screeningTime
         };
         await db.patients.put(patient);
       } else {
         // Create new patient
-        // If the early screening ID is a valid SUC or legacy 4-letter clinic code, reuse it; otherwise generate a new one
-        const isValidSUC = verifySUC(payload.subject.subject_id);
-        const isValid4Letter = /^[A-Z]{4}$/.test(payload.subject.subject_id);
-        const newPatientId = (isValidSUC || isValid4Letter) ? payload.subject.subject_id : generatePatientId();
+        const newPatientId = targetId || generatePatientId();
         const tags = ['来自早筛', payload.integrated_report?.overall_risk === 'low' ? '体态优秀' : '脊柱侧弯预警'];
         const notes = `年龄: ${payload.subject.age ?? '未知'}岁 | 身高: ${payload.subject.height_cm ?? '未知'}cm | 性别: ${payload.subject.sex === 'male' ? '男' : payload.subject.sex === 'female' ? '女' : '未知'}\n早筛备注: ${payload.subject.notes || '无'}\n\n[早筛结论摘要]\n${payload.integrated_report?.summary || '暂无摘要'}`;
         
         patient = {
           id: newPatientId,
           name: payload.subject.display_name,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: screeningTime,
+          updatedAt: screeningTime,
           tags,
           notes
         };
@@ -175,11 +173,42 @@ export const usePatientStore = create<PatientState>((set, get) => ({
 
       const sessionId = generatePatientId() + '_S' + sequence; // Custom clinical format
 
+      // Extract metrics from early screening protocols
+      const extractedMetrics: any = {};
+      payload.protocol_results.forEach(r => {
+        if (r.status === 'completed' && r.metrics) {
+          if (r.protocol === 'static_posture') {
+            Object.entries(r.metrics).forEach(([k, v]) => {
+              if (typeof v === 'number') {
+                extractedMetrics[k] = v;
+              }
+            });
+          } else if (r.protocol === 'squat_screening') {
+            if (r.metrics.left_knee_valgus_deg != null) {
+              extractedMetrics.leftKneeValgus = r.metrics.left_knee_valgus_deg;
+            }
+            if (r.metrics.right_knee_valgus_deg != null) {
+              extractedMetrics.rightKneeValgus = r.metrics.right_knee_valgus_deg;
+            }
+            if (r.metrics.psi_score != null) {
+              extractedMetrics.stabilityScore = r.metrics.psi_score * 100;
+            } else if (r.psi_score != null) {
+              extractedMetrics.stabilityScore = r.psi_score * 100;
+            }
+          } else if (r.protocol === 'adams_forward_bend') {
+            if (r.metrics.atr_angle_deg != null) {
+              extractedMetrics.atrAngle = r.metrics.atr_angle_deg;
+            }
+          }
+        }
+      });
+
       // Map early screening protocol results into clinical posture assessment
       const postureData: PostureAssessmentData = {
         mode: 'stepped',
         view: 'front',
         confidence: 0.95,
+        metrics: extractedMetrics,
         auxiliaryDiagnosis: `
 ### 早筛会话详情
 - **筛查会话**: ${payload.session_id}
@@ -216,7 +245,7 @@ ${payload.llm_analysis ? `
         patientId: patient.id,
         type: 'combined',
         mode: 'stepped',
-        createdAt: Date.now(),
+        createdAt: screeningTime,
         data: {
           posture: postureData
         },
@@ -228,8 +257,8 @@ ${payload.llm_analysis ? `
         id: sessionId,
         patientId: patient.id,
         sequence,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
+        createdAt: screeningTime,
+        updatedAt: screeningTime,
         assessments: [assessment],
         status: 'completed' as const,
         notes: `由早筛同步导入会话: ${payload.session_id}`

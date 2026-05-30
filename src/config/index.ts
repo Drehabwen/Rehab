@@ -1,5 +1,5 @@
-const DEFAULT_API_BASE_URL = 'http://localhost:8002';
-const DEFAULT_WS_URL = 'ws://localhost:8002/ws/analyze';
+const DEFAULT_API_BASE_URL = 'http://localhost:8000';
+const DEFAULT_WS_URL = 'ws://localhost:8000/ws/analyze';
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 

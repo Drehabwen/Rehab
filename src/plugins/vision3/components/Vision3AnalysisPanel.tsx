@@ -70,7 +70,7 @@ const panelShellClass = cn(
   COLORS.neutral.whiteBg95,
 );
 const dashboardShellClass = cn(panelShellClass, 'h-full overflow-hidden');
-const reportShellClass = cn(panelShellClass, 'overflow-visible');
+const reportShellClass = cn(panelShellClass, 'h-full overflow-hidden');
 const headerToggleClass = cn(
   'flex items-center rounded-xl border p-1 shadow-sm',
   COLORS.neutral.light.borderStrong,
@@ -213,7 +213,7 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
       </div>
 
       {activePanel === 'report' ? (
-        <section ref={basicReportRef} className={cn(sectionShellClass, 'bg-[linear-gradient(180deg,rgba(248,252,255,0.98),rgba(255,255,255,1))]')}>
+        <section ref={basicReportRef} className={cn(sectionShellClass, 'flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-[linear-gradient(180deg,rgba(248,252,255,0.98),rgba(255,255,255,1))]')}>
           {hasBasicReportContent ? (
             <div className="space-y-5">
               <div className="grid gap-3 xl:grid-cols-3">
@@ -277,7 +277,9 @@ export const Vision3AnalysisPanel: React.FC<Vision3AnalysisPanelProps> = ({
                     <button
                       type="button"
                       className={quickJumpButtonClass('violet')}
-                      onClick={() => onNavigate?.('report', 'report-basic')}
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('rehab-navigate-to-reports'));
+                      }}
                     >
                       前往报告中心
                     </button>

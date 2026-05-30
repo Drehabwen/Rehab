@@ -21,6 +21,20 @@ export interface AnalysisResult {
   timestamp: number;
 }
 
+const METRIC_CHINESE_LABELS: Record<string, string> = {
+  headForward: '头颈前引角',
+  shoulderAngle: '双肩倾斜角',
+  hipAngle: '骨盆倾斜角',
+  headRoll: '头部侧倾角',
+  headYaw: '头部旋转角',
+  earShoulderDistance: '耳肩距离',
+  neckAngle: '颈椎曲度角',
+  torsoAngle: '躯干倾斜角',
+  pelvisAngle: '骨盆旋转角',
+  kneeAngle: '膝关节角度',
+  ankleAngle: '踝关节角度'
+};
+
 export function generateAuxiliaryReport(data: AnalysisResult | null | undefined): string {
   if (!data) {
     return `### 🩺 辅助诊断报告 (基于规则引擎)\n\n*暂无评估数据，请开始拍摄或等待分析结果。*\n\n---\n*注：此报告由规则引擎自动生成，仅供参考。点击“深度分析”以获取 AI 详细评估。*`;
@@ -34,7 +48,7 @@ export function generateAuxiliaryReport(data: AnalysisResult | null | undefined)
   Object.entries(metrics).forEach(([key, value]) => {
     // Only include numeric metrics that aren't coordinate arrays
     if (typeof value === 'number' && key !== 'head_axes') {
-      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+      const label = METRIC_CHINESE_LABELS[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
       const unit = key.toLowerCase().includes('angle') ? '°' : '';
       report += `- **${label}**: ${value.toFixed(1)}${unit}\n`;
     }

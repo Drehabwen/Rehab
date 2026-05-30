@@ -56,6 +56,28 @@ const getMedVoiceStatus = (assessment: Assessment): SessionReportInputStatus => 
   return 'missing';
 };
 
+const getScaleStatus = (assessment: Assessment): SessionReportInputStatus => {
+  if (assessment.data.scale?.aiInterpretation) {
+    return 'ready';
+  }
+
+  if (assessment.data.scale?.totalScore !== undefined || (assessment.data.scale?.answers?.length ?? 0) > 0) {
+    return 'partial';
+  }
+
+  return 'missing';
+};
+
+const getAdamsStatus = (assessment: Assessment): SessionReportInputStatus => {
+  if (assessment.data.adams?.remarks) {
+    return 'ready';
+  }
+  if (assessment.data.adams?.atrDegrees !== undefined) {
+    return 'ready';
+  }
+  return 'missing';
+};
+
 export function getAssessmentPreview(assessment: Assessment): string | null {
   const sanitizePreview = (value?: string | null) => {
     const cleaned = sanitizeReadableText(value);
@@ -81,6 +103,37 @@ export function getAssessmentPreview(assessment: Assessment): string | null {
 
   if (assessment.data.medvoice?.transcript) {
     return sanitizePreview(assessment.data.medvoice.transcript);
+  }
+
+  if (assessment.data.scale) {
+    const scale = assessment.data.scale;
+    if (scale.aiInterpretation) {
+      return sanitizePreview(scale.aiInterpretation);
+    }
+    const summary = `### ${scale.scaleName} 评估结果\n- **评估总分**: ${scale.totalScore} / ${scale.maxScore} 分\n- **填写人员**: ${
+      scale.filledBy === 'therapist' ? '康复师' : scale.filledBy === 'patient' ? '患者' : '家属'
+    }`;
+    return sanitizePreview(summary);
+  }
+
+  if (assessment.data.adams) {
+    const adams = assessment.data.adams;
+    const severity = adams.atrDegrees >= 7 ? '重度旋转 (高危)' : adams.atrDegrees >= 5 ? '中度旋转 (中危)' : adams.atrDegrees > 0 ? '轻微偏斜 (低危)' : '水平正常';
+    let summary = `### 亚当斯脊柱侧弯早筛结果\n`;
+    summary += `- **ATR 躯干旋转角**: ${adams.atrDegrees}° (${adams.atrDirection === 'left' ? '左侧偏高' : adams.atrDirection === 'right' ? '右侧偏高' : '无明显偏斜'})\n`;
+    summary += `- **临床筛查风险**: ${severity}\n`;
+    if (adams.cobbAngleEstimate !== undefined) {
+      summary += `- **估计 Cobb 角**: ${adams.cobbAngleEstimate}°\n`;
+    }
+    summary += `- **对称性状态**:\n`;
+    summary += `  - 双肩高低: ${adams.shoulderAsymmetry === 'symmetrical' ? '水平对称' : adams.shoulderAsymmetry === 'left-higher' ? '左肩偏高' : '右肩偏高'}\n`;
+    summary += `  - 肩胛骨对称性: ${adams.scapulaAsymmetry === 'symmetrical' ? '水平对称' : adams.scapulaAsymmetry === 'left-prominent' ? '左侧偏高' : '右侧偏高'}\n`;
+    summary += `  - 腰部折痕: ${adams.waistCreaseAsymmetry === 'symmetrical' ? '对称' : adams.waistCreaseAsymmetry === 'left-deeper' ? '左侧折痕深' : '右侧折痕深'}\n`;
+    summary += `  - 脊柱大致形态: ${adams.spineCurveEstimate === 'straight' ? '直线对称' : adams.spineCurveEstimate === 'c-shape-left' ? '左 C 形侧弯' : adams.spineCurveEstimate === 'c-shape-right' ? '右 C 形侧弯' : 'S 形侧弯'}\n`;
+    if (adams.remarks) {
+      summary += `- **康复师备注**: ${adams.remarks}\n`;
+    }
+    return sanitizePreview(summary);
   }
 
   return null;
@@ -138,10 +191,41 @@ export function buildAssessmentOutputSummary(assessment: Assessment): Assessment
     };
   }
 
+  if (assessment.type === 'scale') {
+    const scale = assessment.data.scale;
+    return {
+      assessmentId: assessment.id,
+      sessionId: assessment.sessionId,
+      patientId: assessment.patientId,
+      type: 'scale',
+      title: scale?.scaleName || '量表评估',
+      status: getScaleStatus(assessment),
+      createdAt: assessment.createdAt,
+      preview,
+      evidenceCount: scale?.answers?.length ?? 0,
+      sourceAssessment: assessment,
+    };
+  }
+
+  if (assessment.type === 'adams') {
+    return {
+      assessmentId: assessment.id,
+      sessionId: assessment.sessionId,
+      patientId: assessment.patientId,
+      type: 'adams',
+      title: '亚当斯筛查',
+      status: getAdamsStatus(assessment),
+      createdAt: assessment.createdAt,
+      preview,
+      evidenceCount: 6,
+      sourceAssessment: assessment,
+    };
+  }
+
   return null;
 }
 
-const inputTypes: SessionReportInputType[] = ['posture', 'rom', 'medvoice'];
+const inputTypes: SessionReportInputType[] = ['posture', 'rom', 'medvoice', 'scale', 'adams'];
 
 export function buildSessionReportInputs(
   assessments: Assessment[],
@@ -229,6 +313,22 @@ export function buildSessionReportGenerationRequest(sessionInput: SessionReportI
           status: sessionInput.outputs.medvoice.status,
           preview: sessionInput.outputs.medvoice.preview,
           evidenceCount: sessionInput.outputs.medvoice.evidenceCount,
+        }
+      : undefined,
+    scale: sessionInput.outputs.scale
+      ? {
+          title: sessionInput.outputs.scale.title,
+          status: sessionInput.outputs.scale.status,
+          preview: sessionInput.outputs.scale.preview,
+          evidenceCount: sessionInput.outputs.scale.evidenceCount,
+        }
+      : undefined,
+    adams: sessionInput.outputs.adams
+      ? {
+          title: sessionInput.outputs.adams.title,
+          status: sessionInput.outputs.adams.status,
+          preview: sessionInput.outputs.adams.preview,
+          evidenceCount: sessionInput.outputs.adams.evidenceCount,
         }
       : undefined,
   };

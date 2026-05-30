@@ -1,6 +1,6 @@
 import type { Assessment } from './assessment';
 
-export type SessionReportInputType = 'posture' | 'rom' | 'medvoice';
+export type SessionReportInputType = 'posture' | 'rom' | 'medvoice' | 'scale' | 'adams';
 
 export type SessionReportInputStatus = 'ready' | 'partial' | 'missing';
 
@@ -60,4 +60,6 @@ export interface SessionReportGenerationRequest {
   posture?: SessionReportSectionInput;
   rom?: SessionReportSectionInput;
   medvoice?: SessionReportSectionInput;
+  scale?: SessionReportSectionInput;
+  adams?: SessionReportSectionInput;
 }

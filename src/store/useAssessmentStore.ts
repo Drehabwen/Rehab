@@ -5,6 +5,8 @@ import type {
   PostureAssessmentData,
   RomAssessmentData,
   MedVoiceAssessmentData,
+  ScaleAssessmentData,
+  AdamsAssessmentData,
   AssessmentMode
 } from '@/types/assessment';
 import { nanoid } from 'nanoid';
@@ -26,6 +28,8 @@ interface AssessmentState {
       posture?: PostureAssessmentData;
       rom?: RomAssessmentData;
       medvoice?: MedVoiceAssessmentData;
+      scale?: ScaleAssessmentData;
+      adams?: AdamsAssessmentData;
     };
     notes?: string;
   }) => Promise<Assessment>;

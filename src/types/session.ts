@@ -9,4 +9,5 @@ export interface Session {
   notes?: string;
   assessments: Assessment[];
   status: 'active' | 'completed' | 'archived';
+  isBaseline?: boolean;
 }

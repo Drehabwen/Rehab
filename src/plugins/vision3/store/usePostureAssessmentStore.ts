@@ -3,7 +3,7 @@ import { create } from 'zustand';
 /**
  * 评估类型定义
  */
-export type AssessmentType = 'standard' | 'quick';
+export type AssessmentType = 'standard' | 'quick' | 'adams';
 
 /**
  * 评估模式配置
@@ -36,6 +36,14 @@ export const ASSESSMENT_MODES: Record<AssessmentType, AssessmentModeConfig> = {
     features: ['即时反馈', '快速筛查', '初步检查'],
     estimatedTime: '1-2 分钟',
     requiredViews: ['front']
+  },
+  adams: {
+    type: 'adams',
+    label: '亚当斯评估',
+    description: '脊柱侧弯前屈专项筛查',
+    features: ['ATR临床标定', '体表对称性评分', '网格对齐辅助拍摄'],
+    estimatedTime: '2-3 分钟',
+    requiredViews: ['back']
   }
 };
 
