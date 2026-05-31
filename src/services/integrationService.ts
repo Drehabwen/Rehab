@@ -55,6 +55,7 @@ export interface SyncedScreeningBrief {
   session_id: string;
   subject_id: string;
   subject_display_name: string;
+  patient_id?: string | null;
   overall_risk: string;
   status: 'pending' | 'imported';
   created_at: string;
@@ -63,6 +64,17 @@ export interface SyncedScreeningBrief {
 
 export interface SyncedScreeningDetail extends SyncedScreeningBrief {
   payload: SyncScreeningPayload;
+}
+
+export interface FamilyAccessLink {
+  id: number;
+  patient_id: string;
+  link_type: 'family_code';
+  status: 'active' | 'revoked' | 'expired' | string;
+  linked_to?: string | null;
+  created_at: string;
+  expires_at?: string | null;
+  is_expired: boolean;
 }
 
 const BASE_URL = 'http://localhost:8002/api/integration';
@@ -104,6 +116,104 @@ export class IntegrationService {
     if (!response.ok) {
       throw new Error(`Failed to mark screening as imported: ${response.statusText}`);
     }
+  }
+
+  /**
+   * Confirm a synced screening intake and bind source subject_id to canonical patient_id
+   */
+  static async confirmScreeningIntake(
+    sessionId: string,
+    payload: {
+      action: 'create_patient' | 'link_existing_patient';
+      patient_id?: string | null;
+      family_code?: string | null;
+      family_code_expires_at?: string | null;
+      suc?: string | null;
+    }
+  ): Promise<{
+    status: string;
+    session_id: string;
+    patient_id: string;
+    subject_id: string;
+    family_code?: string | null;
+    alias_created: boolean;
+  }> {
+    const response = await fetch(`${BASE_URL}/intake/${encodeURIComponent(sessionId)}/confirm`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to confirm screening intake: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * List family-code access links for a canonical patient without exposing stored hashes
+   */
+  static async listFamilyAccess(patientId: string): Promise<FamilyAccessLink[]> {
+    const response = await fetch(`${BASE_URL}/family/access/${encodeURIComponent(patientId)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to list family access links: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Rotate a patient's family code. The raw family_code is returned once.
+   */
+  static async rotateFamilyAccess(
+    patientId: string,
+    payload: {
+      family_code?: string | null;
+      expires_at?: string | null;
+      linked_to?: string | null;
+    } = {}
+  ): Promise<FamilyAccessLink & { family_code: string; rotated_at: string }> {
+    const response = await fetch(`${BASE_URL}/family/access/${encodeURIComponent(patientId)}/rotate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to rotate family access link: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Revoke a single family-code access link
+   */
+  static async revokeFamilyAccess(linkId: number): Promise<FamilyAccessLink> {
+    const response = await fetch(`${BASE_URL}/family/access-link/${linkId}/revoke`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to revoke family access link: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Extend a single family-code access link
+   */
+  static async extendFamilyAccess(linkId: number, expiresAt: string): Promise<FamilyAccessLink> {
+    const response = await fetch(`${BASE_URL}/family/access-link/${linkId}/extend`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expires_at: expiresAt }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to extend family access link: ${response.statusText}`);
+    }
+    return response.json();
   }
 
   /**

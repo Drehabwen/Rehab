@@ -100,11 +100,25 @@ backend/
 - `POST /api/treatment-plan/generate-from-session-report`
 - `POST /api/treatment-plan/generate-from-session-report/stream`
 - `POST /api/session-report/generate`
+- `POST /api/integration/sync-screening`
+- `GET /api/integration/synced-screenings`
+- `POST /api/integration/intake/{session_id}/confirm`
+- `POST /api/integration/family/login`
+- `GET /api/integration/family/access/{patient_id}`
+- `POST /api/integration/family/access/{patient_id}/rotate`
+- `POST /api/integration/family/access-link/{link_id}/extend`
+- `POST /api/integration/family/access-link/{link_id}/revoke`
+- `POST /api/integration/scale/push`
+- `GET /api/integration/scale/pending/{patient_id}`
+- `POST /api/integration/scale/submit`
+- `GET /api/integration/scale/results/{session_id}`
 - `WS /ws/analyze`
 
 ## 文档索引
 
 - 项目总盘点：[PROJECT_INFO_MAP.md](C:/Users/DORAT/Desktop/Rehab-main/PROJECT_INFO_MAP.md)
+- 闭环工作流：[docs/CLOSED_LOOP_WORKFLOW.md](docs/CLOSED_LOOP_WORKFLOW.md)
+- 患者身份契约：[docs/IDENTITY_CONTRACT.md](docs/IDENTITY_CONTRACT.md)
 - API 规范：[docs/API_SPECIFICATION.md](C:/Users/DORAT/Desktop/Rehab-main/docs/API_SPECIFICATION.md)
 - 开发规范：[docs/DEVELOPMENT_STANDARDS.md](C:/Users/DORAT/Desktop/Rehab-main/docs/DEVELOPMENT_STANDARDS.md)
 - 设计系统：[DESIGN_SYSTEM.md](C:/Users/DORAT/Desktop/Rehab-main/DESIGN_SYSTEM.md)

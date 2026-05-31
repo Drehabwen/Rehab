@@ -5,8 +5,8 @@ import { generatePatientId } from '@/lib/session-utils';
 import { formatPatientSearch } from '@/lib/patient-utils';
 import type { SyncScreeningPayload } from '@/services/integrationService';
 import type { Assessment, PostureAssessmentData, ScaleAssessmentData } from '@/types/assessment';
-import { verifySUC } from '@/utils/suc-utils';
 
+const generateCanonicalPatientId = () => `pat_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
 
 interface PatientState {
   patients: Patient[];
@@ -130,7 +130,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       const screeningTime = new Date(payload.created_at).getTime();
       let patient: Patient;
 
-      const targetId = patientId || ((verifySUC(payload.subject.subject_id) || /^[A-Z]{4}$/.test(payload.subject.subject_id)) ? payload.subject.subject_id : null);
+      const targetId = patientId || null;
       let existing = targetId ? await db.patients.get(targetId) : null;
 
       if (existing) {
@@ -150,7 +150,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
         await db.patients.put(patient);
       } else {
         // Create new patient
-        const newPatientId = targetId || generatePatientId();
+        const newPatientId = targetId || generateCanonicalPatientId();
         const tags = ['来自早筛', payload.integrated_report?.overall_risk === 'low' ? '体态优秀' : '脊柱侧弯预警'];
         const notes = `年龄: ${payload.subject.age ?? '未知'}岁 | 身高: ${payload.subject.height_cm ?? '未知'}cm | 性别: ${payload.subject.sex === 'male' ? '男' : payload.subject.sex === 'female' ? '女' : '未知'}\n早筛备注: ${payload.subject.notes || '无'}\n\n[早筛结论摘要]\n${payload.integrated_report?.summary || '暂无摘要'}`;
         

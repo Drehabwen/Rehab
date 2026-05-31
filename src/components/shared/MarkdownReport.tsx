@@ -42,7 +42,24 @@ const toneClassMap = {
   },
 } as const;
 
-const mojibakePattern = /锟|鏂|鍩|鎶|璇|瀹|缁|鍗|閲|鍐|鍚|鎵|姹囨€|寮傚父|�/u;
+const mojibakeTokens = [
+  '\u951F',
+  '\u93C2',
+  '\u9369',
+  '\u93B6',
+  '\u7487',
+  '\u7039',
+  '\u7F01',
+  '\u9357',
+  '\u95B2',
+  '\u9350',
+  '\u935A',
+  '\u93B5',
+  '\u59F9\u56E8\u20AC',
+  '\u5BEE\u509A\u7236',
+  '\uFFFD',
+];
+const mojibakePattern = new RegExp(mojibakeTokens.join('|'), 'u');
 const suspiciousPhoneticPattern = /[\u3100-\u312F]/u;
 const viewLabelMap = {
   front: '正面',

@@ -33,6 +33,11 @@ interface SquatLabSyncPanelProps {
   onImportSuccess?: (patientName: string) => void;
 }
 
+const getInitialFamilyCode = (payload: any): string | null => {
+  const code = String(payload?.subject?.subject_id || '').trim().toUpperCase();
+  return /^[A-Z0-9]{4,6}$/.test(code) ? code : null;
+};
+
 export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
   isOpen,
   onClose,
@@ -104,7 +109,11 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
     setError(null);
     try {
       const patient = await importSquatLabScreening(payload);
-      await IntegrationService.markAsImported(payload.session_id);
+      await IntegrationService.confirmScreeningIntake(payload.session_id, {
+        action: 'create_patient',
+        patient_id: patient.id,
+        family_code: getInitialFamilyCode(payload),
+      });
       
       // Success feedback
       if (onImportSuccess) {
@@ -127,7 +136,11 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
     setError(null);
     try {
       const patient = await importSquatLabScreening(payload, patientId);
-      await IntegrationService.markAsImported(payload.session_id);
+      await IntegrationService.confirmScreeningIntake(payload.session_id, {
+        action: 'link_existing_patient',
+        patient_id: patient.id,
+        family_code: getInitialFamilyCode(payload),
+      });
       
       if (onImportSuccess) {
         onImportSuccess(patient.name || '已绑定患者');

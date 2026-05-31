@@ -11,6 +11,7 @@ import { useAssessmentStore } from '@/store/useAssessmentStore';
 
 // Sub-components
 import { PatientInfoCard } from './patient-toolbox/PatientInfoCard';
+import { FamilyAccessManager } from './patient-toolbox/FamilyAccessManager';
 import { CompleteSessionModal } from './patient-toolbox/CompleteSessionModal';
 
 interface PatientToolboxProps {
@@ -133,6 +134,8 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
           visitTask={visitTask} 
           sessionCount={sessionCount} 
         />
+
+        <FamilyAccessManager patient={patient} />
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-4">
           {visitTask.modules.map((module) => {

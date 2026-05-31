@@ -165,6 +165,131 @@ Response shape:
 }
 ```
 
+### 2.6 Integration Closed Loop
+
+These routes are mounted from `backend/routers/integration.py` with the prefix `/api/integration`.
+They are the current bridge between the early screening terminal, the therapist workstation, and the parent / patient chatbot.
+
+#### Screening Sync
+
+- Method: `POST`
+- Path: `/api/integration/sync-screening`
+- Purpose: receive one completed screening session from the early screening terminal.
+
+Request body shape:
+
+```json
+{
+  "session_id": "screening_session_001",
+  "subject": {
+    "subject_id": "student_001",
+    "display_name": "Student Name",
+    "sex": "male",
+    "age": 14,
+    "height_cm": 165.5,
+    "notes": ""
+  },
+  "protocol_results": [
+    {
+      "result_id": "result_static_001",
+      "protocol": "static_posture",
+      "status": "completed",
+      "capture_quality": "good",
+      "metrics": {},
+      "findings": [],
+      "risk_flags": [],
+      "recommendations": [],
+      "psi_score": null,
+      "severity_grades": null
+    }
+  ],
+  "integrated_report": {
+    "report_id": "report_001",
+    "title": "Screening Summary",
+    "overall_risk": "attention",
+    "consistency_level": "single_protocol",
+    "main_patterns": [],
+    "next_action": "pending_review",
+    "summary": "Screening summary text.",
+    "recommendations": []
+  },
+  "llm_analysis": null,
+  "created_at": "2026-05-30T10:00:00Z",
+  "completed_at": "2026-05-30T10:05:00Z"
+}
+```
+
+Response shape:
+
+```json
+{
+  "status": "success",
+  "action": "created",
+  "session_id": "screening_session_001"
+}
+```
+
+`action` can be `created` or `updated`; the route is idempotent by `session_id`.
+
+#### Screening Intake
+
+- `GET /api/integration/synced-screenings`
+- `GET /api/integration/synced-screenings?status=pending`
+- `GET /api/integration/synced-screenings/{session_id}`
+- `POST /api/integration/intake/{session_id}/confirm`
+- `POST /api/integration/synced-screenings/{session_id}/import`
+- `DELETE /api/integration/synced-screenings/{session_id}`
+
+These routes support the B-end synchronization panel. New imports should confirm identity through `/intake/{session_id}/confirm`, which binds the source `subject_id` alias to a canonical `patient_id` and can create a `family_code` access link. The older `/import` route only marks a screening as imported.
+
+Example intake confirmation:
+
+```json
+{
+  "action": "create_patient",
+  "patient_id": "pat_01hx_example",
+  "family_code": "AB12CD",
+  "family_code_expires_at": "2026-12-31T23:59:59"
+}
+```
+
+#### Family Access
+
+- `POST /api/integration/family/login`
+- `GET /api/integration/family/access/{patient_id}`
+- `POST /api/integration/family/access/{patient_id}/rotate`
+- `POST /api/integration/family/access-link/{link_id}/extend`
+- `POST /api/integration/family/access-link/{link_id}/revoke`
+
+`POST /family/login` resolves an active, unexpired parent / guardian `family_code` into the canonical `patient_id` that C-end scale, plan, assessment, and tracking routes use.
+
+The management routes are B-end only:
+
+- `GET /family/access/{patient_id}` returns link metadata without the stored credential hash.
+- `POST /family/access/{patient_id}/rotate` revokes existing active links and returns the new raw `family_code` once.
+- `POST /family/access-link/{link_id}/extend` updates `expires_at`; revoked links remain revoked.
+- `POST /family/access-link/{link_id}/revoke` immediately blocks C-end login for that code.
+
+`patient_access_links.code` stores a server-side hash. Raw family codes must not be used as database join keys or returned by list / extend / revoke responses.
+
+#### Subject Lookup And Trends
+
+- `GET /api/integration/subject/{subject_id}`
+- `GET /api/integration/subject/{subject_id}/trends`
+
+These routes expose the latest subject profile and historical screening trends derived from synced payloads.
+
+#### Scale Task Exchange
+
+- `POST /api/integration/scale/push`
+- `GET /api/integration/scale/pending/{patient_id}`
+- `POST /api/integration/scale/submit`
+- `GET /api/integration/scale/results/{session_id}`
+
+The B-end pushes scale tasks, the C-end pulls and submits them with `patient_id`, and the B-end reads completed results by session. The backend rejects scale submissions where the submitted `patient_id` does not match the task owner.
+
+See [CLOSED_LOOP_WORKFLOW.md](CLOSED_LOOP_WORKFLOW.md) for the end-to-end workflow.
+
 ## 3. WebSocket Endpoint
 
 - Path: `/ws/analyze`
@@ -336,6 +461,7 @@ Current frontend API clients:
 
 - [src/api/treatmentPlanApi.ts](C:/Users/DORAT/Desktop/Rehab-main/src/api/treatmentPlanApi.ts)
 - [src/api/sessionReportApi.ts](C:/Users/DORAT/Desktop/Rehab-main/src/api/sessionReportApi.ts)
+- [src/services/integrationService.ts](C:/Users/DORAT/Desktop/Rehab-main/src/services/integrationService.ts)
 - [src/hooks/usePostureWS.ts](C:/Users/DORAT/Desktop/Rehab-main/src/hooks/usePostureWS.ts)
 
 ## 6. Error Handling

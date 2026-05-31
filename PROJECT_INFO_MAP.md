@@ -320,6 +320,8 @@ Defined in [backend/models.py](C:/Users/DORAT/Desktop/Rehab-main/backend/models.
 #### API / data flow / development specs
 
 - [docs/API_SPECIFICATION.md](C:/Users/DORAT/Desktop/Rehab-main/docs/API_SPECIFICATION.md)
+- [docs/CLOSED_LOOP_WORKFLOW.md](docs/CLOSED_LOOP_WORKFLOW.md)
+- [docs/IDENTITY_CONTRACT.md](docs/IDENTITY_CONTRACT.md)
 - [docs/API_ASSESSMENT_MODES.md](C:/Users/DORAT/Desktop/Rehab-main/docs/API_ASSESSMENT_MODES.md)
 - [docs/dataflow-state-management-spec.md](C:/Users/DORAT/Desktop/Rehab-main/docs/dataflow-state-management-spec.md)
 - [docs/plugin-development-spec.md](C:/Users/DORAT/Desktop/Rehab-main/docs/plugin-development-spec.md)
@@ -388,6 +390,8 @@ Across [DESIGN_SYSTEM.md](C:/Users/DORAT/Desktop/Rehab-main/DESIGN_SYSTEM.md), [
 - runtime URLs and integration endpoints:
   - [src/config/index.ts](C:/Users/DORAT/Desktop/Rehab-main/src/config/index.ts)
   - [backend/main.py](C:/Users/DORAT/Desktop/Rehab-main/backend/main.py)
+  - [backend/routers/integration.py](backend/routers/integration.py)
+  - [src/services/integrationService.ts](src/services/integrationService.ts)
 - backend contracts:
   - [backend/models.py](C:/Users/DORAT/Desktop/Rehab-main/backend/models.py)
 - app shell and module map:
@@ -399,8 +403,14 @@ Across [DESIGN_SYSTEM.md](C:/Users/DORAT/Desktop/Rehab-main/DESIGN_SYSTEM.md), [
   - updated on `2026-03-10`.
   - now reflects the actual app shell, stack, local run commands, and current backend port `8002`.
 - [docs/API_SPECIFICATION.md](C:/Users/DORAT/Desktop/Rehab-main/docs/API_SPECIFICATION.md)
-  - updated on `2026-03-10`.
-  - now matches the current backend routes in `backend/main.py` and the current WebSocket path `/ws/analyze`.
+  - updated on `2026-05-30` for `/api/integration/*`.
+  - now covers the current backend routes in `backend/main.py`, the WebSocket path `/ws/analyze`, and the screening / identity / scale integration API.
+- [docs/CLOSED_LOOP_WORKFLOW.md](docs/CLOSED_LOOP_WORKFLOW.md)
+  - added on `2026-05-30`.
+  - current source-of-truth for the early screening -> B-end workstation -> C-end chatbot -> B-end result loop.
+- [docs/IDENTITY_CONTRACT.md](docs/IDENTITY_CONTRACT.md)
+  - added on `2026-05-30`.
+  - current source-of-truth for `patient_id`, `subject_id`, SUC/display codes, family codes, sessions, and names.
 - [docs/DEVELOPMENT_STANDARDS.md](C:/Users/DORAT/Desktop/Rehab-main/docs/DEVELOPMENT_STANDARDS.md)
   - updated on `2026-03-10`.
   - now references the real frontend API clients, WebSocket hook, runtime config, and backend contract files that exist today.
@@ -423,8 +433,11 @@ If someone needs to understand the project quickly, use this order:
 4. [src/plugins/medvoice/MedVoicePlugin.tsx](C:/Users/DORAT/Desktop/Rehab-main/src/plugins/medvoice/MedVoicePlugin.tsx)
 5. [src/config/index.ts](C:/Users/DORAT/Desktop/Rehab-main/src/config/index.ts)
 6. [backend/main.py](C:/Users/DORAT/Desktop/Rehab-main/backend/main.py)
-7. [backend/models.py](C:/Users/DORAT/Desktop/Rehab-main/backend/models.py)
-8. then only the docs that match the question you are answering
+7. [backend/routers/integration.py](backend/routers/integration.py)
+8. [docs/IDENTITY_CONTRACT.md](docs/IDENTITY_CONTRACT.md)
+9. [docs/CLOSED_LOOP_WORKFLOW.md](docs/CLOSED_LOOP_WORKFLOW.md)
+10. [backend/models.py](C:/Users/DORAT/Desktop/Rehab-main/backend/models.py)
+11. then only the docs that match the question you are answering
 
 ## 10. Verification Basis
 
@@ -436,7 +449,12 @@ This inventory was produced from direct repo scans and current code, not from hi
 - API client files read:
   - `src/api/treatmentPlanApi.ts`
   - `src/api/sessionReportApi.ts`
+  - `src/services/integrationService.ts`
   - `src/hooks/usePostureWS.ts`
+- Integration files read:
+  - `backend/routers/integration.py`
+  - `src/components/SquatLabSyncPanel.tsx`
+  - `src/components/patient/ScaleAssessmentPanel.tsx`
 - Persistence/config files read:
   - `src/lib/db.ts`
   - `src/config/index.ts`
@@ -446,5 +464,7 @@ This inventory was produced from direct repo scans and current code, not from hi
   - `docs/UI_DESIGN_GUIDE.md`
   - `docs/DEVELOPMENT_STANDARDS.md`
   - `docs/API_SPECIFICATION.md`
+  - `docs/CLOSED_LOOP_WORKFLOW.md`
+  - `docs/IDENTITY_CONTRACT.md`
 - Test status reference:
   - current frontend Vitest report is green at `114` suites / `241` tests / `0` failures
