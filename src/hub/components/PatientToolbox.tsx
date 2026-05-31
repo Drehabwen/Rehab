@@ -8,6 +8,7 @@ import type { VisitTaskSummary, WorkflowToolId } from '../workflow';
 import { formatDate } from '@/lib/session-utils';
 import { useSessionStore } from '@/store/useSessionStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
+import { IntegrationService } from '@/services/integrationService';
 
 // Sub-components
 import { PatientInfoCard } from './patient-toolbox/PatientInfoCard';
@@ -78,7 +79,7 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
         const sessionAssessments = visitTask.modules
           .map(m => m.latestAssessment)
           .filter(Boolean) as Assessment[];
-        
+
         await Promise.all(
           sessionAssessments.map(async (ast) => {
             await updateAssessment(ast.id, { isBaseline: true });
@@ -87,6 +88,29 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
       }
     } catch (err) {
       console.error('Failed to complete session:', err);
+    }
+
+    // 推送评估摘要至家长端（非阻塞，失败不影响本地流程）
+    try {
+      const completedModuleNames = visitTask.modules
+        .filter(m => m.status === 'completed')
+        .map(m => m.title);
+      const concernLabels = completedModuleNames.length > 0
+        ? completedModuleNames.map(t => `已完成${t}评定`)
+        : ['本次接诊评估已完成'];
+
+      await IntegrationService.pushAssessmentSummary({
+        patient_id: visitTask.patient.id,
+        patient_name: visitTask.patientName,
+        session_id: visitTask.visitId,
+        risk_level: 'low',
+        risk_label: '待康复师综合判断',
+        summary_text: notes || `本次接诊（${visitTask.visitId}）已完成 ${completedModuleNames.join('、')} 等 ${visitTask.completedModules} 项评定。`,
+        concerns: concernLabels,
+        recommendations: ['请关注康复师后续训练处方'],
+      });
+    } catch (err) {
+      console.warn('[PatientToolbox] Push assessment summary failed (non-blocking):', err);
     }
 
     onOpenReports();

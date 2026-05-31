@@ -252,6 +252,55 @@ export class IntegrationService {
   }
 
   /**
+   * Push assessment summary from therapist workstation to parent chatbot
+   */
+  static async pushAssessmentSummary(payload: {
+    patient_id: string;
+    patient_name?: string;
+    session_id: string;
+    risk_level: string;
+    risk_label: string;
+    summary_text: string;
+    concerns?: string[];
+    recommendations?: string[];
+  }): Promise<{ summary_id: string; status: string }> {
+    const response = await fetch(`${BASE_URL}/assessment/push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to push assessment summary: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Push treatment plan from therapist workstation to parent chatbot
+   */
+  static async pushTreatmentPlan(payload: {
+    patient_id: string;
+    patient_name?: string;
+    session_id: string;
+    therapist_name: string;
+    plan_content: string;
+  }): Promise<{ plan_id: string; status: string }> {
+    const response = await fetch(`${BASE_URL}/plan/push`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to push treatment plan: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
    * Get submitted rehabilitation scale results for a session
    */
   static async getScaleResults(sessionId: string): Promise<{

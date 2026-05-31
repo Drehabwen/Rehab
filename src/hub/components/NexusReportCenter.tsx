@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Activity, ClipboardList, Compass, Layers, Mic, Sparkles, Wand2 } from 'lucide-react';
+import { Activity, ClipboardList, Compass, Layers, Mic, Send, Sparkles, Wand2 } from 'lucide-react';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionReportStore } from '@/store/useSessionReportStore';
@@ -17,6 +17,7 @@ import {
 } from '../report-center-utils';
 import { buildSessionDraftReport, buildSessionInsightCards } from '../report-center-insights';
 import { exportMarkdownToPdf } from '@/utils/exportPdf';
+import { IntegrationService } from '@/services/integrationService';
 
 // Sub-components
 import { ReportFilterPanel } from './report-center/ReportFilterPanel';
@@ -106,6 +107,8 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [selectedReportMarkdown, setSelectedReportMarkdown] = useState<string | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isPushingToParent, setIsPushingToParent] = useState(false);
+  const [pushResultMsg, setPushResultMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -316,6 +319,27 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     }
   };
 
+  const handlePushToParent = async () => {
+    if (!activeSessionInput || !currentTreatmentPlanContent) return;
+    setIsPushingToParent(true);
+    setPushResultMsg(null);
+    try {
+      const result = await IntegrationService.pushTreatmentPlan({
+        patient_id: activeSessionInput.patientId,
+        patient_name: activeSessionInput.patientName,
+        session_id: activeSessionInput.sessionId,
+        therapist_name: '康复师',
+        plan_content: currentTreatmentPlanContent,
+      });
+      setPushResultMsg(`已成功推送至家长端（处方ID: ${result.plan_id}）`);
+    } catch (err) {
+      console.error('推送治疗计划失败:', err);
+      setPushResultMsg(err instanceof Error ? err.message : '推送失败，请检查网络后重试');
+    } finally {
+      setIsPushingToParent(false);
+    }
+  };
+
   return (
     <div className="rehab-page custom-scrollbar">
       <div className="rehab-page-inner space-y-5">
@@ -338,6 +362,16 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
           actions={
             <>
               <Button variant="secondary" icon={<Wand2 size={16} />} onClick={handleGenerateTreatmentPlan} loading={isGeneratingTreatmentPlan} disabled={!generatedSessionReport}>生成康复建议</Button>
+              <Button
+                variant="primary"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_4px_12px_rgba(16,185,129,0.2)]"
+                icon={<Send size={16} />}
+                onClick={handlePushToParent}
+                loading={isPushingToParent}
+                disabled={!hasVisibleTreatmentPlan || isPushingToParent}
+              >
+                推送至家长端
+              </Button>
               <Button variant="primary" icon={<Sparkles size={16} />} onClick={handleGenerateSessionReport} loading={isGeneratingSessionReport} disabled={!activeSessionInput}>生成综合报告</Button>
             </>
           }
@@ -374,6 +408,12 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
         {treatmentPlanError && (
           <Card variant="default" padding="md" className="border-rose-200 bg-rose-50 text-rose-700">
             <div className="text-sm">{treatmentPlanError}</div>
+          </Card>
+        )}
+
+        {pushResultMsg && (
+          <Card variant="default" padding="md" className={pushResultMsg.includes('失败') ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}>
+            <div className="text-sm">{pushResultMsg}</div>
           </Card>
         )}
 
