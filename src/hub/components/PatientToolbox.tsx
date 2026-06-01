@@ -13,6 +13,7 @@ import { IntegrationService } from '@/services/integrationService';
 // Sub-components
 import { PatientInfoCard } from './patient-toolbox/PatientInfoCard';
 import { FamilyAccessManager } from './patient-toolbox/FamilyAccessManager';
+import { ParentPushCenter } from './patient-toolbox/ParentPushCenter';
 import { CompleteSessionModal } from './patient-toolbox/CompleteSessionModal';
 
 interface PatientToolboxProps {
@@ -160,6 +161,11 @@ export const PatientToolbox: React.FC<PatientToolboxProps> = ({
         />
 
         <FamilyAccessManager patient={patient} />
+
+        <ParentPushCenter
+          patient={patient}
+          sessionId={visitTask?.visitId}
+        />
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-4">
           {visitTask.modules.map((module) => {

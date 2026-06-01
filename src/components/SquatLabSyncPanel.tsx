@@ -1,21 +1,23 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { 
-  Cloud, 
-  Search, 
-  UserPlus, 
-  Link, 
-  Trash2, 
-  X, 
-  Activity, 
-  ChevronRight, 
-  AlertTriangle, 
+import {
+  Cloud,
+  Search,
+  UserPlus,
+  Link,
+  Trash2,
+  X,
+  Activity,
+  ChevronRight,
+  AlertTriangle,
   CheckCircle,
   HelpCircle,
   FileText,
   User,
   ArrowRight,
   TrendingUp,
-  RotateCw
+  RotateCw,
+  Copy,
+  Key
 } from 'lucide-react';
 import { 
   IntegrationService, 
@@ -51,6 +53,10 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
   const [actionLoading, setActionLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // 家庭码展示
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
   
   // Link to existing patient states
   const [isLinking, setIsLinking] = useState(false);
@@ -107,20 +113,24 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
   const handleImportNew = async (payload: any) => {
     setActionLoading(true);
     setError(null);
+    setGeneratedCode(null);
     try {
       const patient = await importSquatLabScreening(payload);
-      await IntegrationService.confirmScreeningIntake(payload.session_id, {
+      const result = await IntegrationService.confirmScreeningIntake(payload.session_id, {
         action: 'create_patient',
         patient_id: patient.id,
         family_code: getInitialFamilyCode(payload),
       });
-      
-      // Success feedback
+
+      // 展示生成的/返回的家庭码
+      if (result.family_code) {
+        setGeneratedCode(result.family_code);
+      }
+
       if (onImportSuccess) {
         onImportSuccess(patient.name || '新患者');
       }
-      
-      // Reset layout and refresh lists
+
       setSelectedSessionId(null);
       fetchSyncedList();
     } catch (err) {
@@ -134,18 +144,24 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
   const handleImportLink = async (payload: any, patientId: string) => {
     setActionLoading(true);
     setError(null);
+    setGeneratedCode(null);
     try {
       const patient = await importSquatLabScreening(payload, patientId);
-      await IntegrationService.confirmScreeningIntake(payload.session_id, {
+      const result = await IntegrationService.confirmScreeningIntake(payload.session_id, {
         action: 'link_existing_patient',
         patient_id: patient.id,
         family_code: getInitialFamilyCode(payload),
       });
-      
+
+      // 如果生成了新家庭码，展示出来
+      if (result.family_code) {
+        setGeneratedCode(result.family_code);
+      }
+
       if (onImportSuccess) {
         onImportSuccess(patient.name || '已绑定患者');
       }
-      
+
       setIsLinking(false);
       setSelectedSessionId(null);
       fetchSyncedList();
@@ -264,6 +280,38 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
               <p className="mt-0.5 text-xs text-red-700/90">{error}</p>
             </div>
             <button onClick={() => setError(null)} className="text-xs font-semibold text-red-500 hover:text-red-700">忽略</button>
+          </div>
+        )}
+
+        {/* 家庭码生成成功提示 */}
+        {generatedCode && (
+          <div className="m-4 flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/90 p-3.5 shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
+              <Key size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-emerald-800">家庭码已生成，请告知家长</p>
+              <p className="mt-0.5 font-mono text-lg font-bold tracking-[0.2em] text-emerald-900">{generatedCode}</p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={codeCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
+              onClick={async () => {
+                if (!generatedCode) return;
+                await navigator.clipboard.writeText(generatedCode);
+                setCodeCopied(true);
+                setTimeout(() => setCodeCopied(false), 1200);
+              }}
+            >
+              {codeCopied ? '已复制' : '复制'}
+            </Button>
+            <button
+              onClick={() => setGeneratedCode(null)}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
           </div>
         )}
 

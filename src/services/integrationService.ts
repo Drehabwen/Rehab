@@ -77,14 +77,15 @@ export interface FamilyAccessLink {
   is_expired: boolean;
 }
 
-const BASE_URL = 'http://localhost:8002/api/integration';
+// Phase 5: 统一数据后端 — 所有 API 调用走 Rehab Python (:8000) 作为唯一数据源
+const API_URL = 'http://localhost:8000/api/integration';
 
 export class IntegrationService {
   /**
    * Get all synced screenings from early screening terminal
    */
   static async getSyncedScreenings(status?: 'pending' | 'imported'): Promise<SyncedScreeningBrief[]> {
-    const url = status ? `${BASE_URL}/synced-screenings?status=${status}` : `${BASE_URL}/synced-screenings`;
+    const url = status ? `${API_URL}/synced-screenings?status=${status}` : `${API_URL}/synced-screenings`;
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch synced screenings: ${response.statusText}`);
@@ -96,7 +97,7 @@ export class IntegrationService {
    * Get detailed payload of a synced screening record
    */
   static async getSyncedScreeningDetail(sessionId: string): Promise<SyncedScreeningDetail> {
-    const response = await fetch(`${BASE_URL}/synced-screenings/${encodeURIComponent(sessionId)}`);
+    const response = await fetch(`${API_URL}/synced-screenings/${encodeURIComponent(sessionId)}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch synced screening detail: ${response.statusText}`);
     }
@@ -107,7 +108,7 @@ export class IntegrationService {
    * Mark a synced screening session as imported
    */
   static async markAsImported(sessionId: string): Promise<void> {
-    const response = await fetch(`${BASE_URL}/synced-screenings/${encodeURIComponent(sessionId)}/import`, {
+    const response = await fetch(`${API_URL}/synced-screenings/${encodeURIComponent(sessionId)}/import`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -138,7 +139,7 @@ export class IntegrationService {
     family_code?: string | null;
     alias_created: boolean;
   }> {
-    const response = await fetch(`${BASE_URL}/intake/${encodeURIComponent(sessionId)}/confirm`, {
+    const response = await fetch(`${API_URL}/intake/${encodeURIComponent(sessionId)}/confirm`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -152,10 +153,41 @@ export class IntegrationService {
   }
 
   /**
+   * Ensure a patient identity exists in the Python backend (idempotent).
+   * Call this before any family-code operation to guarantee the patient
+   * is synced regardless of creation source (manual, screening, import).
+   */
+  static async ensurePatient(patient: {
+    patient_id: string;
+    display_name?: string;
+    sex?: string;
+    age?: number | null;
+    height_cm?: number | null;
+    notes?: string;
+  }): Promise<{ status: string; patient_id: string }> {
+    const response = await fetch(`${API_URL}/patient/ensure`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patient_id: patient.patient_id,
+        display_name: patient.display_name,
+        sex: patient.sex,
+        age: patient.age,
+        height_cm: patient.height_cm,
+        notes: patient.notes,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to ensure patient: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
    * List family-code access links for a canonical patient without exposing stored hashes
    */
   static async listFamilyAccess(patientId: string): Promise<FamilyAccessLink[]> {
-    const response = await fetch(`${BASE_URL}/family/access/${encodeURIComponent(patientId)}`);
+    const response = await fetch(`${API_URL}/family/access/${encodeURIComponent(patientId)}`);
     if (!response.ok) {
       throw new Error(`Failed to list family access links: ${response.statusText}`);
     }
@@ -173,7 +205,7 @@ export class IntegrationService {
       linked_to?: string | null;
     } = {}
   ): Promise<FamilyAccessLink & { family_code: string; rotated_at: string }> {
-    const response = await fetch(`${BASE_URL}/family/access/${encodeURIComponent(patientId)}/rotate`, {
+    const response = await fetch(`${API_URL}/family/access/${encodeURIComponent(patientId)}/rotate`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -190,7 +222,7 @@ export class IntegrationService {
    * Revoke a single family-code access link
    */
   static async revokeFamilyAccess(linkId: number): Promise<FamilyAccessLink> {
-    const response = await fetch(`${BASE_URL}/family/access-link/${linkId}/revoke`, {
+    const response = await fetch(`${API_URL}/family/access-link/${linkId}/revoke`, {
       method: 'POST',
     });
     if (!response.ok) {
@@ -203,7 +235,7 @@ export class IntegrationService {
    * Extend a single family-code access link
    */
   static async extendFamilyAccess(linkId: number, expiresAt: string): Promise<FamilyAccessLink> {
-    const response = await fetch(`${BASE_URL}/family/access-link/${linkId}/extend`, {
+    const response = await fetch(`${API_URL}/family/access-link/${linkId}/extend`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -220,7 +252,7 @@ export class IntegrationService {
    * Delete a synced screening record
    */
   static async deleteSyncedScreening(sessionId: string): Promise<void> {
-    const response = await fetch(`${BASE_URL}/synced-screenings/${encodeURIComponent(sessionId)}`, {
+    const response = await fetch(`${API_URL}/synced-screenings/${encodeURIComponent(sessionId)}`, {
       method: 'DELETE',
     });
     if (!response.ok) {
@@ -238,7 +270,7 @@ export class IntegrationService {
     scale_id: 'SRS-22' | 'ODI' | 'VAS' | 'MBI' | 'Berg' | 'MMT' | 'MAS';
     therapist_name: string;
   }): Promise<{ task_id: string; status: string }> {
-    const response = await fetch(`${BASE_URL}/scale/push`, {
+    const response = await fetch(`${API_URL}/scale/push`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -264,7 +296,7 @@ export class IntegrationService {
     concerns?: string[];
     recommendations?: string[];
   }): Promise<{ summary_id: string; status: string }> {
-    const response = await fetch(`${BASE_URL}/assessment/push`, {
+    const response = await fetch(`${API_URL}/assessment/push`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -287,7 +319,7 @@ export class IntegrationService {
     therapist_name: string;
     plan_content: string;
   }): Promise<{ plan_id: string; status: string }> {
-    const response = await fetch(`${BASE_URL}/plan/push`, {
+    const response = await fetch(`${API_URL}/plan/push`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -313,9 +345,93 @@ export class IntegrationService {
     created_at: string;
     submitted_at: string | null;
   }[]> {
-    const response = await fetch(`${BASE_URL}/scale/results/${encodeURIComponent(sessionId)}`);
+    const response = await fetch(`${API_URL}/scale/results/${encodeURIComponent(sessionId)}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch scale results: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get pending scale tasks for a patient (parent-side status)
+   */
+  static async getPendingScales(patientId: string): Promise<{
+    task_id: string;
+    patient_id: string;
+    patient_name: string;
+    session_id: string;
+    scale_id: string;
+    status: string;
+    created_at: string;
+    submitted_at: string | null;
+  }[]> {
+    const response = await fetch(`${API_URL}/scale/pending/${encodeURIComponent(patientId)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch pending scales: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get latest assessment summary for a patient
+   */
+  static async getAssessmentSummary(patientId: string): Promise<{
+    summary_id: string;
+    patient_id: string;
+    patient_name: string;
+    session_id: string;
+    risk_level: string;
+    risk_label: string;
+    summary_text: string;
+    concerns: string[];
+    recommendations: string[];
+    created_at: string;
+  } | null> {
+    const response = await fetch(`${API_URL}/assessment/summary/${encodeURIComponent(patientId)}`);
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(`Failed to fetch assessment summary: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get pending treatment plans for a patient
+   */
+  static async getTreatmentPlans(patientId: string): Promise<{
+    plan_id: string;
+    patient_id: string;
+    patient_name: string;
+    therapist_name: string;
+    plan_content: string;
+    status: string;
+    created_at: string;
+    updated_at: string | null;
+  }[]> {
+    const response = await fetch(`${API_URL}/plan/pending/${encodeURIComponent(patientId)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch treatment plans: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get daily tracking history for a patient
+   */
+  static async getTrackingHistory(patientId: string): Promise<{
+    id: number;
+    patient_id: string;
+    patient_name: string;
+    tracking_date: string;
+    exercises_completed: Array<{ name: string; duration: number; completed: boolean }>;
+    total_duration_min: number;
+    symptoms: Record<string, any>;
+    notes: string;
+    submitted_at: string;
+  }[]> {
+    const response = await fetch(`${API_URL}/tracking/${encodeURIComponent(patientId)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tracking history: ${response.statusText}`);
     }
     return response.json();
   }

@@ -94,6 +94,15 @@ class IntakeConfirmPayload(BaseModel):
 class FamilyLoginPayload(BaseModel):
     family_code: str
 
+class PatientEnsurePayload(BaseModel):
+    """Idempotent patient upsert from B-end — ensures patient exists in Python DB."""
+    patient_id: str
+    display_name: Optional[str] = None
+    sex: Optional[str] = None
+    age: Optional[int] = None
+    height_cm: Optional[float] = None
+    notes: Optional[str] = None
+
 class FamilyAccessRotatePayload(BaseModel):
     family_code: Optional[str] = None
     expires_at: Optional[str] = None
@@ -101,6 +110,10 @@ class FamilyAccessRotatePayload(BaseModel):
 
 class FamilyAccessExtendPayload(BaseModel):
     expires_at: str
+
+class PlanStatusUpdatePayload(BaseModel):
+    """Phase 5: 处方状态更新"""
+    status: str = Field(..., description="pending / acknowledged / in_progress / completed")
 
 # ── Phase 3: 康复师↔家长数据通道 ──
 
@@ -526,6 +539,13 @@ def init_db():
 # Initialize DB on import
 init_db()
 
+# Phase 5: 种子数据（首次启动自动插入，幂等）
+try:
+    from seed import seed_all
+    seed_all()
+except Exception as e:
+    print(f"[Seed] Warning: seed data migration skipped ({e})")
+
 router = APIRouter(prefix="/api/integration", tags=["integration"])
 
 @router.post("/sync-screening")
@@ -758,6 +778,20 @@ async def confirm_screening_intake(session_id: str, payload: IntakeConfirmPayloa
         candidate_code = normalize_code(subject_id)
         if not family_code and 4 <= len(candidate_code) <= 6 and candidate_code.isalnum():
             family_code = candidate_code
+        # 自动生成：如果以上条件都不满足，生成随机家庭码
+        if not family_code:
+            for _ in range(8):
+                candidate = generate_family_code()
+                code_hash = hash_family_code(candidate)
+                exists = conn.execute(
+                    "SELECT id FROM patient_access_links WHERE link_type = 'family_code' AND code = ? LIMIT 1",
+                    (code_hash,),
+                ).fetchone()
+                if not exists:
+                    family_code = candidate
+                    break
+            if not family_code:
+                family_code = generate_family_code()  # 极小概率碰撞时仍尝试
         linked_family_code = upsert_family_access_link(
             conn,
             patient_id=patient_id,
@@ -1130,6 +1164,39 @@ async def family_login(payload: FamilyLoginPayload):
     finally:
         conn.close()
 
+@router.post("/patient/ensure")
+async def ensure_patient(payload: PatientEnsurePayload):
+    """
+    Idempotent patient identity upsert from B-end.
+    Ensures patient exists in Python DB regardless of creation source
+    (manual, screening, import, etc.) so family-code flows always work.
+    """
+    conn = get_db_connection()
+    try:
+        patient_id = payload.patient_id or resolve_patient_id(conn, payload.display_name or "") or generate_patient_id()
+        upsert_patient_identity(
+            conn,
+            patient_id=patient_id,
+            display_name=payload.display_name,
+            sex=payload.sex,
+            age=payload.age,
+            height_cm=payload.height_cm,
+            notes=payload.notes,
+        )
+        conn.commit()
+        return {
+            "status": "ok",
+            "patient_id": patient_id,
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to ensure patient: {str(e)}")
+    finally:
+        conn.close()
+
 @router.get("/family/access/{patient_id}")
 async def list_family_access_links(patient_id: str):
     """
@@ -1421,6 +1488,37 @@ async def get_pending_plans(patient_id: str):
         conn.close()
 
 
+@router.patch("/plan/{plan_id}/status")
+async def update_plan_status(plan_id: str, payload: PlanStatusUpdatePayload):
+    """
+    更新训练处方状态（如 pending → acknowledged → in_progress → completed）。
+    Phase 5: 从 chatbotagent Node 迁移到 Python 统一数据后端。
+    """
+    conn = get_db_connection()
+    try:
+        new_status = payload.status
+        row = conn.execute(
+            "SELECT plan_id FROM treatment_plans WHERE plan_id = ?",
+            (plan_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        now_str = datetime.now().isoformat()
+        conn.execute(
+            "UPDATE treatment_plans SET status = ?, updated_at = ? WHERE plan_id = ?",
+            (new_status, now_str, plan_id),
+        )
+        conn.commit()
+        return {"status": "success", "plan_id": plan_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update plan status: {str(e)}")
+    finally:
+        conn.close()
+
+
 # ═══ 3.3 评估摘要推送 + 拉取 ═══
 
 @router.post("/assessment/push")
@@ -1517,6 +1615,91 @@ async def get_assessment_summary(patient_id: str):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to query assessment summary: {str(e)}")
+    finally:
+        conn.close()
+
+
+@router.get("/assessment/history/{patient_id}")
+async def get_assessment_history(patient_id: str):
+    """
+    获取患者所有历史评估记录（按创建时间倒序）。
+    Phase 5: 从 chatbotagent Node 迁移到 Python 统一数据后端。
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        canonical_patient_id = resolve_patient_id(conn, patient_id) or patient_id
+        cursor.execute(
+            """
+            SELECT summary_id, patient_id, patient_name, session_id,
+                   risk_level, risk_label, summary_text,
+                   concerns, recommendations, created_at
+            FROM assessment_summaries
+            WHERE patient_id = ?
+            ORDER BY datetime(created_at) DESC
+            """,
+            (canonical_patient_id,),
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "summary_id": row["summary_id"],
+                "patient_id": row["patient_id"],
+                "patient_name": row["patient_name"],
+                "session_id": row["session_id"],
+                "risk_level": row["risk_level"] or "none",
+                "risk_label": row["risk_label"] or "",
+                "summary_text": row["summary_text"],
+                "concerns": json.loads(row["concerns"] or "[]"),
+                "recommendations": json.loads(row["recommendations"] or "[]"),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to query assessment history: {str(e)}")
+    finally:
+        conn.close()
+
+
+@router.get("/assessment/search")
+async def search_assessment_by_name(name: str):
+    """
+    按患者姓名模糊搜索评估记录。
+    Phase 5: 供 chatbotagent Node 内部调用，替代原 JSON DB 的 includes 查询。
+    """
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT summary_id, patient_id, patient_name, session_id,
+                   risk_level, risk_label, summary_text,
+                   concerns, recommendations, created_at
+            FROM assessment_summaries
+            WHERE patient_name LIKE ?
+            ORDER BY datetime(created_at) DESC
+            """,
+            (f"%{name}%",),
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "summary_id": row["summary_id"],
+                "patient_id": row["patient_id"],
+                "patient_name": row["patient_name"],
+                "session_id": row["session_id"],
+                "risk_level": row["risk_level"] or "none",
+                "risk_label": row["risk_label"] or "",
+                "summary_text": row["summary_text"],
+                "concerns": json.loads(row["concerns"] or "[]"),
+                "recommendations": json.loads(row["recommendations"] or "[]"),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to search assessments: {str(e)}")
     finally:
         conn.close()
 
