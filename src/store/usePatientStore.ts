@@ -3,10 +3,11 @@ import { db } from '@/lib/db';
 import type { Patient } from '@/types/patient';
 import { generatePatientId } from '@/lib/session-utils';
 import { formatPatientSearch } from '@/lib/patient-utils';
-import type { SyncScreeningPayload } from '@/services/integrationService';
+import { IntegrationService, type SyncScreeningPayload } from '@/services/integrationService';
 import type { Assessment, PostureAssessmentData, ScaleAssessmentData } from '@/types/assessment';
 
 const generateCanonicalPatientId = () => `pat_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
+export { generateCanonicalPatientId };
 
 interface PatientState {
   patients: Patient[];
@@ -36,18 +37,12 @@ export const usePatientStore = create<PatientState>((set, get) => ({
   addPatient: async (name?: string, predefinedId?: string): Promise<Patient> => {
     set({ isLoading: true, error: null });
 
-    let patientId = predefinedId || generatePatientId();
-    let exists = await db.patients.get(patientId);
-    let attempts = 0;
+    // 统一使用 pat_xxx 格式，与早筛导入一致
+    const patientId = predefinedId || generateCanonicalPatientId();
 
-    while (exists && attempts < 100) {
-      patientId = generatePatientId();
-      exists = await db.patients.get(patientId);
-      attempts += 1;
-    }
-
+    const exists = await db.patients.get(patientId);
     if (exists) {
-      throw new Error('无法生成唯一患者编号，请重试');
+      throw new Error('患者编号冲突，请重试');
     }
 
     const patient: Patient = {
@@ -58,6 +53,16 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     };
 
     await db.patients.add(patient);
+
+    // 同步到 Python 后端，确保患者存在于统一数据源中
+    try {
+      await IntegrationService.ensurePatient({
+        patient_id: patientId,
+        display_name: name,
+      });
+    } catch (err) {
+      console.warn('[PatientStore] Failed to sync patient to backend (non-blocking):', err);
+    }
 
     set((state) => ({
       patients: [patient, ...state.patients],

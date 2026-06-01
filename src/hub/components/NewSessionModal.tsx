@@ -1,8 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { CheckCircle, RefreshCw, Stethoscope, User, X } from 'lucide-react';
-import { usePatientStore } from '@/store/usePatientStore';
+import { generateCanonicalPatientId, usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
-import { generatePatientId } from '@/lib/session-utils';
 import { cn } from '@/lib/utils';
 
 interface NewSessionModalProps {
@@ -30,7 +29,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
   const generateNewId = () => {
     setIsGenerating(true);
     setTimeout(() => {
-      setPatientId(generatePatientId());
+      setPatientId(generateCanonicalPatientId());
       setIsGenerating(false);
     }, 200);
   };
@@ -99,8 +98,8 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
             </div>
 
             <div className="mt-2 p-4 rounded-xl bg-slate-900 text-white border border-slate-700">
-              <div className="text-2xl font-semibold tracking-[0.18em]">{patientId || '--'}</div>
-              <div className="mt-1 text-xs text-slate-400">请在后续流程中使用该编号检索患者</div>
+              <div className="text-lg font-mono font-semibold tracking-tight break-all">{patientId || '--'}</div>
+              <div className="mt-1 text-xs text-slate-400">患者唯一编号，用于全系统身份标识</div>
             </div>
           </div>
         </div>
