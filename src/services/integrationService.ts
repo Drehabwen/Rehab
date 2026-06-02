@@ -1,81 +1,10 @@
 import type { ScaleAssessmentData } from '@/types/assessment';
-
-export interface SyncSubject {
-  subject_id: string;
-  display_name: string;
-  sex: string;
-  age: number | null;
-  height_cm: number | null;
-  notes?: string;
-}
-
-export interface SyncProtocolResult {
-  result_id: string;
-  protocol: 'static_posture' | 'adams_forward_bend' | 'squat' | 'squat_screening';
-  status: string;
-  capture_quality: string;
-  metrics: Record<string, any>;
-  findings: string[];
-  risk_flags: string[];
-  recommendations: string[];
-  psi_score?: number | null;
-  severity_grades?: Record<string, string> | null;
-}
-
-export interface SyncIntegratedReport {
-  report_id: string;
-  title: string;
-  overall_risk: 'low' | 'attention' | 'review_required' | 'recapture_needed';
-  consistency_level: string;
-  main_patterns: string[];
-  next_action: string;
-  summary: string;
-  recommendations: string[];
-}
-
-export interface SyncLlmAnalysis {
-  enhanced_summary?: string | null;
-  clinical_context?: string | null;
-  risk_narrative?: string | null;
-  suggestions: string[];
-  limitations: string[];
-}
-
-export interface SyncScreeningPayload {
-  session_id: string;
-  subject: SyncSubject;
-  protocol_results: SyncProtocolResult[];
-  integrated_report?: SyncIntegratedReport | null;
-  llm_analysis?: SyncLlmAnalysis | null;
-  created_at: string;
-  completed_at?: string | null;
-}
-
-export interface SyncedScreeningBrief {
-  session_id: string;
-  subject_id: string;
-  subject_display_name: string;
-  patient_id?: string | null;
-  overall_risk: string;
-  status: 'pending' | 'imported';
-  created_at: string;
-  synced_at: string;
-}
-
-export interface SyncedScreeningDetail extends SyncedScreeningBrief {
-  payload: SyncScreeningPayload;
-}
-
-export interface FamilyAccessLink {
-  id: number;
-  patient_id: string;
-  link_type: 'family_code';
-  status: 'active' | 'revoked' | 'expired' | string;
-  linked_to?: string | null;
-  created_at: string;
-  expires_at?: string | null;
-  is_expired: boolean;
-}
+import type {
+  SyncSubject, SyncProtocolResult, SyncIntegratedReport, SyncLlmAnalysis,
+  SyncScreeningPayload, SyncedScreeningBrief, SyncedScreeningDetail,
+  FamilyAccessLink, ParentReportResult,
+  PatientReminders, AllRemindersResponse,
+} from './integrationService.types';
 
 // Phase 5: 统一数据后端 — 所有 API 调用走 Rehab Python (:8000) 作为唯一数据源
 const API_URL = 'http://localhost:8000/api/integration';
@@ -127,6 +56,8 @@ export class IntegrationService {
     payload: {
       action: 'create_patient' | 'link_existing_patient';
       patient_id?: string | null;
+      patient_code?: string | null;
+      short_code?: string | null;
       family_code?: string | null;
       family_code_expires_at?: string | null;
       suc?: string | null;
@@ -135,6 +66,8 @@ export class IntegrationService {
     status: string;
     session_id: string;
     patient_id: string;
+    patient_code?: string | null;
+    short_code?: string | null;
     subject_id: string;
     family_code?: string | null;
     alias_created: boolean;
@@ -164,7 +97,9 @@ export class IntegrationService {
     age?: number | null;
     height_cm?: number | null;
     notes?: string;
-  }): Promise<{ status: string; patient_id: string }> {
+    patient_code?: string;
+    short_code?: string;
+  }): Promise<{ status: string; patient_id: string; patient_code?: string | null; short_code?: string | null }> {
     const response = await fetch(`${API_URL}/patient/ensure`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -175,6 +110,8 @@ export class IntegrationService {
         age: patient.age,
         height_cm: patient.height_cm,
         notes: patient.notes,
+        patient_code: patient.patient_code || patient.short_code || null,
+        short_code: patient.short_code || null,
       }),
     });
     if (!response.ok) {
@@ -234,7 +171,7 @@ export class IntegrationService {
   /**
    * Extend a single family-code access link
    */
-  static async extendFamilyAccess(linkId: number, expiresAt: string): Promise<FamilyAccessLink> {
+  static async extendFamilyAccess(linkId: number, expiresAt: string | null): Promise<FamilyAccessLink> {
     const response = await fetch(`${API_URL}/family/access-link/${linkId}/extend`, {
       method: 'POST',
       headers: {
@@ -267,7 +204,7 @@ export class IntegrationService {
     patient_id: string;
     patient_name?: string;
     session_id: string;
-    scale_id: 'SRS-22' | 'ODI' | 'VAS' | 'MBI' | 'Berg' | 'MMT' | 'MAS';
+    scale_id: 'SRS-22' | 'ODI' | 'VAS' | 'MBI' | 'Berg' | 'MMT' | 'MAS' | 'HAM-A';
     therapist_name: string;
   }): Promise<{ task_id: string; status: string }> {
     const response = await fetch(`${API_URL}/scale/push`, {
@@ -348,6 +285,27 @@ export class IntegrationService {
     const response = await fetch(`${API_URL}/scale/results/${encodeURIComponent(sessionId)}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch scale results: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /**
+   * Get all scale tasks/results for a patient, including completed parent submissions.
+   */
+  static async getScaleResultsByPatient(patientId: string, status?: 'pending' | 'completed'): Promise<{
+    task_id: string;
+    patient_id: string;
+    session_id: string;
+    scale_id: string;
+    status: 'pending' | 'completed' | 'imported';
+    scale_data: ScaleAssessmentData | null;
+    created_at: string;
+    submitted_at: string | null;
+  }[]> {
+    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+    const response = await fetch(`${API_URL}/scale/results/by-patient/${encodeURIComponent(patientId)}${query}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch patient scale results: ${response.statusText}`);
     }
     return response.json();
   }
@@ -435,4 +393,44 @@ export class IntegrationService {
     }
     return response.json();
   }
+
+  /**
+   * Get parent-submitted self-screening/report evidence for a patient
+   */
+  static async getParentReports(patientId: string): Promise<ParentReportResult[]> {
+    const response = await fetch(`${API_URL}/parent-report/${encodeURIComponent(patientId)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch parent reports: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  // ── Reminder System ──
+
+  /** 单条提醒 */
+  static async getReminders(patientId: string): Promise<PatientReminders> {
+    const response = await fetch(`${API_URL}/reminders/${encodeURIComponent(patientId)}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch reminders: ${response.statusText}`);
+    }
+    return response.json();
+  }
+
+  /** 所有患者的提醒汇总 */
+  static async getAllReminders(): Promise<AllRemindersResponse> {
+    const response = await fetch(`${API_URL}/reminders`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch all reminders: ${response.statusText}`);
+    }
+    return response.json();
+  }
 }
+
+// ── Re-exports from types module ──
+export type {
+  SyncSubject, SyncProtocolResult, SyncIntegratedReport, SyncLlmAnalysis,
+  SyncScreeningPayload, SyncedScreeningBrief, SyncedScreeningDetail,
+  FamilyAccessLink, ParentReportResult,
+  ReminderItem, PatientReminders, AllRemindersResponse,
+} from './integrationService.types';
+export { SCALE_INTERVALS, PLAN_INTERVAL_DAYS, ASSESSMENT_INTERVAL_DAYS } from './integrationService.types';

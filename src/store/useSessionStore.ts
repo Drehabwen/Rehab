@@ -41,7 +41,8 @@ export const useSessionStore = create<SessionState>((set, get) => ({
     set({ isLoading: true, error: null });
 
     const sequence = await get().getNextSequence(patientId);
-    const sessionId = generateSessionId(patientId, sequence);
+    const patient = await db.patients.get(patientId);
+    const sessionId = generateSessionId(patient?.shortCode || patientId, sequence);
 
     const session: Session = {
       id: sessionId,

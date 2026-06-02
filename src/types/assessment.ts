@@ -44,7 +44,7 @@ export interface ScaleAnswer {
 }
 
 export interface ScaleAssessmentData {
-  scaleId: 'SRS-22' | 'ODI' | 'VAS' | 'MBI' | 'Berg' | 'MMT' | 'MAS';
+  scaleId: 'SRS-22' | 'ODI' | 'VAS' | 'MBI' | 'Berg' | 'MMT' | 'MAS' | 'HAM-A';
   scaleName: string;
   filledBy: 'therapist' | 'patient' | 'parent';
   totalScore: number;

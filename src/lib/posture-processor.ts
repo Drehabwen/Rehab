@@ -125,11 +125,21 @@ export class PostureProcessor {
       const nose = landmarks[0];
       const midShoulderX = (leftShoulder.x + rightShoulder.x) / 2;
       metrics.headDeviation = (nose.x - midShoulderX) * 100; // Normalized deviation
+
+      // Head Roll (ear-to-ear angle)
+      const leftEar = landmarks[7];
+      const rightEar = landmarks[8];
+      if (leftEar && rightEar) {
+        metrics.headRoll = Math.atan2(
+          rightEar.y - leftEar.y,
+          rightEar.x - leftEar.x
+        ) * (180 / Math.PI);
+      }
     } else if (view === 'side') {
-      // Forward Head (Ear to Shoulder)
-      const ear = landmarks[7]; // Left ear for side view
+      // Forward Head (Ear Midpoint to Shoulder)
+      const earMidX = (landmarks[7].x + landmarks[8].x) / 2;
       const shoulder = landmarks[11];
-      metrics.headForward = (ear.x - shoulder.x) * 100;
+      metrics.headForward = (earMidX - shoulder.x) * 100;
 
       // Shoulder Roundedness
       // Approximate using distance between shoulder and ear in Z-plane if available, 

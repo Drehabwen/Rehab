@@ -1,6 +1,6 @@
 # Patient Identity Contract
 
-Last verified: 2026-05-30
+Last verified: 2026-06-01
 
 This document defines the patient identity contract for the screening-to-rehab closed loop. It is the source of truth for how `早筛`, `Rehab-main`, and `chatbotagent` should identify the same child across screening, therapist review, parent access, scale tasks, reports, prescriptions, and follow-up tracking.
 
@@ -9,6 +9,7 @@ This document defines the patient identity contract for the screening-to-rehab c
 The patient is not one loose ID string. The patient is an identity component made of:
 
 - one internal primary identity
+- one public patient code
 - one or more external aliases
 - one or more access credentials
 - one profile snapshot for display and matching assistance
@@ -24,6 +25,7 @@ All assessments, sessions, reports, scale tasks, treatment plans, parent submiss
 | Field | Meaning | Owner | Can be primary key? | Notes |
 | --- | --- | --- | --- | --- |
 | `patient_id` | Rehab system patient primary identity | `Rehab-main` | Yes | Stable internal ID. All B-end and C-end business records should converge here. |
+| `patient_code` / `short_code` | Public four-letter child file code | `Rehab-main` | No | Shared visible code for early screening, therapist workbench, parent-side display, search, visit labels, and handoff. `short_code` is the current compatibility field name. |
 | `subject_id` | Early screening subject identity | `早筛` | No | External alias only. It can change by source system and should not own rehab records. |
 | `suc` / `display_code` | Human-readable clinical circulation code | `Rehab-main` | No | Good for search, labels, reports, and offline handoff. It may use Luhn validation. |
 | `family_code` | Parent / guardian access code | `Rehab-main` | No | Access credential. It should be revocable and preferably expirable. |
@@ -35,6 +37,7 @@ All assessments, sessions, reports, scale tasks, treatment plans, parent submiss
 ```ts
 interface PatientIdentity {
   patient_id: string;
+  patient_code: string;
   suc?: string;
   profile: {
     display_name: string;
@@ -94,6 +97,8 @@ The early screening terminal should send:
 
 It should not invent or own `patient_id`.
 
+After B-end confirmation, early screening may store the returned `patient_code` for cross-terminal display and manual handoff.
+
 ### Stage 2: B-End Intake
 
 When `Rehab-main` receives a screening payload:
@@ -132,6 +137,8 @@ family_code -> active access link -> patient_id -> patient profile and allowed r
 
 The C-end store may keep `patient_id` after successful login, but only after the backend has resolved it from a valid access credential.
 
+The C-end may display `patient_code`, but it should not treat it as a login secret.
+
 ### Stage 5: C-End Submissions
 
 The C-end should submit:
@@ -158,6 +165,21 @@ Recommended rules:
 - do not expose raw database primary keys as public patient IDs
 - keep `patient_id` stable for the lifetime of the patient record
 - if records are merged, preserve old IDs as `legacy_patient_id` aliases
+
+Recommended `patient_code` format:
+
+```text
+Four uppercase letters, for example KJHT
+```
+
+Rules:
+
+- generate `patient_code` in `Rehab-main`
+- keep it stable for the lifetime of the patient record
+- use it for therapist-facing and parent-facing display/search
+- use `patient_code-001`, `patient_code-002`, ... as the visible visit code
+- do not use it as the parent login credential
+- expose `patient_code` in APIs; keep accepting `short_code` during migration
 
 Recommended `suc` / display code format:
 

@@ -32,7 +32,11 @@ export const PatientInfoCard: React.FC<PatientInfoCardProps> = ({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-xl font-semibold text-slate-900">{getPatientDisplayName(patient)}</h2>
-              <span className="text-sm text-slate-400">ID {patient.id}</span>
+              {patient.shortCode && (
+                <span className="rounded-md bg-slate-900 px-2 py-0.5 font-mono text-xs font-bold tracking-[0.15em] text-white">
+                  {patient.shortCode}
+                </span>
+              )}
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               当前围绕本次接诊完成体态评估、ROM 评估、语音问诊和量表评估。页面只负责完成评估任务，报告查看与导出统一在报告中心完成。

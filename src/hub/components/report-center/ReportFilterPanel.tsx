@@ -85,7 +85,7 @@ export const ReportFilterPanel: React.FC<ReportFilterPanelProps> = ({
               <div
                 key={label}
                 className={cn(
-                  'rounded-xl border px-1 py-2 text-center text-[10px] font-bold transition-all duration-200 truncate',
+                  'rounded-xl border px-1 py-2 text-center text-xs font-bold transition-all duration-200 truncate',
                   isReady
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-[0_2px_8px_rgba(16,185,129,0.08)]'
                     : isPartial

@@ -191,7 +191,7 @@ export class DataProcessor {
     const lAnkle = getPt(27), rAnkle = getPt(28);
     const midAnkleX = (lAnkle.x + rAnkle.x) / 2;
     const nose = getPt(0);
-    const swayOffset = (nose.x - midAnkleX) * 1000; // 转化为毫米量级
+    const swayOffset = (nose.x - midAnkleX) * 100; // 转化为毫米量级
 
     // 肩部倾斜角
     const lShoulder = getPt(11), rShoulder = getPt(12);

@@ -25,6 +25,13 @@ export class RehabDatabase extends Dexie {
       assessments: 'id, sessionId, patientId, type, mode, status, createdAt, [patientId+createdAt], [patientId+status]',
       sessionReports: 'id, sessionId, patientId, createdAt, [patientId+createdAt], [sessionId+createdAt]',
     });
+
+    this.version(4).stores({
+      patients: 'id, shortCode, name, createdAt',
+      sessions: 'id, patientId, sequence, createdAt, [patientId+createdAt]',
+      assessments: 'id, sessionId, patientId, type, mode, status, createdAt, [patientId+createdAt], [patientId+status]',
+      sessionReports: 'id, sessionId, patientId, createdAt, [patientId+createdAt], [sessionId+createdAt]',
+    });
   }
 }
 

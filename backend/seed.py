@@ -23,6 +23,8 @@ if sys.platform == 'win32':
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rehab_integration.db")
 FAMILY_CODE_HASH_NAMESPACE = "rehab-family-code:v1:"
 FAMILY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+SHORT_CODE_ALPHABET = "ABCDEFGHJKLMNPRTUVWXYZ"  # 20字符，无 I/O/Q 防混淆
+SHORT_CODE_LENGTH = 4
 
 
 def get_db_connection():
@@ -43,6 +45,11 @@ def generate_family_code(length: int = 6) -> str:
     return "".join(secrets.choice(FAMILY_CODE_ALPHABET) for _ in range(length))
 
 
+def generate_short_code() -> str:
+    """生成4位大写字母临床短码"""
+    return "".join(secrets.choice(SHORT_CODE_ALPHABET) for _ in range(SHORT_CODE_LENGTH))
+
+
 def seed_all():
     conn = get_db_connection()
     try:
@@ -61,22 +68,24 @@ def seed_all():
         existing = conn.execute("SELECT COUNT(*) as cnt FROM patients").fetchone()
         if existing["cnt"] == 0:
             print("[Seed] Inserting test patients...")
+            short_code_1 = generate_short_code()
+            short_code_2 = generate_short_code()
             conn.execute(
                 """
-                INSERT INTO patients (patient_id, display_name, sex, age, height_cm, notes, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO patients (patient_id, short_code, display_name, sex, age, height_cm, notes, suc, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (patient_1_id, "小明", "male", 9, 135, "测试患者 - 中度脊柱侧弯风险", now_str, now_str),
+                (patient_1_id, short_code_1, "小明", "male", 9, 135, "测试患者 - 中度脊柱侧弯风险", None, now_str, now_str),
             )
             conn.execute(
                 """
-                INSERT INTO patients (patient_id, display_name, sex, age, height_cm, notes, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO patients (patient_id, short_code, display_name, sex, age, height_cm, notes, suc, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (patient_2_id, "小红", "female", 12, 152, "测试患者 - 轻度姿态异常", now_str, now_str),
+                (patient_2_id, short_code_2, "小红", "female", 12, 152, "测试患者 - 轻度姿态异常", None, now_str, now_str),
             )
             conn.commit()
-            print(f"  ✅ 患者: 小明 (P00001), 小红 (P00002)")
+            print(f"  ✅ 患者: 小明 (P00001, {short_code_1}), 小红 (P00002, {short_code_2})")
         else:
             print("[Seed] Patients table already has data — skipped")
 

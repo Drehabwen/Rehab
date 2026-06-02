@@ -129,8 +129,8 @@ def analyze_posture(
             pitch = math.degrees(math.atan2(head_vec["y"], -head_vec["z"]))
 
         roll = math.degrees(math.atan2(
-            left_ear_lm.y - right_ear_lm.y,
-            left_ear_lm.x - right_ear_lm.x
+            right_ear_lm.y - left_ear_lm.y,
+            right_ear_lm.x - left_ear_lm.x
         ))
 
         metrics.headYaw = round(yaw, 1)

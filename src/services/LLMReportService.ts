@@ -33,7 +33,7 @@ export class LLMReportService {
 
   private async callLLM(prompt: string): Promise<any> {
     const requestBody = {
-      model: APP_CONFIG.LLM_MODEL || 'deepseek-chat',
+      model: APP_CONFIG.LLM_MODEL || 'deepseek-v4-flash',
       messages: [
         {
           role: 'system',

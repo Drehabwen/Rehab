@@ -34,7 +34,7 @@ export const ModuleResultsGrid: React.FC<ModuleResultsGridProps> = ({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400">模块结果</div>
+            <div className="text-xs font-semibold tracking-[0.14em] text-slate-400">模块结果</div>
             <h2 className="mt-1 text-lg font-semibold text-slate-900">评估结果</h2>
             <p className="mt-1 text-sm text-slate-500">整合同一接诊下的体态、ROM、语音问诊及量表评估结构化结论。</p>
           </div>

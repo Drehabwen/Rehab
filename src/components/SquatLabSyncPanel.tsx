@@ -119,6 +119,8 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
       const result = await IntegrationService.confirmScreeningIntake(payload.session_id, {
         action: 'create_patient',
         patient_id: patient.id,
+        patient_code: patient.shortCode,
+        short_code: patient.shortCode,
         family_code: getInitialFamilyCode(payload),
       });
 
@@ -150,6 +152,8 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
       const result = await IntegrationService.confirmScreeningIntake(payload.session_id, {
         action: 'link_existing_patient',
         patient_id: patient.id,
+        patient_code: patient.shortCode,
+        short_code: patient.shortCode,
         family_code: getInitialFamilyCode(payload),
       });
 
@@ -203,6 +207,7 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
     if (!q) return patients.slice(0, 10); // Display top 10 as default
     return patients.filter(p => 
       (p.name && p.name.toLowerCase().includes(q)) || 
+      (p.shortCode && p.shortCode.toLowerCase().includes(q)) ||
       p.id.toLowerCase().includes(q)
     );
   }, [patients, patientSearchQuery]);
@@ -582,7 +587,7 @@ export const SquatLabSyncPanel: React.FC<SquatLabSyncPanelProps> = ({
                             >
                               <div>
                                 <span className="font-bold text-slate-800">{p.name || '未命名'}</span>
-                                <span className="text-[10px] text-slate-400 ml-2">ID: {p.id}</span>
+                                <span className="text-[10px] text-slate-400 ml-2">编码: {p.shortCode || p.id}</span>
                               </div>
                               <ArrowRight size={13} className="text-blue-500" />
                             </div>

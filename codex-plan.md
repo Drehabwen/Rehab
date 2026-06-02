@@ -252,3 +252,132 @@
   - `npm run check` in `Rehab-main` passed.
   - `npm run build` in `chatbotagent` passed.
   - `git diff --check` passed in both touched repos with CRLF warnings only.
+
+## Current Task: Public Patient Code Unification
+
+### Objective
+- Make the four-letter public patient code the shared visible identifier across screening, therapist workbench, visit cards, reports, and parent login responses while keeping `patient_id` as the hidden canonical key.
+
+### Constraints
+- Do not make the public patient code a login credential.
+- Keep family access codes private, revocable, and separate from the public patient code.
+- Preserve existing `short_code` / `shortCode` compatibility while documenting the product name as `patient_code`.
+- Avoid committing local SQLite test data changes.
+
+### Steps
+- [completed] Inspect current partial `short_code` implementation and existing dirty files.
+- [completed] Patch frontend code generation, display labels, search, and visit-code construction.
+- [completed] Patch backend/API payloads to return `patient_code` alongside legacy `short_code`.
+- [completed] Update identity/closed-loop docs with the public-code contract.
+- [completed] Run targeted verification and record residual risk.
+
+### Verification
+- `python -m py_compile backend/routers/integration.py backend/tests/test_identity_contract.py`
+- `python -m pytest tests/test_identity_contract.py -q -s`
+- `python -m pytest tests/test_router_integration.py tests/test_identity_contract.py tests/test_scale_integration.py -q -s`
+- `npm run check` in `Rehab-main`
+- `npm run build` in `RehabGPT-feat-biz`
+- `git diff --check` in both touched repos
+
+### Outcome
+- Implemented.
+- Backend now accepts and returns `patient_code` as the product-facing alias for the four-letter public code, while preserving `short_code` compatibility.
+- `patient_id` remains the canonical hidden primary key; public patient codes can resolve API reads/pushes but cannot log in as family credentials.
+- Therapist workbench now generates/stores/searches/displays the four-letter public patient code, and visible visit codes derive from that code.
+- Parent login now receives and displays `patient_code` / `short_code`, but still authenticates only through the family access code.
+- Documentation updated across the identity contract, API specification, and closed-loop workflow.
+- Verification passed:
+  - Backend identity tests and integration closed-loop tests passed.
+  - `Rehab-main` type check passed.
+  - `RehabGPT-feat-biz` production build passed.
+  - `git diff --check` passed in both touched repos with CRLF warnings only.
+- Residual risk:
+  - `backend/rehab_integration.db` remains a local/test database change from verification and should not be committed unless intentionally refreshing fixture data.
+
+## Current Task: Parent Plan Translation Layer Implementation
+
+### Objective
+- Complete the therapist plan to parent-friendly execution guide path, so family users see actionable training instructions without changing the therapist's original prescription.
+
+### Constraints
+- Keep `plan_content` as the source-of-truth therapist prescription.
+- Translation may explain and structure, but must not alter action names, dosage, frequency, or safety boundaries.
+- Use the existing Python `/api/integration/plan/pending/{patient_id}` data path.
+- Support gray release without an LLM key by providing a rule/template fallback.
+- Preserve other dirty changes and avoid committing local SQLite test data.
+
+### Steps
+- [completed] Audit the existing translation module and family plan UI.
+- [completed] Add backend rule fallback for structured parent plan explanations.
+- [completed] Add C-end parsing/rendering for translated or fallback parent explanations.
+- [completed] Wire homepage/training page copy to parent-friendly summaries.
+- [completed] Run backend/frontend verification and record outcome.
+
+### Verification
+- `python -m py_compile backend/routers/integration.py backend/translation/*.py backend/translation/prompts/*.py`
+- `python -m pytest tests/test_identity_contract.py -q -s`
+- `npm run build` in `RehabGPT-feat-biz`
+- `git diff --check` in touched repos
+
+### Outcome
+- Implemented.
+- Backend `/api/integration/plan/push` now stores `translated_plan_content` for parent-facing plan explanations, with a rule/template fallback when LLM generation is unavailable.
+- The fallback extracts only explicit bullet/numbered exercise rows, preserves source dosage/cautions, and returns structured fields for title, focus, estimated time, exercises, stop conditions, and therapist-contact triggers.
+- C-end now parses `translated_plan_content` and renders a parent-friendly execution guide in the training/tracking and prescription pages, while keeping the therapist's original `plan_content` visible in a folded section.
+- C-end home action cards now use the parent explanation title, focus, and estimated duration instead of raw therapist prose.
+- Verification passed:
+  - `python -m py_compile backend\routers\integration.py backend\tests\test_identity_contract.py backend\translation\types.py backend\translation\config.py backend\translation\cache.py backend\translation\service.py backend\translation\prompts\plan_prompt.py backend\translation\prompts\scale_prompt.py backend\translation\prompts\assessment_prompt.py`
+  - `python -m pytest tests/test_router_integration.py tests/test_identity_contract.py tests/test_scale_integration.py -q -s`
+  - `npm run build` in `RehabGPT-feat-biz`
+  - Browser smoke test on local Vite `:5181` confirmed the family training page renders the parent guide, safety panels, action cards, and original-plan folded section without console errors.
+- Residual risk:
+  - The already-running Python service on `:8000` must be restarted after deploy to pick up the updated translation fallback.
+  - `backend/rehab_integration.db` remains local test data and should not be committed unless intentionally refreshing the fixture database.
+
+## Current Task: Parent Return Channel And Stable Family Code
+
+### Objective
+- Make parent-submitted scale/tracking/report evidence recoverable from the therapist workspace by patient, and change family-code handling from periodic rotation to stable long-lived access.
+
+### Constraints
+- Keep `patient_id` as the canonical grouping key for returned family evidence.
+- Preserve existing `/scale/results/{session_id}` compatibility.
+- Keep parent self-screening reports separate from therapist-authored assessment summaries.
+- Do not force periodic `family_code` expiry or rotation; rotation is only manual reset for loss/leak.
+- Keep stored family codes hashed and never expose hashes.
+- Avoid committing local SQLite test data.
+
+### Steps
+- [completed] Inspect current return paths for scale results, tracking, and family access UI.
+- [completed] Add patient-scoped scale result retrieval to the integration backend.
+- [completed] Update therapist-side parent data panel to show pending and completed returned scale evidence.
+- [completed] Change family-code UI defaults to long-lived access and manual reset/revoke language.
+- [completed] Extend backend tests and run verification.
+- [completed] Add a separate parent-report return channel for family self-screening results.
+
+### Verification
+- `python -m py_compile backend/routers/integration.py backend/tests/test_identity_contract.py`
+- `python -m pytest tests/test_identity_contract.py -q -s`
+- `npm run check` in `Rehab-main`
+- `git diff --check`
+
+### Outcome
+- Added `GET /api/integration/scale/results/by-patient/{patient_id}` so therapist-side views can recover parent-submitted scale evidence by canonical patient after refresh or context switching. The endpoint accepts canonical `patient_id`, short code, or family code aliases and can filter `pending` / `completed`.
+- Updated therapist-side parent push/feedback UI to load all patient scale tasks instead of only pending tasks, with separate pending/completed counts, returned score display, and submitted timestamp.
+- Changed family-code handling to long-lived access by default: auto-generated and manually reset codes now use `expires_at = null`; old expiring links can be set back to long-term with the existing extend endpoint.
+- Added a separate `parent_reports` return channel for family self-screening reports, with `POST /api/integration/parent-report/submit` and `GET /api/integration/parent-report/{patient_id}`. This keeps parent-generated reports distinct from therapist-authored assessment summaries.
+- Updated the parent app result page to submit local self-screening risk results back to the integration backend once per patient/session/result signature.
+- Updated the therapist feedback panel to show the latest parent self-screening report alongside returned scales and daily tracking.
+- Added regression coverage for parent scale return by patient/family code, parent-report return/update, and family-code long-term extension.
+- Verification passed:
+  - `python -m py_compile backend\routers\integration.py backend\tests\test_identity_contract.py`
+  - `python -m pytest tests\test_identity_contract.py -q -s` from `backend`
+  - `npm run check`
+  - `npm run build` in `RehabGPT-feat-biz`
+  - `git diff --check`
+- Local runtime check:
+  - Confirmed `GET http://localhost:8000/api/integration/scale/results/by-patient/__codex_probe__` returns `200 []`.
+  - Confirmed the new parent-report route returns `200 []` on a temporary clean backend instance on `:8010`.
+  - Runtime caveat: local `:8000` still has an old listener mapped to PID `3388`, but Windows process tools cannot find that PID (`taskkill` also reports not found). Clear that listener or restart the local environment before live-testing the new parent-report endpoint on `:8000`.
+  - Refreshed the therapist Vite app on `http://localhost:5173/` and the parent Vite app on `http://localhost:5175/`; no browser console errors were observed.
+- Open product decision: returned parent scale data is displayed in the therapist workspace, but not auto-imported into the local report assessment table yet. Auto-import needs an idempotent import marker or explicit "include in report" action to avoid duplicate assessment records.

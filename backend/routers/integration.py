@@ -4,10 +4,16 @@ import os
 import uuid
 import hashlib
 import secrets
+import logging
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
+
+# Phase 6: 统一翻译层
+from translation import get_translation_service, PatientContext
+
+logger = logging.getLogger(__name__)
 
 # Define Pydantic Models for Schema Validation
 
@@ -87,6 +93,8 @@ class ScaleSubmitPayload(BaseModel):
 class IntakeConfirmPayload(BaseModel):
     action: str = Field(..., description="create_patient or link_existing_patient")
     patient_id: Optional[str] = None
+    patient_code: Optional[str] = None
+    short_code: Optional[str] = None
     family_code: Optional[str] = None
     family_code_expires_at: Optional[str] = None
     suc: Optional[str] = None
@@ -97,11 +105,13 @@ class FamilyLoginPayload(BaseModel):
 class PatientEnsurePayload(BaseModel):
     """Idempotent patient upsert from B-end — ensures patient exists in Python DB."""
     patient_id: str
+    patient_code: Optional[str] = None
     display_name: Optional[str] = None
     sex: Optional[str] = None
     age: Optional[int] = None
     height_cm: Optional[float] = None
     notes: Optional[str] = None
+    short_code: Optional[str] = None  # 前端可预生成短码，留空则后端自动生成
 
 class FamilyAccessRotatePayload(BaseModel):
     family_code: Optional[str] = None
@@ -109,7 +119,7 @@ class FamilyAccessRotatePayload(BaseModel):
     linked_to: Optional[str] = None
 
 class FamilyAccessExtendPayload(BaseModel):
-    expires_at: str
+    expires_at: Optional[str] = None
 
 class PlanStatusUpdatePayload(BaseModel):
     """Phase 5: 处方状态更新"""
@@ -132,6 +142,7 @@ class TreatmentPlanBrief(BaseModel):
     patient_name: Optional[str] = None
     therapist_name: Optional[str] = None
     plan_content: str
+    translated_plan_content: Optional[str] = None  # Phase 6: 家长友好版
     status: str
     created_at: str
     updated_at: Optional[str] = None
@@ -156,9 +167,37 @@ class AssessmentSummaryResponse(BaseModel):
     risk_level: str
     risk_label: str
     summary_text: str
+    translated_summary_text: Optional[str] = None  # Phase 6: 家长友好版
     concerns: List[str] = []
     recommendations: List[str] = []
     created_at: str
+
+class ParentReportSubmitPayload(BaseModel):
+    """Parent-side self-screening/report result submitted back to therapist workspace."""
+    patient_id: str
+    patient_name: Optional[str] = None
+    session_id: Optional[str] = None
+    report_type: str = "self_screening"
+    risk_level: str = "none"
+    risk_label: str = ""
+    summary_text: str = ""
+    recommendation: Optional[str] = None
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    source: str = "parent"
+
+class ParentReportResponse(BaseModel):
+    report_id: str
+    patient_id: str
+    patient_name: Optional[str] = None
+    session_id: str
+    report_type: str
+    risk_level: str
+    risk_label: str
+    summary_text: str
+    recommendation: Optional[str] = None
+    payload: Dict[str, Any] = Field(default_factory=dict)
+    source: str
+    submitted_at: str
 
 class TrackingSubmitPayload(BaseModel):
     """C端家长提交每日打卡数据"""
@@ -187,6 +226,11 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 FAMILY_CODE_HASH_NAMESPACE = "rehab-family-code:v1:"
 FAMILY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
+# 临床短码：4位大写字母，用于康复师日常标识患者（白板、叫号、记录）
+# 与家长码分离——短码是公开的内部索引，家长码是私密的登录凭证
+SHORT_CODE_ALPHABET = "ABCDEFGHJKLMNPRTUVWXYZ"  # 20字符，无 I/O/Q 防混淆
+SHORT_CODE_LENGTH = 4
+
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -208,6 +252,18 @@ def is_family_code_hash(value: Optional[str]) -> bool:
 def generate_family_code(length: int = 6) -> str:
     return "".join(secrets.choice(FAMILY_CODE_ALPHABET) for _ in range(length))
 
+def generate_short_code() -> str:
+    """生成4位大写字母临床短码（20^4 ≈ 16万种组合）"""
+    return "".join(secrets.choice(SHORT_CODE_ALPHABET) for _ in range(SHORT_CODE_LENGTH))
+
+def normalize_patient_code(value: Optional[str]) -> Optional[str]:
+    code = normalize_code(value)
+    if len(code) != SHORT_CODE_LENGTH:
+        return None
+    if any(char not in SHORT_CODE_ALPHABET for char in code):
+        return None
+    return code
+
 def generate_patient_id() -> str:
     return f"pat_{uuid.uuid4().hex[:12]}"
 
@@ -227,17 +283,28 @@ def upsert_patient_identity(
     height_cm: Optional[float] = None,
     notes: Optional[str] = None,
     suc: Optional[str] = None,
+    short_code: Optional[str] = None,
 ) -> None:
     now_str = datetime.now().isoformat()
+    short_code = normalize_patient_code(short_code)
     existing = conn.execute(
-        "SELECT patient_id FROM patients WHERE patient_id = ?",
+        "SELECT patient_id, short_code FROM patients WHERE patient_id = ?",
         (patient_id,),
     ).fetchone()
     if existing:
+        if short_code and not existing["short_code"]:
+            conflict = conn.execute(
+                "SELECT patient_id FROM patients WHERE short_code = ? AND patient_id <> ? LIMIT 1",
+                (short_code, patient_id),
+            ).fetchone()
+            if conflict:
+                short_code = None
+        # 更新时不覆盖已有 short_code（短码终身不变）
         conn.execute(
             """
             UPDATE patients
-            SET display_name = COALESCE(?, display_name),
+            SET short_code = COALESCE(short_code, ?),
+                display_name = COALESCE(?, display_name),
                 sex = COALESCE(?, sex),
                 age = COALESCE(?, age),
                 height_cm = COALESCE(?, height_cm),
@@ -246,17 +313,38 @@ def upsert_patient_identity(
                 updated_at = ?
             WHERE patient_id = ?
             """,
-            (display_name, sex, age, height_cm, notes, suc, now_str, patient_id),
+            (short_code, display_name, sex, age, height_cm, notes, suc, now_str, patient_id),
         )
         return
+
+    # 新建患者：如果没有提供 short_code，自动生成唯一短码
+    if short_code:
+        conflict = conn.execute(
+            "SELECT patient_id FROM patients WHERE short_code = ? LIMIT 1",
+            (short_code,),
+        ).fetchone()
+        if conflict:
+            short_code = None
+    if not short_code:
+        for _ in range(8):
+            candidate = generate_short_code()
+            existing_code = conn.execute(
+                "SELECT patient_id FROM patients WHERE short_code = ? LIMIT 1",
+                (candidate,),
+            ).fetchone()
+            if not existing_code:
+                short_code = candidate
+                break
+        if not short_code:
+            short_code = generate_short_code()  # 极小概率碰撞时仍使用
 
     conn.execute(
         """
         INSERT INTO patients (
-            patient_id, display_name, sex, age, height_cm, notes, suc, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            patient_id, short_code, display_name, sex, age, height_cm, notes, suc, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (patient_id, display_name, sex, age, height_cm, notes, suc, now_str, now_str),
+        (patient_id, short_code, display_name, sex, age, height_cm, notes, suc, now_str, now_str),
     )
 
 def upsert_patient_alias(
@@ -402,6 +490,15 @@ def resolve_patient_id(conn: sqlite3.Connection, identity: Optional[str]) -> Opt
     if direct:
         return direct["patient_id"]
 
+    code = normalize_patient_code(value)
+    if code:
+        by_code = conn.execute(
+            "SELECT patient_id FROM patients WHERE short_code = ?",
+            (code,),
+        ).fetchone()
+        if by_code:
+            return by_code["patient_id"]
+
     upper_value = normalize_code(value)
     alias = conn.execute(
         """
@@ -453,6 +550,7 @@ def init_db():
         conn.execute("""
             CREATE TABLE IF NOT EXISTS patients (
                 patient_id TEXT PRIMARY KEY,
+                short_code TEXT UNIQUE,
                 display_name TEXT,
                 sex TEXT,
                 age INTEGER,
@@ -516,6 +614,22 @@ def init_db():
             )
         """)
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS parent_reports (
+                report_id TEXT PRIMARY KEY,
+                patient_id TEXT NOT NULL,
+                patient_name TEXT,
+                session_id TEXT NOT NULL,
+                report_type TEXT DEFAULT 'self_screening',
+                risk_level TEXT DEFAULT 'none',
+                risk_label TEXT DEFAULT '',
+                summary_text TEXT DEFAULT '',
+                recommendation TEXT,
+                payload TEXT DEFAULT '{}',
+                source TEXT DEFAULT 'parent',
+                submitted_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS daily_tracking (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 patient_id TEXT NOT NULL,
@@ -531,6 +645,31 @@ def init_db():
         conn.commit()
         add_column_if_missing(conn, "pending_scales", "patient_name", "TEXT")
         add_column_if_missing(conn, "synced_screenings", "patient_id", "TEXT")
+        add_column_if_missing(conn, "patients", "short_code", "TEXT")
+        # 短码唯一索引（仅在新表上创建，已存在的表通过 add_column_if_missing 保证存在即可）
+        try:
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_short_code ON patients(short_code)")
+        except sqlite3.OperationalError:
+            pass
+        # Phase 6: Translation layer — cache table + translated columns
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS translation_cache (
+                cache_key TEXT PRIMARY KEY,
+                source_type TEXT NOT NULL,
+                original_content TEXT NOT NULL,
+                translated_content TEXT NOT NULL,
+                source TEXT DEFAULT 'llm',
+                generated_at TEXT NOT NULL
+            )
+        """)
+        add_column_if_missing(conn, "treatment_plans", "translated_plan_content", "TEXT")
+        add_column_if_missing(conn, "pending_scales", "translated_scale_content", "TEXT")
+        add_column_if_missing(conn, "assessment_summaries", "translated_summary_text", "TEXT")
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_parent_reports_patient_session_type
+            ON parent_reports(patient_id, session_id, report_type)
+        """)
+
         migrate_family_access_code_hashes(conn)
         conn.commit()
     finally:
@@ -747,6 +886,7 @@ async def confirm_screening_intake(session_id: str, payload: IntakeConfirmPayloa
         display_name = subject.get("display_name") or row["subject_display_name"]
         subject_id = row["subject_id"]
         suc = payload.suc or (subject_id if normalize_code(subject_id).startswith("QY-") else None)
+        requested_patient_code = payload.patient_code or payload.short_code
 
         upsert_patient_identity(
             conn,
@@ -757,7 +897,13 @@ async def confirm_screening_intake(session_id: str, payload: IntakeConfirmPayloa
             height_cm=subject.get("height_cm"),
             notes=subject.get("notes"),
             suc=suc,
+            short_code=requested_patient_code,
         )
+        patient_row = conn.execute(
+            "SELECT short_code FROM patients WHERE patient_id = ?",
+            (patient_id,),
+        ).fetchone()
+        patient_code = patient_row["short_code"] if patient_row else None
         upsert_patient_alias(
             conn,
             patient_id=patient_id,
@@ -810,6 +956,8 @@ async def confirm_screening_intake(session_id: str, payload: IntakeConfirmPayloa
             "status": "success",
             "session_id": session_id,
             "patient_id": patient_id,
+            "patient_code": patient_code,
+            "short_code": patient_code,
             "subject_id": subject_id,
             "family_code": linked_family_code,
             "alias_created": True,
@@ -866,8 +1014,44 @@ async def push_scale_task(payload: ScalePushPayload):
             INSERT INTO pending_scales (task_id, patient_id, patient_name, session_id, scale_id, status, created_at)
             VALUES (?, ?, ?, ?, ?, 'pending', ?)
         """, (task_id, patient_id, payload.patient_name, payload.session_id, payload.scale_id, now_str))
+
+        # Phase 6: 翻译量表 → 家长友好说明
+        translated_scale_content: Optional[str] = None
+        try:
+            svc = get_translation_service()
+            patient_age = None
+            patient_sex = None
+            patient_row = conn.execute(
+                "SELECT age, sex FROM patients WHERE patient_id = ?",
+                (patient_id,),
+            ).fetchone()
+            if patient_row:
+                patient_age = patient_row["age"]
+                patient_sex = patient_row["sex"]
+            patient_ctx = PatientContext(
+                display_name=payload.patient_name or "",
+                age=patient_age,
+                sex=patient_sex,
+            )
+            result = svc.translate("scale", payload.scale_id, patient_ctx)
+            if result.structured_output:
+                translated_scale_content = json.dumps(result.structured_output, ensure_ascii=False)
+                cursor.execute(
+                    "UPDATE pending_scales SET translated_scale_content = ? WHERE task_id = ?",
+                    (translated_scale_content, task_id),
+                )
+                logger.info("Scale translation success for %s (source=%s)", task_id, result.source)
+        except Exception as exc:
+            logger.warning("Scale translation skipped for %s: %s", task_id, exc)
+
         conn.commit()
-        return {"status": "success", "task_id": task_id, "scale_id": payload.scale_id, "patient_id": patient_id}
+        return {
+            "status": "success",
+            "task_id": task_id,
+            "scale_id": payload.scale_id,
+            "patient_id": patient_id,
+            "translated": bool(translated_scale_content),
+        }
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to push scale task: {str(e)}")
@@ -884,7 +1068,8 @@ async def get_pending_scales(patient_id: str):
         cursor = conn.cursor()
         canonical_patient_id = resolve_patient_id(conn, patient_id) or patient_id
         cursor.execute("""
-            SELECT task_id, patient_id, patient_name, session_id, scale_id, status, created_at
+            SELECT task_id, patient_id, patient_name, session_id, scale_id, status,
+                   translated_scale_content, created_at
             FROM pending_scales
             WHERE patient_id = ? AND status = 'pending'
             ORDER BY datetime(created_at) DESC
@@ -898,7 +1083,8 @@ async def get_pending_scales(patient_id: str):
                 "session_id": row["session_id"],
                 "scale_id": row["scale_id"],
                 "status": row["status"],
-                "created_at": row["created_at"]
+                "translated_scale_content": row["translated_scale_content"],
+                "created_at": row["created_at"],
             }
             for row in rows
         ]
@@ -1050,7 +1236,7 @@ async def submit_scale(payload: ScaleSubmitPayload):
                 raise HTTPException(status_code=403, detail="Scale task does not belong to this patient_id")
 
         now_str = datetime.now().isoformat()
-        payload_json = json.dumps(payload.scale_data)
+        payload_json = json.dumps(payload.scale_data, ensure_ascii=False)
         
         cursor.execute("""
             UPDATE pending_scales
@@ -1069,6 +1255,62 @@ async def submit_scale(payload: ScaleSubmitPayload):
     finally:
         conn.close()
 
+def scale_result_response(row: sqlite3.Row) -> Dict[str, Any]:
+    scale_data = None
+    if row["payload"]:
+        try:
+            scale_data = json.loads(row["payload"])
+        except Exception:
+            pass
+    return {
+        "task_id": row["task_id"],
+        "patient_id": row["patient_id"],
+        "session_id": row["session_id"],
+        "scale_id": row["scale_id"],
+        "status": row["status"],
+        "scale_data": scale_data,
+        "created_at": row["created_at"],
+        "submitted_at": row["submitted_at"],
+    }
+
+
+@router.get("/scale/results/by-patient/{patient_id}")
+async def get_scale_results_by_patient(patient_id: str, status: Optional[str] = None, limit: int = 50):
+    """
+    B-End Workstation retrieves parent-submitted scale tasks by canonical patient.
+    This is recoverable after page refresh or therapist context switches.
+    """
+    conn = get_db_connection()
+    try:
+        resolved_patient_id = resolve_patient_id(conn, patient_id)
+        if not resolved_patient_id:
+            return []
+
+        normalized_status = (status or "").strip().lower()
+        params: List[Any] = [resolved_patient_id]
+        where = "patient_id = ?"
+        if normalized_status in {"pending", "completed"}:
+            where += " AND status = ?"
+            params.append(normalized_status)
+
+        safe_limit = max(1, min(int(limit or 50), 200))
+        params.append(safe_limit)
+
+        cursor = conn.cursor()
+        cursor.execute(f"""
+            SELECT task_id, patient_id, session_id, scale_id, status, payload, created_at, submitted_at
+            FROM pending_scales
+            WHERE {where}
+            ORDER BY datetime(COALESCE(submitted_at, created_at)) DESC
+            LIMIT ?
+        """, tuple(params))
+        return [scale_result_response(row) for row in cursor.fetchall()]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get patient scale results: {str(e)}")
+    finally:
+        conn.close()
+
+
 @router.get("/scale/results/{session_id}")
 async def get_scale_results(session_id: str):
     """
@@ -1084,25 +1326,7 @@ async def get_scale_results(session_id: str):
             ORDER BY datetime(created_at) DESC
         """, (session_id,))
         rows = cursor.fetchall()
-        results = []
-        for row in rows:
-            scale_data = None
-            if row["payload"]:
-                try:
-                    scale_data = json.loads(row["payload"])
-                except Exception:
-                    pass
-            results.append({
-                "task_id": row["task_id"],
-                "patient_id": row["patient_id"],
-                "session_id": row["session_id"],
-                "scale_id": row["scale_id"],
-                "status": row["status"],
-                "scale_data": scale_data,
-                "created_at": row["created_at"],
-                "submitted_at": row["submitted_at"]
-            })
-        return results
+        return [scale_result_response(row) for row in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get scale results: {str(e)}")
     finally:
@@ -1125,7 +1349,7 @@ async def family_login(payload: FamilyLoginPayload):
     try:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT l.patient_id, p.display_name, p.sex, p.age, p.height_cm, p.notes
+            SELECT l.patient_id, p.display_name, p.sex, p.age, p.height_cm, p.notes, p.short_code
             FROM patient_access_links l
             LEFT JOIN patients p ON p.patient_id = l.patient_id
             WHERE l.link_type = 'family_code'
@@ -1149,6 +1373,8 @@ async def family_login(payload: FamilyLoginPayload):
         latest_session = cursor.fetchone()
         return {
             "patient_id": row["patient_id"],
+            "patient_code": row["short_code"],
+            "short_code": row["short_code"],
             "display_name": row["display_name"],
             "sex": row["sex"] or "unknown",
             "age": row["age"],
@@ -1173,7 +1399,7 @@ async def ensure_patient(payload: PatientEnsurePayload):
     """
     conn = get_db_connection()
     try:
-        patient_id = payload.patient_id or resolve_patient_id(conn, payload.display_name or "") or generate_patient_id()
+        patient_id = payload.patient_id or generate_patient_id()
         upsert_patient_identity(
             conn,
             patient_id=patient_id,
@@ -1182,11 +1408,19 @@ async def ensure_patient(payload: PatientEnsurePayload):
             age=payload.age,
             height_cm=payload.height_cm,
             notes=payload.notes,
+            short_code=payload.patient_code or payload.short_code,
         )
+        # 读回 short_code（新生成或已有）
+        row = conn.execute(
+            "SELECT short_code FROM patients WHERE patient_id = ?",
+            (patient_id,),
+        ).fetchone()
         conn.commit()
         return {
             "status": "ok",
             "patient_id": patient_id,
+            "patient_code": row["short_code"] if row else None,
+            "short_code": row["short_code"] if row else None,
         }
     except HTTPException:
         conn.rollback()
@@ -1434,11 +1668,42 @@ async def push_treatment_plan(payload: TreatmentPlanPushPayload):
                 now_str,
             ),
         )
+
+        # Phase 6: 翻译训练处方 → 家长友好版
+        translated_plan_content: Optional[str] = None
+        try:
+            svc = get_translation_service()
+            patient_age = None
+            patient_sex = None
+            patient_row = conn.execute(
+                "SELECT age, sex FROM patients WHERE patient_id = ?",
+                (patient_id,),
+            ).fetchone()
+            if patient_row:
+                patient_age = patient_row["age"]
+                patient_sex = patient_row["sex"]
+            patient_ctx = PatientContext(
+                display_name=payload.patient_name or "",
+                age=patient_age,
+                sex=patient_sex,
+            )
+            result = svc.translate("plan", payload.plan_content, patient_ctx)
+            if result.structured_output:
+                translated_plan_content = json.dumps(result.structured_output, ensure_ascii=False)
+                cursor.execute(
+                    "UPDATE treatment_plans SET translated_plan_content = ? WHERE plan_id = ?",
+                    (translated_plan_content, plan_id),
+                )
+                logger.info("Plan translation success for %s (source=%s)", plan_id, result.source)
+        except Exception as exc:
+            logger.warning("Plan translation skipped for %s: %s", plan_id, exc)
+
         conn.commit()
         return {
             "status": "success",
             "plan_id": plan_id,
             "patient_id": patient_id,
+            "translated": bool(translated_plan_content),
         }
     except Exception as e:
         conn.rollback()
@@ -1460,7 +1725,7 @@ async def get_pending_plans(patient_id: str):
         cursor.execute(
             """
             SELECT plan_id, patient_id, patient_name, therapist_name,
-                   plan_content, status, created_at, updated_at
+                   plan_content, translated_plan_content, status, created_at, updated_at
             FROM treatment_plans
             WHERE patient_id = ?
               AND status = 'active'
@@ -1476,6 +1741,7 @@ async def get_pending_plans(patient_id: str):
                 patient_name=row["patient_name"],
                 therapist_name=row["therapist_name"],
                 plan_content=row["plan_content"],
+                translated_plan_content=row["translated_plan_content"],
                 status=row["status"],
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
@@ -1562,11 +1828,42 @@ async def push_assessment_summary(payload: AssessmentPushPayload):
                 now_str,
             ),
         )
+
+        # Phase 6: 翻译评估摘要 → 家长友好版
+        translated_summary_text: Optional[str] = None
+        try:
+            svc = get_translation_service()
+            patient_age = None
+            patient_sex = None
+            patient_row = conn.execute(
+                "SELECT age, sex FROM patients WHERE patient_id = ?",
+                (patient_id,),
+            ).fetchone()
+            if patient_row:
+                patient_age = patient_row["age"]
+                patient_sex = patient_row["sex"]
+            patient_ctx = PatientContext(
+                display_name=payload.patient_name or "",
+                age=patient_age,
+                sex=patient_sex,
+            )
+            result = svc.translate("assessment", payload.summary_text, patient_ctx)
+            if result.structured_output:
+                translated_summary_text = json.dumps(result.structured_output, ensure_ascii=False)
+                cursor.execute(
+                    "UPDATE assessment_summaries SET translated_summary_text = ? WHERE summary_id = ?",
+                    (translated_summary_text, summary_id),
+                )
+                logger.info("Assessment translation success for %s (source=%s)", summary_id, result.source)
+        except Exception as exc:
+            logger.warning("Assessment translation skipped for %s: %s", summary_id, exc)
+
         conn.commit()
         return {
             "status": "success",
             "summary_id": summary_id,
             "patient_id": patient_id,
+            "translated": bool(translated_summary_text),
         }
     except Exception as e:
         conn.rollback()
@@ -1588,7 +1885,7 @@ async def get_assessment_summary(patient_id: str):
         cursor.execute(
             """
             SELECT summary_id, patient_id, patient_name, session_id,
-                   risk_level, risk_label, summary_text,
+                   risk_level, risk_label, summary_text, translated_summary_text,
                    concerns, recommendations, created_at
             FROM assessment_summaries
             WHERE patient_id = ?
@@ -1609,6 +1906,7 @@ async def get_assessment_summary(patient_id: str):
             risk_level=row["risk_level"] or "none",
             risk_label=row["risk_label"] or "",
             summary_text=row["summary_text"],
+            translated_summary_text=row["translated_summary_text"],
             concerns=json.loads(row["concerns"] or "[]"),
             recommendations=json.loads(row["recommendations"] or "[]"),
             created_at=row["created_at"],
@@ -1632,7 +1930,7 @@ async def get_assessment_history(patient_id: str):
         cursor.execute(
             """
             SELECT summary_id, patient_id, patient_name, session_id,
-                   risk_level, risk_label, summary_text,
+                   risk_level, risk_label, summary_text, translated_summary_text,
                    concerns, recommendations, created_at
             FROM assessment_summaries
             WHERE patient_id = ?
@@ -1650,6 +1948,7 @@ async def get_assessment_history(patient_id: str):
                 "risk_level": row["risk_level"] or "none",
                 "risk_label": row["risk_label"] or "",
                 "summary_text": row["summary_text"],
+                "translated_summary_text": row["translated_summary_text"],
                 "concerns": json.loads(row["concerns"] or "[]"),
                 "recommendations": json.loads(row["recommendations"] or "[]"),
                 "created_at": row["created_at"],
@@ -1658,6 +1957,176 @@ async def get_assessment_history(patient_id: str):
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to query assessment history: {str(e)}")
+    finally:
+        conn.close()
+
+
+def parent_report_response(row: sqlite3.Row) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {}
+    if row["payload"]:
+        try:
+            payload = json.loads(row["payload"])
+        except Exception:
+            payload = {}
+    return {
+        "report_id": row["report_id"],
+        "patient_id": row["patient_id"],
+        "patient_name": row["patient_name"],
+        "session_id": row["session_id"],
+        "report_type": row["report_type"],
+        "risk_level": row["risk_level"] or "none",
+        "risk_label": row["risk_label"] or "",
+        "summary_text": row["summary_text"] or "",
+        "recommendation": row["recommendation"],
+        "payload": payload,
+        "source": row["source"] or "parent",
+        "submitted_at": row["submitted_at"],
+    }
+
+
+@router.post("/parent-report/submit")
+async def submit_parent_report(payload: ParentReportSubmitPayload):
+    """
+    C-End parent submits self-screening/report evidence back to the therapist workspace.
+    Kept separate from therapist-authored assessment_summaries.
+    """
+    conn = get_db_connection()
+    try:
+        patient_id = resolve_patient_id(conn, payload.patient_id)
+        if not patient_id:
+            raise HTTPException(status_code=404, detail="Patient not found for parent report")
+
+        session_id = (payload.session_id or "").strip()
+        if not session_id:
+            latest_session = conn.execute(
+                """
+                SELECT session_id
+                FROM synced_screenings
+                WHERE patient_id = ?
+                ORDER BY datetime(created_at) DESC
+                LIMIT 1
+                """,
+                (patient_id,),
+            ).fetchone()
+            session_id = latest_session["session_id"] if latest_session else f"parent_{patient_id}"
+
+        now_str = datetime.now().isoformat()
+        report_type = (payload.report_type or "self_screening").strip() or "self_screening"
+        payload_json = json.dumps(payload.payload or {}, ensure_ascii=False)
+
+        existing = conn.execute(
+            """
+            SELECT report_id
+            FROM parent_reports
+            WHERE patient_id = ? AND session_id = ? AND report_type = ?
+            ORDER BY datetime(submitted_at) DESC
+            LIMIT 1
+            """,
+            (patient_id, session_id, report_type),
+        ).fetchone()
+
+        if existing:
+            report_id = existing["report_id"]
+            conn.execute(
+                """
+                UPDATE parent_reports
+                SET patient_name = ?,
+                    risk_level = ?,
+                    risk_label = ?,
+                    summary_text = ?,
+                    recommendation = ?,
+                    payload = ?,
+                    source = ?,
+                    submitted_at = ?
+                WHERE report_id = ?
+                """,
+                (
+                    payload.patient_name,
+                    payload.risk_level,
+                    payload.risk_label,
+                    payload.summary_text,
+                    payload.recommendation,
+                    payload_json,
+                    payload.source or "parent",
+                    now_str,
+                    report_id,
+                ),
+            )
+        else:
+            report_id = str(uuid.uuid4())
+            conn.execute(
+                """
+                INSERT INTO parent_reports (
+                    report_id, patient_id, patient_name, session_id, report_type,
+                    risk_level, risk_label, summary_text, recommendation,
+                    payload, source, submitted_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    report_id,
+                    patient_id,
+                    payload.patient_name,
+                    session_id,
+                    report_type,
+                    payload.risk_level,
+                    payload.risk_label,
+                    payload.summary_text,
+                    payload.recommendation,
+                    payload_json,
+                    payload.source or "parent",
+                    now_str,
+                ),
+            )
+
+        conn.commit()
+        row = conn.execute(
+            """
+            SELECT report_id, patient_id, patient_name, session_id, report_type,
+                   risk_level, risk_label, summary_text, recommendation,
+                   payload, source, submitted_at
+            FROM parent_reports
+            WHERE report_id = ?
+            """,
+            (report_id,),
+        ).fetchone()
+        return parent_report_response(row)
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to submit parent report: {str(e)}")
+    finally:
+        conn.close()
+
+
+@router.get("/parent-report/{patient_id}", response_model=List[ParentReportResponse])
+async def get_parent_reports(patient_id: str, limit: int = 20):
+    """
+    B-End therapist workspace retrieves parent-submitted reports by canonical patient.
+    """
+    conn = get_db_connection()
+    try:
+        canonical_patient_id = resolve_patient_id(conn, patient_id)
+        if not canonical_patient_id:
+            return []
+
+        safe_limit = max(1, min(int(limit or 20), 100))
+        rows = conn.execute(
+            """
+            SELECT report_id, patient_id, patient_name, session_id, report_type,
+                   risk_level, risk_label, summary_text, recommendation,
+                   payload, source, submitted_at
+            FROM parent_reports
+            WHERE patient_id = ?
+            ORDER BY datetime(submitted_at) DESC
+            LIMIT ?
+            """,
+            (canonical_patient_id, safe_limit),
+        ).fetchall()
+        return [parent_report_response(row) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to query parent reports: {str(e)}")
     finally:
         conn.close()
 
@@ -1674,7 +2143,7 @@ async def search_assessment_by_name(name: str):
         cursor.execute(
             """
             SELECT summary_id, patient_id, patient_name, session_id,
-                   risk_level, risk_label, summary_text,
+                   risk_level, risk_label, summary_text, translated_summary_text,
                    concerns, recommendations, created_at
             FROM assessment_summaries
             WHERE patient_name LIKE ?
@@ -1692,6 +2161,7 @@ async def search_assessment_by_name(name: str):
                 "risk_level": row["risk_level"] or "none",
                 "risk_label": row["risk_label"] or "",
                 "summary_text": row["summary_text"],
+                "translated_summary_text": row["translated_summary_text"],
                 "concerns": json.loads(row["concerns"] or "[]"),
                 "recommendations": json.loads(row["recommendations"] or "[]"),
                 "created_at": row["created_at"],
@@ -1844,5 +2314,276 @@ async def get_tracking_history(
         ]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to query tracking history: {str(e)}")
+    finally:
+        conn.close()
+
+
+# ═══ 3.5 提醒系统：按时间间隔提醒康复师下达量表/处方/评估 ═══
+
+# 建议推送间隔（天）
+RECOMMENDED_INTERVALS: Dict[str, int] = {
+    "SRS-22": 90,     # 每3个月
+    "ODI": 60,        # 每2个月
+    "VAS": 14,        # 每2周
+    "MBI": 60,        # 每2个月
+    "HAM-A": 28,      # 每4周
+    "Berg": 60,       # 每2个月（专业评定，但提醒频率不变）
+    "MMT": 30,        # 每月
+    "MAS": 30,        # 每月
+}
+
+PLAN_RECOMMENDED_INTERVAL_DAYS = 28     # 训练处方每4周更新
+ASSESSMENT_RECOMMENDED_INTERVAL_DAYS = 3  # 评估后3天内应推送摘要
+
+
+class ReminderItem(BaseModel):
+    """单条提醒"""
+    item_type: str          # "scale" | "plan" | "assessment"
+    item_id: str            # scale_id / "treatment_plan" / "assessment_summary"
+    item_label: str         # 显示名称
+    status: str             # "ok" | "due_soon" | "overdue" | "missing"
+    days_since_last: Optional[int] = None  # 距上次推送天数
+    recommended_interval: int              # 建议间隔天数
+    last_push_at: Optional[str] = None     # 上次推送时间 ISO
+    patient_id: str
+    patient_name: Optional[str] = None
+
+
+class PatientRemindersResponse(BaseModel):
+    """单个患者的提醒汇总"""
+    patient_id: str
+    patient_name: Optional[str] = None
+    items: List[ReminderItem] = []
+    overdue_count: int = 0
+    due_soon_count: int = 0
+
+
+def _compute_reminder_status(
+    last_push_at: Optional[str],
+    interval_days: int,
+) -> tuple[str, Optional[int]]:
+    """根据距上次推送的天数计算提醒状态。
+
+    Returns:
+        (status, days_since): status 为 "ok"/"due_soon"/"overdue"/"missing"
+    """
+    if not last_push_at:
+        return ("missing", None)
+
+    try:
+        last_dt = datetime.fromisoformat(last_push_at)
+    except (ValueError, TypeError):
+        return ("missing", None)
+
+    days_since = (datetime.now() - last_dt).days
+
+    if days_since >= interval_days:
+        return ("overdue", days_since)
+    elif days_since >= interval_days * 0.7:
+        return ("due_soon", days_since)
+    else:
+        return ("ok", days_since)
+
+
+@router.get("/reminders/{patient_id}", response_model=PatientRemindersResponse)
+async def get_patient_reminders(patient_id: str):
+    """获取单个患者的推送提醒状态。"""
+    conn = get_db_connection()
+    try:
+        canonical_pid = resolve_patient_id(conn, patient_id) or patient_id
+
+        # 获取患者姓名
+        patient_row = conn.execute(
+            "SELECT display_name FROM patients WHERE patient_id = ?",
+            (canonical_pid,),
+        ).fetchone()
+        patient_name = patient_row["display_name"] if patient_row else None
+
+        items: List[ReminderItem] = []
+
+        # ── 1. 各量表最后推送时间 ──
+        for scale_id, interval in RECOMMENDED_INTERVALS.items():
+            row = conn.execute(
+                """
+                SELECT scale_id, created_at
+                FROM pending_scales
+                WHERE patient_id = ? AND scale_id = ?
+                ORDER BY datetime(created_at) DESC
+                LIMIT 1
+                """,
+                (canonical_pid, scale_id),
+            ).fetchone()
+
+            last_push = row["created_at"] if row else None
+            status, days_since = _compute_reminder_status(last_push, interval)
+
+            items.append(ReminderItem(
+                item_type="scale",
+                item_id=scale_id,
+                item_label=f"{scale_id} 量表",
+                status=status,
+                days_since_last=days_since,
+                recommended_interval=interval,
+                last_push_at=last_push,
+                patient_id=canonical_pid,
+                patient_name=patient_name,
+            ))
+
+        # ── 2. 训练处方最后推送时间 ──
+        plan_row = conn.execute(
+            """
+            SELECT plan_id, created_at
+            FROM treatment_plans
+            WHERE patient_id = ? AND status = 'active'
+            ORDER BY datetime(created_at) DESC
+            LIMIT 1
+            """,
+            (canonical_pid,),
+        ).fetchone()
+
+        plan_last_push = plan_row["created_at"] if plan_row else None
+        plan_status, plan_days = _compute_reminder_status(plan_last_push, PLAN_RECOMMENDED_INTERVAL_DAYS)
+
+        items.append(ReminderItem(
+            item_type="plan",
+            item_id="treatment_plan",
+            item_label="运动处方",
+            status=plan_status,
+            days_since_last=plan_days,
+            recommended_interval=PLAN_RECOMMENDED_INTERVAL_DAYS,
+            last_push_at=plan_last_push,
+            patient_id=canonical_pid,
+            patient_name=patient_name,
+        ))
+
+        # ── 3. 评估摘要最后推送时间 ──
+        ast_row = conn.execute(
+            """
+            SELECT summary_id, created_at
+            FROM assessment_summaries
+            WHERE patient_id = ?
+            ORDER BY datetime(created_at) DESC
+            LIMIT 1
+            """,
+            (canonical_pid,),
+        ).fetchone()
+
+        ast_last_push = ast_row["created_at"] if ast_row else None
+        ast_status, ast_days = _compute_reminder_status(ast_last_push, ASSESSMENT_RECOMMENDED_INTERVAL_DAYS)
+
+        items.append(ReminderItem(
+            item_type="assessment",
+            item_id="assessment_summary",
+            item_label="评估摘要",
+            status=ast_status,
+            days_since_last=ast_days,
+            recommended_interval=ASSESSMENT_RECOMMENDED_INTERVAL_DAYS,
+            last_push_at=ast_last_push,
+            patient_id=canonical_pid,
+            patient_name=patient_name,
+        ))
+
+        overdue_count = sum(1 for it in items if it.status == "overdue")
+        due_soon_count = sum(1 for it in items if it.status == "due_soon")
+
+        return PatientRemindersResponse(
+            patient_id=canonical_pid,
+            patient_name=patient_name,
+            items=items,
+            overdue_count=overdue_count,
+            due_soon_count=due_soon_count,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute reminders: {str(e)}")
+    finally:
+        conn.close()
+
+
+@router.get("/reminders")
+async def get_all_reminders():
+    """获取所有患者的推送提醒汇总（用于仪表盘聚合卡片）。"""
+    conn = get_db_connection()
+    try:
+        # 获取所有有推送记录的患者
+        patient_rows = conn.execute(
+            "SELECT DISTINCT patient_id, display_name FROM patients"
+        ).fetchall()
+
+        all_reminders: List[PatientRemindersResponse] = []
+        total_overdue = 0
+        total_due_soon = 0
+
+        for prow in patient_rows:
+            pid = prow["patient_id"]
+            pname = prow["display_name"]
+
+            items: List[ReminderItem] = []
+
+            # 量表
+            for scale_id, interval in RECOMMENDED_INTERVALS.items():
+                row = conn.execute(
+                    """
+                    SELECT created_at FROM pending_scales
+                    WHERE patient_id = ? AND scale_id = ?
+                    ORDER BY datetime(created_at) DESC LIMIT 1
+                    """,
+                    (pid, scale_id),
+                ).fetchone()
+                last_push = row["created_at"] if row else None
+                status, days_since = _compute_reminder_status(last_push, interval)
+                items.append(ReminderItem(
+                    item_type="scale", item_id=scale_id,
+                    item_label=f"{scale_id} 量表", status=status,
+                    days_since_last=days_since, recommended_interval=interval,
+                    last_push_at=last_push, patient_id=pid, patient_name=pname,
+                ))
+
+            # 处方
+            plan_row = conn.execute(
+                "SELECT created_at FROM treatment_plans WHERE patient_id = ? AND status = 'active' ORDER BY datetime(created_at) DESC LIMIT 1",
+                (pid,),
+            ).fetchone()
+            plan_last = plan_row["created_at"] if plan_row else None
+            p_status, p_days = _compute_reminder_status(plan_last, PLAN_RECOMMENDED_INTERVAL_DAYS)
+            items.append(ReminderItem(
+                item_type="plan", item_id="treatment_plan", item_label="运动处方",
+                status=p_status, days_since_last=p_days,
+                recommended_interval=PLAN_RECOMMENDED_INTERVAL_DAYS,
+                last_push_at=plan_last, patient_id=pid, patient_name=pname,
+            ))
+
+            # 评估
+            ast_row = conn.execute(
+                "SELECT created_at FROM assessment_summaries WHERE patient_id = ? ORDER BY datetime(created_at) DESC LIMIT 1",
+                (pid,),
+            ).fetchone()
+            ast_last = ast_row["created_at"] if ast_row else None
+            a_status, a_days = _compute_reminder_status(ast_last, ASSESSMENT_RECOMMENDED_INTERVAL_DAYS)
+            items.append(ReminderItem(
+                item_type="assessment", item_id="assessment_summary", item_label="评估摘要",
+                status=a_status, days_since_last=a_days,
+                recommended_interval=ASSESSMENT_RECOMMENDED_INTERVAL_DAYS,
+                last_push_at=ast_last, patient_id=pid, patient_name=pname,
+            ))
+
+            overdue = sum(1 for it in items if it.status == "overdue")
+            due_soon = sum(1 for it in items if it.status == "due_soon")
+            total_overdue += overdue
+            total_due_soon += due_soon
+
+            # 只返回有提醒的患者（overdue 或 due_soon）
+            if overdue > 0 or due_soon > 0:
+                all_reminders.append(PatientRemindersResponse(
+                    patient_id=pid, patient_name=pname, items=items,
+                    overdue_count=overdue, due_soon_count=due_soon,
+                ))
+
+        return {
+            "total_overdue": total_overdue,
+            "total_due_soon": total_due_soon,
+            "patients": all_reminders,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute all reminders: {str(e)}")
     finally:
         conn.close()

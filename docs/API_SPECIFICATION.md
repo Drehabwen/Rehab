@@ -248,10 +248,13 @@ Example intake confirmation:
 {
   "action": "create_patient",
   "patient_id": "pat_01hx_example",
+  "patient_code": "KJHT",
   "family_code": "AB12CD",
   "family_code_expires_at": "2026-12-31T23:59:59"
 }
 ```
+
+`patient_code` is the four-letter public file code shown to early screening, therapists, and parents. `short_code` is accepted as a compatibility alias during migration.
 
 #### Family Access
 
@@ -261,7 +264,7 @@ Example intake confirmation:
 - `POST /api/integration/family/access-link/{link_id}/extend`
 - `POST /api/integration/family/access-link/{link_id}/revoke`
 
-`POST /family/login` resolves an active, unexpired parent / guardian `family_code` into the canonical `patient_id` that C-end scale, plan, assessment, and tracking routes use.
+`POST /family/login` resolves an active, unexpired parent / guardian `family_code` into the canonical `patient_id` that C-end scale, plan, assessment, and tracking routes use. Responses also include `patient_code` / `short_code` for display only.
 
 The management routes are B-end only:
 
@@ -287,6 +290,30 @@ These routes expose the latest subject profile and historical screening trends d
 - `GET /api/integration/scale/results/{session_id}`
 
 The B-end pushes scale tasks, the C-end pulls and submits them with `patient_id`, and the B-end reads completed results by session. The backend rejects scale submissions where the submitted `patient_id` does not match the task owner.
+
+#### Treatment Plan Exchange
+
+- `POST /api/integration/plan/push`
+- `GET /api/integration/plan/pending/{patient_id}`
+
+The B-end pushes the therapist's source-of-truth treatment plan in `plan_content`. The backend stores that original content and may attach `translated_plan_content`, a JSON string for the C-end parent-friendly execution guide.
+
+`translated_plan_content` is explanatory only. It must not change actions, dosage, frequency, cautions, or safety boundaries from the therapist's original `plan_content`. When LLM generation is unavailable, the backend falls back to a rule/template explanation so C-end pages can still render a structured family guide.
+
+Response items from `/plan/pending/{patient_id}` include:
+
+```json
+{
+  "plan_id": "plan_01",
+  "patient_id": "pat_01hx_example",
+  "patient_code": "KJHT",
+  "plan_content": "therapist source plan",
+  "translated_plan_content": "{\"parent_title\":\"家庭训练执行说明\",\"today_focus\":\"...\"}",
+  "status": "active",
+  "created_at": "2026-06-01T10:00:00Z",
+  "updated_at": "2026-06-01T10:00:00Z"
+}
+```
 
 See [CLOSED_LOOP_WORKFLOW.md](CLOSED_LOOP_WORKFLOW.md) for the end-to-end workflow.
 

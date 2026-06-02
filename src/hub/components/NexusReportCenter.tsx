@@ -354,7 +354,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
               <>
                 <StatusTag status={generatedSessionReport ? 'completed' : 'pending'} />
                 <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                  接诊 ID {activeSessionInput.sessionId}
+                  接诊号 {activeSessionInput.sessionId}
                 </span>
               </>
             ) : undefined
@@ -380,7 +380,7 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
         <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0">
-              <div className="text-base font-semibold text-slate-900">报告筛选</div>
+              <div className="text-lg font-semibold text-slate-900">报告筛选</div>
               <p className="mt-1 text-sm text-slate-500">先确定患者与接诊范围，再决定是否生成综合报告和康复建议。</p>
             </div>
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">

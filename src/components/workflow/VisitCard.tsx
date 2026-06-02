@@ -8,6 +8,7 @@ import {
   getPatientAvatar,
   getPatientColor,
   getPatientDisplayName,
+  getPatientPublicCode,
 } from '@/lib/patient-utils';
 import { formatDate } from '@/lib/session-utils';
 import { cn } from '@/lib/utils';
@@ -28,7 +29,7 @@ export const VisitCard: React.FC<VisitCardProps> = ({ task, onOpen }) => {
             </div>
             <div className="min-w-0">
               <div className="truncate text-base font-semibold text-slate-900">{getPatientDisplayName(task.patient)}</div>
-              <div className="mt-1 text-xs text-slate-500">患者 ID {task.patient.id}</div>
+              <div className="mt-1 text-xs text-slate-500">患者编码 {getPatientPublicCode(task.patient)}</div>
             </div>
           </div>
           <StatusTag status={task.status} />

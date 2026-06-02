@@ -169,7 +169,7 @@ def generate_session_report(request: SessionReportRequest) -> SessionReportRespo
     if client:
         try:
             response = client.chat.completions.create(
-                model="deepseek-chat",
+                model="deepseek-v4-flash",
                 messages=[
                     {
                         "role": "system",

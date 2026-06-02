@@ -1,13 +1,22 @@
 import { create } from 'zustand';
 import { db } from '@/lib/db';
 import type { Patient } from '@/types/patient';
-import { generatePatientId } from '@/lib/session-utils';
+import { generateSessionId } from '@/lib/session-utils';
 import { formatPatientSearch } from '@/lib/patient-utils';
 import { IntegrationService, type SyncScreeningPayload } from '@/services/integrationService';
 import type { Assessment, PostureAssessmentData, ScaleAssessmentData } from '@/types/assessment';
 
+const SHORT_CODE_ALPHABET = 'ABCDEFGHJKLMNPRTUVWXYZ';  // 20字符，无 I/O/Q
+
 const generateCanonicalPatientId = () => `pat_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`;
-export { generateCanonicalPatientId };
+const generateShortCode = () => {
+  let code = '';
+  for (let i = 0; i < 4; i++) {
+    code += SHORT_CODE_ALPHABET[Math.floor(Math.random() * SHORT_CODE_ALPHABET.length)];
+  }
+  return code;
+};
+export { generateCanonicalPatientId, generateShortCode };
 
 interface PatientState {
   patients: Patient[];
@@ -16,7 +25,7 @@ interface PatientState {
   error: string | null;
 
   setCurrentPatient: (patient: Patient | null) => void;
-  addPatient: (name?: string, predefinedId?: string) => Promise<Patient>;
+  addPatient: (name?: string, predefinedId?: string, predefinedShortCode?: string) => Promise<Patient>;
   updatePatient: (id: string, updates: Partial<Patient>) => Promise<void>;
   deletePatient: (id: string) => Promise<void>;
   loadPatients: () => Promise<void>;
@@ -34,11 +43,13 @@ export const usePatientStore = create<PatientState>((set, get) => ({
 
   setCurrentPatient: (patient) => set({ currentPatient: patient }),
 
-  addPatient: async (name?: string, predefinedId?: string): Promise<Patient> => {
+  addPatient: async (name?: string, predefinedId?: string, predefinedShortCode?: string): Promise<Patient> => {
     set({ isLoading: true, error: null });
 
     // 统一使用 pat_xxx 格式，与早筛导入一致
     const patientId = predefinedId || generateCanonicalPatientId();
+    // 预生成临床短码（后端创建时确认唯一性）
+    const shortCode = predefinedShortCode || generateShortCode();
 
     const exists = await db.patients.get(patientId);
     if (exists) {
@@ -47,6 +58,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
 
     const patient: Patient = {
       id: patientId,
+      shortCode,
       name,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -56,10 +68,18 @@ export const usePatientStore = create<PatientState>((set, get) => ({
 
     // 同步到 Python 后端，确保患者存在于统一数据源中
     try {
-      await IntegrationService.ensurePatient({
+      const result = await IntegrationService.ensurePatient({
         patient_id: patientId,
         display_name: name,
+        patient_code: shortCode,
+        short_code: shortCode,
       });
+      // 以后端返回的 short_code 为准（可能在碰撞时重新生成）
+      const confirmedCode = result.patient_code || result.short_code;
+      if (confirmedCode && confirmedCode !== shortCode) {
+        patient.shortCode = confirmedCode;
+        await db.patients.put(patient);
+      }
     } catch (err) {
       console.warn('[PatientStore] Failed to sync patient to backend (non-blocking):', err);
     }
@@ -148,6 +168,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
         
         patient = {
           ...existing,
+          shortCode: existing.shortCode || generateShortCode(),
           tags,
           notes: updatedNotes,
           updatedAt: screeningTime
@@ -155,12 +176,14 @@ export const usePatientStore = create<PatientState>((set, get) => ({
         await db.patients.put(patient);
       } else {
         // Create new patient
-        const newPatientId = targetId || generateCanonicalPatientId();
+      const newPatientId = targetId || generateCanonicalPatientId();
+      const shortCode = generateShortCode();
         const tags = ['来自早筛', payload.integrated_report?.overall_risk === 'low' ? '体态优秀' : '脊柱侧弯预警'];
         const notes = `年龄: ${payload.subject.age ?? '未知'}岁 | 身高: ${payload.subject.height_cm ?? '未知'}cm | 性别: ${payload.subject.sex === 'male' ? '男' : payload.subject.sex === 'female' ? '女' : '未知'}\n早筛备注: ${payload.subject.notes || '无'}\n\n[早筛结论摘要]\n${payload.integrated_report?.summary || '暂无摘要'}`;
         
         patient = {
           id: newPatientId,
+          shortCode,
           name: payload.subject.display_name,
           createdAt: screeningTime,
           updatedAt: screeningTime,
@@ -176,7 +199,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
         return Math.max(...sessions.map(s => s.sequence)) + 1;
       });
 
-      const sessionId = generatePatientId() + '_S' + sequence; // Custom clinical format
+      const sessionId = generateSessionId(patient.shortCode || patient.id, sequence);
 
       // Extract metrics from early screening protocols
       const extractedMetrics: any = {};
@@ -308,7 +331,7 @@ ${payload.llm_analysis ? `
           targetSessionId = sessions[0].id;
           sequence = sessions[0].sequence;
         } else {
-          targetSessionId = generatePatientId() + '_S1';
+          targetSessionId = generateSessionId(patient.shortCode || patient.id, 1);
           const newSession = {
             id: targetSessionId,
             patientId,

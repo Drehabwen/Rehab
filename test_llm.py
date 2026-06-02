@@ -23,7 +23,7 @@ client = OpenAI(
 print("Calling LLM API...")
 try:
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         messages=[
             {"role": "system", "content": "你是一个助手。"},
             {"role": "user", "content": "你好"}

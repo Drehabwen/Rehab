@@ -2,89 +2,22 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   Send, FileText, ClipboardList, Dumbbell,
   Check, AlertCircle, RotateCw, ChevronDown, ChevronUp,
-  Clock, TrendingUp, Activity,
+  Clock, TrendingUp, Activity, AlertTriangle, Bell,
 } from 'lucide-react';
 import { Button, Card } from '@/components/ui';
-import type { Patient } from '@/types/patient';
-import { IntegrationService } from '@/services/integrationService';
+import {
+  IntegrationService,
+  type ParentReportResult,
+  type PatientReminders,
+  type ReminderItem,
+  SCALE_INTERVALS,
+} from '@/services/integrationService';
 import { cn } from '@/lib/utils';
-
-// ── 量表模板 ──
-
-const SCALE_OPTIONS = [
-  { id: 'SRS-22' as const, name: 'SRS-22 脊柱侧弯问卷', desc: '功能/疼痛/自我形象/精神健康/满意度' },
-  { id: 'ODI' as const, name: 'ODI 功能障碍指数', desc: '下背痛日常活动障碍评估' },
-  { id: 'VAS' as const, name: 'VAS 视觉模拟疼痛评分', desc: '疼痛强度快速评估' },
-];
-
-// ── 处方模板 ──
-
-const PLAN_TEMPLATE = `# 个人化脊柱侧弯康复训练方案
-
-## 训练原则
-- Schroth 三维脊柱侧弯矫正体操
-- 重点矫正（待填写）侧凸
-- 配合旋转呼吸训练
-- 每天坚持，循序渐进
-
-## 热身（5分钟）
-- 猫牛式：缓慢进行，配合呼吸，10次
-- 骨盆前后倾：激活核心肌群，10次
-- 肩胛骨回缩：改善驼背姿势，10次
-
-## 核心训练（15分钟）
-- 侧平板支撑：增强核心力量，3组×30秒
-- 死虫式：核心稳定训练，3组×10次
-- Schroth旋转呼吸：在矫正位进行深呼吸，5分钟
-
-## 拉伸放松（10分钟）
-- 胸椎凹侧拉伸：针对性拉伸，3组×30秒
-- 胸肌拉伸：改善前侧紧张，2组×30秒
-- 儿童式放松：结束放松，2分钟
-
-## 注意事项
-1. 训练时穿着舒适运动服
-2. 训练前确保支具已取下
-3. 如出现疼痛立即停止，联系康复师
-4. 每天记录训练完成情况`;
-
-// ── Types ──
-
-interface AssessmentInfo {
-  exists: boolean;
-  riskLabel?: string;
-  summaryText?: string;
-  createdAt?: string;
-}
-
-interface PlanInfo {
-  exists: boolean;
-  planId?: string;
-  content?: string;
-  status?: string;
-  createdAt?: string;
-}
-
-interface ScaleInfo {
-  taskId: string;
-  scaleId: string;
-  status: string;
-  createdAt: string;
-}
-
-interface TrackingRecord {
-  tracking_date: string;
-  total_duration_min: number;
-  exercises_completed: Array<{ name: string; duration: number; completed: boolean }>;
-  symptoms: Record<string, any>;
-  notes: string;
-}
-
-interface ParentPushCenterProps {
-  patient: Patient;
-  sessionId?: string | null;
-  therapistName?: string;
-}
+import {
+  SCALE_OPTIONS, PLAN_TEMPLATE,
+  type AssessmentInfo, type PlanInfo, type ScaleInfo,
+  type TrackingRecord, type ParentPushCenterProps,
+} from './ParentPushCenter.data';
 
 export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
   patient,
@@ -96,6 +29,8 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
   const [plan, setPlan] = useState<PlanInfo>({ exists: false });
   const [scales, setScales] = useState<ScaleInfo[]>([]);
   const [tracking, setTracking] = useState<TrackingRecord[]>([]);
+  const [parentReports, setParentReports] = useState<ParentReportResult[]>([]);
+  const [reminders, setReminders] = useState<PatientReminders | null>(null);
 
   const [planEditorOpen, setPlanEditorOpen] = useState(false);
   const [planContent, setPlanContent] = useState(PLAN_TEMPLATE);
@@ -113,11 +48,13 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const [ast, plans, pendingScales, trackingData] = await Promise.all([
+      const [ast, plans, scaleResults, trackingData, parentReportData, reminderData] = await Promise.all([
         IntegrationService.getAssessmentSummary(patient.id),
         IntegrationService.getTreatmentPlans(patient.id),
-        IntegrationService.getPendingScales(patient.id),
+        IntegrationService.getScaleResultsByPatient(patient.id),
         IntegrationService.getTrackingHistory(patient.id),
+        IntegrationService.getParentReports(patient.id),
+        IntegrationService.getReminders(patient.id).catch(() => null),
       ]);
 
       setAssessment(ast ? {
@@ -136,14 +73,19 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
         createdAt: latestPlan.created_at,
       } : { exists: false });
 
-      setScales(pendingScales.map(s => ({
+      setScales(scaleResults.map(s => ({
         taskId: s.task_id,
         scaleId: s.scale_id,
+        sessionId: s.session_id,
         status: s.status,
         createdAt: s.created_at,
+        submittedAt: s.submitted_at,
+        scaleData: s.scale_data,
       })));
 
       setTracking(trackingData.slice(0, 7)); // 最近7天
+      setParentReports(parentReportData);
+      setReminders(reminderData);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
@@ -200,6 +142,19 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
     }
   };
 
+  // ── Reminder helpers ──
+
+  const getReminderFor = (itemType: string, itemId: string): ReminderItem | undefined => {
+    return reminders?.items.find(it => it.item_type === itemType && it.item_id === itemId);
+  };
+
+  const getScaleReminder = (scaleId: string): ReminderItem | undefined => {
+    return getReminderFor('scale', scaleId);
+  };
+
+  const planReminder = getReminderFor('plan', 'treatment_plan');
+  const assessmentReminder = getReminderFor('assessment', 'assessment_summary');
+
   // ── Derived ──
 
   const trackingSummary = tracking.length > 0 ? (() => {
@@ -207,6 +162,11 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
     const avgPain = tracking.reduce((sum, t) => sum + (t.symptoms?.pain_level || 0), 0) / tracking.length;
     return { completedDays, total: tracking.length, avgPain: avgPain.toFixed(1) };
   })() : null;
+  const pendingScaleCount = scales.filter(s => s.status === 'pending').length;
+  const completedScaleCount = scales.filter(s => s.status === 'completed').length;
+  const latestParentReport = parentReports[0];
+  const totalOverdue = reminders?.overdue_count ?? 0;
+  const totalDueSoon = reminders?.due_soon_count ?? 0;
 
   // ── Render ──
 
@@ -217,10 +177,26 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50 text-violet-700">
           <Send size={18} />
         </div>
-        <div>
+        <div className="flex-1">
           <h3 className="text-base font-semibold text-slate-900">推送至家长端</h3>
           <p className="text-xs text-slate-500">评估摘要、训练处方、量表处方一键推送到小柱家长端</p>
         </div>
+        {reminders && (totalOverdue > 0 || totalDueSoon > 0) && (
+          <div className="flex items-center gap-1.5">
+            {totalOverdue > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700">
+                <AlertCircle size={12} />
+                {totalOverdue} 项逾期
+              </span>
+            )}
+            {totalDueSoon > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                <AlertTriangle size={12} />
+                {totalDueSoon} 项临近
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -238,6 +214,7 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
             doneText={assessment.riskLabel || '已推送'}
             doneSub={assessment.createdAt ? `推送于 ${new Date(assessment.createdAt).toLocaleDateString()}` : ''}
             pendingText="完成接诊评估后将自动推送"
+            reminder={assessmentReminder}
           />
 
           {/* ── 训练处方 ── */}
@@ -252,6 +229,7 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
                       <Check size={11} className="mr-1" />已推送
                     </span>
                   )}
+                  <ReminderBadge reminder={planReminder} />
                 </div>
               </div>
               <Button
@@ -308,9 +286,14 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
                 <ClipboardList size={16} className="text-slate-500" />
                 <div>
                   <span className="text-sm font-semibold text-slate-800">量表处方</span>
-                  {scales.filter(s => s.status === 'pending').length > 0 && (
+                  {pendingScaleCount > 0 && (
                     <span className="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
-                      {scales.filter(s => s.status === 'pending').length} 份待填写
+                      {pendingScaleCount} 份待填写
+                    </span>
+                  )}
+                  {completedScaleCount > 0 && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                      {completedScaleCount} 份已回传
                     </span>
                   )}
                 </div>
@@ -322,7 +305,9 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
                   className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none"
                 >
                   {SCALE_OPTIONS.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                    <option key={s.id} value={s.id}>
+                      {s.name} — {s.adminLevel === 'parent' ? '🟢 家长自评' : '🟡 适配版'}
+                    </option>
                   ))}
                 </select>
                 <Button
@@ -335,21 +320,59 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
                   推送
                 </Button>
               </div>
+
+              {/* Classification note */}
+              <p className="mt-2 text-[11px] text-slate-400 flex items-center gap-1.5">
+                <AlertCircle size={12} />
+                仅展示可下发给家长的<b className="text-emerald-600">患者自评量表（PROM）</b>类量表。
+                Berg/MMT/MAS 等<b className="text-red-500">专业评定</b>类量表需在诊所内由康复师完成。
+              </p>
             </div>
 
             {/* Scale status list */}
             {scales.length > 0 && (
               <div className="mt-2 space-y-1">
-                {scales.map(s => (
-                  <div key={s.taskId} className="flex items-center gap-2 text-xs text-slate-500">
-                    <span className={cn(
-                      'w-1.5 h-1.5 rounded-full',
-                      s.status === 'completed' ? 'bg-emerald-400' : 'bg-amber-400'
-                    )} />
-                    {s.scaleId} — {s.status === 'completed' ? '已完成' : '待填写'}
-                    <span className="text-slate-400">· {new Date(s.createdAt).toLocaleDateString()}</span>
-                  </div>
-                ))}
+                {scales.map(s => {
+                  const scaleReminder = getScaleReminder(s.scaleId);
+                  return (
+                    <div key={s.taskId} className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span className={cn(
+                        'w-1.5 h-1.5 rounded-full',
+                        s.status === 'completed' ? 'bg-emerald-400' : 'bg-amber-400'
+                      )} />
+                      {s.scaleId} — {s.status === 'completed' ? '已完成' : '待填写'}
+                      {s.status === 'completed' && s.scaleData?.totalScore !== undefined && (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                          {s.scaleData.totalScore}/{s.scaleData.maxScore ?? '-'} 分
+                        </span>
+                      )}
+                      <span className="text-slate-400">· {new Date(s.createdAt).toLocaleDateString()}</span>
+                      {s.submittedAt && (
+                        <span className="text-emerald-600">回传于 {new Date(s.submittedAt).toLocaleString()}</span>
+                      )}
+                      {/* 提醒标签 */}
+                      {scaleReminder && (scaleReminder.status === 'overdue' || scaleReminder.status === 'due_soon') && (
+                        <ReminderBadge reminder={scaleReminder} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 未推送过的量表提醒（从 reminders 中找 missing 或 overdue 的） */}
+            {reminders && (
+              <div className="mt-2 space-y-1">
+                {reminders.items
+                  .filter(it => it.item_type === 'scale' && (it.status === 'overdue' || it.status === 'missing'))
+                  .filter(it => !scales.some(s => s.scaleId === it.item_id))
+                  .map(it => (
+                    <div key={it.item_id} className="flex items-center gap-2 text-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                      <span className="text-slate-500">{it.item_label}</span>
+                      <ReminderBadge reminder={it} />
+                    </div>
+                  ))}
               </div>
             )}
           </div>
@@ -388,6 +411,38 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
 
             {feedbackOpen && (
               <div className="mt-3 space-y-3">
+                {latestParentReport && (
+                  <div className="space-y-2 rounded-xl border border-sky-100 bg-sky-50/60 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-sky-800">
+                        <FileText size={13} />
+                        家长自筛报告
+                      </div>
+                      <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-sky-700">
+                        {parentReports.length} 份已回传
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                      <span className="font-semibold text-slate-800">
+                        {latestParentReport.risk_label || latestParentReport.risk_level || '已提交'}
+                      </span>
+                      {latestParentReport.payload?.total !== undefined && (
+                        <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-sky-700">
+                          {latestParentReport.payload.total}/160 分
+                        </span>
+                      )}
+                      <span className="text-slate-400">
+                        {new Date(latestParentReport.submitted_at).toLocaleString()}
+                      </span>
+                    </div>
+                    {(latestParentReport.summary_text || latestParentReport.recommendation) && (
+                      <p className="text-xs leading-5 text-slate-600">
+                        {latestParentReport.summary_text || latestParentReport.recommendation}
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Tracking summary */}
                 {trackingSummary ? (
                   <div className="grid grid-cols-3 gap-3">
@@ -400,7 +455,7 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
                       <div className="text-xs text-blue-600">平均疼痛 /10</div>
                     </div>
                     <div className="rounded-xl bg-violet-50 p-3 text-center">
-                      <div className="text-lg font-bold text-violet-700">{scales.filter(s => s.status === 'completed').length}</div>
+                      <div className="text-lg font-bold text-violet-700">{completedScaleCount}</div>
                       <div className="text-xs text-violet-600">已填量表</div>
                     </div>
                   </div>
@@ -430,10 +485,24 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
                 )}
 
                 {/* Scale results */}
-                {scales.filter(s => s.status === 'completed').length > 0 && (
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <TrendingUp size={13} />
-                    {scales.filter(s => s.status === 'completed').map(s => s.scaleId).join('、')} 已完成
+                {completedScaleCount > 0 && (
+                  <div className="space-y-2 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-emerald-800">
+                      <TrendingUp size={13} />
+                      家长已回传量表
+                    </div>
+                    {scales.filter(s => s.status === 'completed').map(s => (
+                      <div key={s.taskId} className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                        <span className="font-semibold text-slate-800">{s.scaleId}</span>
+                        {s.scaleData?.scaleName && <span>{s.scaleData.scaleName}</span>}
+                        {s.scaleData?.totalScore !== undefined && (
+                          <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-emerald-700">
+                            {s.scaleData.totalScore}/{s.scaleData.maxScore ?? '-'} 分
+                          </span>
+                        )}
+                        {s.submittedAt && <span className="text-slate-400">{new Date(s.submittedAt).toLocaleString()}</span>}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -445,6 +514,54 @@ export const ParentPushCenter: React.FC<ParentPushCenterProps> = ({
   );
 };
 
+// ── Helper: ReminderBadge ──
+
+const ReminderBadge: React.FC<{ reminder?: ReminderItem }> = ({ reminder }) => {
+  if (!reminder) return null;
+
+  if (reminder.status === 'overdue') {
+    return (
+      <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">
+        <AlertCircle size={10} />
+        {reminder.days_since_last != null
+          ? `逾期 ${reminder.days_since_last} 天`
+          : '逾期'}
+      </span>
+    );
+  }
+
+  if (reminder.status === 'due_soon') {
+    const remaining = reminder.recommended_interval - (reminder.days_since_last ?? 0);
+    return (
+      <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-1.5 py-0.5 text-[11px] font-semibold text-amber-700">
+        <AlertTriangle size={10} />
+        {remaining > 0 ? `还剩 ${remaining} 天` : '即将到期'}
+      </span>
+    );
+  }
+
+  if (reminder.status === 'missing') {
+    return (
+      <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+        <Bell size={10} />
+        尚未推送
+      </span>
+    );
+  }
+
+  // "ok" — show subtle time since push
+  if (reminder.days_since_last != null && reminder.days_since_last > 0) {
+    return (
+      <span className="ml-1.5 inline-flex items-center gap-0.5 text-[11px] text-slate-400">
+        <Clock size={10} />
+        {reminder.days_since_last} 天前
+      </span>
+    );
+  }
+
+  return null;
+};
+
 // ── Helper: PushRow ──
 
 const PushRow: React.FC<{
@@ -454,16 +571,20 @@ const PushRow: React.FC<{
   doneText: string;
   doneSub: string;
   pendingText: string;
-}> = ({ icon, label, done, doneText, doneSub, pendingText }) => (
+  reminder?: ReminderItem;
+}> = ({ icon, label, done, doneText, doneSub, pendingText, reminder }) => (
   <div className="flex items-center justify-between rounded-xl border border-slate-100 p-3">
     <div className="flex items-center gap-2.5">
       <span className="text-slate-500">{icon}</span>
       <div>
         <span className="text-sm font-semibold text-slate-800">{label}</span>
         {done ? (
-          <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-            <Check size={11} className="mr-1" />{doneText}
-          </span>
+          <>
+            <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              <Check size={11} className="mr-1" />{doneText}
+            </span>
+            <ReminderBadge reminder={reminder} />
+          </>
         ) : (
           <span className="ml-2 text-xs text-slate-400">{pendingText}</span>
         )}

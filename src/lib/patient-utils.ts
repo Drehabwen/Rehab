@@ -4,14 +4,15 @@ export function getPatientDisplayName(patient: Patient): string {
   if (patient.name && patient.name.trim()) {
     return patient.name.trim();
   }
-  return `患者 ${patient.id}`;
+  return `患者 ${getPatientPublicCode(patient)}`;
 }
 
 export function getPatientDisplayId(patient: Patient): string {
-  if (patient.name && patient.name.trim()) {
-    return patient.id;
-  }
-  return '';
+  return getPatientPublicCode(patient);
+}
+
+export function getPatientPublicCode(patient: Patient): string {
+  return patient.shortCode || patient.id;
 }
 
 export function getPatientAvatar(patient: Patient): string {
@@ -56,7 +57,7 @@ export function getPatientInitials(patient: Patient): string {
 
 export function getPatientSubtitle(patient: Patient, sessionCount?: number): string {
   if (patient.name && patient.name.trim()) {
-    return `ID: ${patient.id}`;
+    return `患者编码: ${getPatientPublicCode(patient)}`;
   }
   return sessionCount !== undefined ? `接诊 ${sessionCount} 次` : '新患者';
 }
@@ -67,6 +68,7 @@ export function formatPatientSearch(patient: Patient, query: string): boolean {
   const lowerQuery = query.toLowerCase();
 
   return (
+    (patient.shortCode && patient.shortCode.toLowerCase().includes(lowerQuery)) ||
     patient.id.toLowerCase().includes(lowerQuery) ||
     (patient.name && patient.name.toLowerCase().includes(lowerQuery)) ||
     (patient.notes && patient.notes.toLowerCase().includes(lowerQuery)) ||

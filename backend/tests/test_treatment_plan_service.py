@@ -153,7 +153,7 @@ class TestGenerateTreatmentPlan:
             
             # 验证调用参数
             call_args = mock_client.chat.completions.create.call_args
-            assert call_args[1]["model"] == "deepseek-chat"
+            assert call_args[1]["model"] == "deepseek-v4-flash"
             assert call_args[1]["temperature"] == 0.7
             assert "messages" in call_args[1]
     

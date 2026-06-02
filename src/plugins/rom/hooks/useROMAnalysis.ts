@@ -90,7 +90,7 @@ export function calculateCervicalAngle(landmarks: any[], direction: MovementDire
     const earLine = vector3D(leftEar, rightEar);
     const transverseRotation = deviationFromSameLine(shoulderLine, earLine);
     const noseOffset = Math.abs((nose.x || 0) - earMid.x) * 180;
-    return Math.max(transverseRotation, noseOffset);
+    return transverseRotation;
   }
 
   return deviationFromSameLine(torsoVector, headVector);

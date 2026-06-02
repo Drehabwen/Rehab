@@ -174,7 +174,7 @@ class PostureAgent:
         try:
             print(f"[generate_final_report] Calling LLM API...", flush=True)
             response = client.chat.completions.create(
-                model="deepseek-chat",
+                model="deepseek-v4-flash",
                 messages=[
                     {"role": "system", "content": "你是一个具有批判性思维的医疗专家。你的目标是揭示体态问题背后的深层代偿逻辑，而非简单描述。你必须严格遵循推理链可视化的要求，展示从原始数值到最终结论的完整推导过程。严禁省略推理步骤或降低数值的重要性。"},
                     {"role": "user", "content": prompt}
@@ -275,7 +275,7 @@ class PostureAgent:
             
             # Call LLM with streaming enabled
             stream = client.chat.completions.create(
-                model="deepseek-chat",
+                model="deepseek-v4-flash",
                 messages=[
                     {"role": "system", "content": "你是一个具有批判性思维的医疗专家。你的目标是揭示体态问题背后的深层代偿逻辑，而非简单描述。你必须严格遵循推理链可视化的要求，展示从原始数值到最终结论的完整推导过程。严禁省略推理步骤或降低数值的重要性。"},
                     {"role": "user", "content": prompt}

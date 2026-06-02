@@ -6,7 +6,7 @@ This document describes the current screening-to-rehab closed loop in this repos
 
 The product framing is a posture and spinal screening workflow. It records screening evidence, risk triage, report readiness, follow-up tasks, and retest outcomes. It must not be treated as a medical diagnosis system.
 
-Patient identity is governed by [IDENTITY_CONTRACT.md](IDENTITY_CONTRACT.md). In short, `patient_id` is the only primary business identity; `subject_id`, SUC/display codes, family codes, session IDs, and names are aliases, access credentials, events, or display fields.
+Patient identity is governed by [IDENTITY_CONTRACT.md](IDENTITY_CONTRACT.md). In short, `patient_id` is the hidden primary business identity; `patient_code` is the four-letter public file code; `subject_id`, SUC/display codes, family codes, session IDs, and names are aliases, access credentials, events, or display fields.
 
 ## 1. Participating Apps
 
@@ -35,7 +35,7 @@ flowchart LR
   F -->|GET /scale/results/{session_id}| I["纳入复评 / 报告 / 随访"]
 ```
 
-The loop is complete only when the B-end can see the early-screening record, import or link it, push a follow-up or scale task, and receive the C-end submission back against the same session.
+The loop is complete only when the B-end can see the early-screening record, import or link it, assign or reuse a `patient_code`, push a follow-up or scale task, and receive the C-end submission back against the same session.
 
 ## 3. Data Stages
 
@@ -171,7 +171,7 @@ Trust this order when behavior and documentation disagree:
 - Protocol names should be normalized. Current code accepts or references `static_posture`, `adams_forward_bend`, `squat`, and `squat_screening`; choose one canonical name per protocol before adding more reports.
 - `青跃康复工作台` does not currently implement the integration endpoints. If it becomes the main workbench, migrate `/api/integration/*` first or point it to the `Rehab-main` integration backend.
 - The legacy `/api/integration/subject/link` path has been removed from the active C-end flow. New and existing C-end login must use `/api/integration/family/login`.
-- Identity binding follows [IDENTITY_CONTRACT.md](IDENTITY_CONTRACT.md): `patient_id` is primary, `subject_id` is an early-screening alias, and `family_code` is a revocable access credential. Runtime login rejects inactive or expired access links, stored family codes are hashed, and B-end can rotate, extend, or revoke access from the patient workbench.
+- Identity binding follows [IDENTITY_CONTRACT.md](IDENTITY_CONTRACT.md): `patient_id` is the hidden primary key, `patient_code` is the four-letter visible file code, `subject_id` is an early-screening alias, and `family_code` is a revocable access credential. Runtime login rejects inactive or expired access links, stored family codes are hashed, and B-end can rotate, extend, or revoke access from the patient workbench.
 
 ## 7. Verification Checklist
 
@@ -179,7 +179,7 @@ Trust this order when behavior and documentation disagree:
 - Confirm the test data follows [IDENTITY_CONTRACT.md](IDENTITY_CONTRACT.md): early screening owns `subject_id`, B-end owns `patient_id`, and C-end resolves access through `family_code`.
 - From `早筛`, submit one completed screening session to `/api/integration/sync-screening`.
 - In `Rehab-main`, open the sync panel and confirm the record appears as `pending`.
-- Import the record as a new patient or link it to an existing patient, then confirm `/api/integration/intake/{session_id}/confirm` returns a `patient_id`.
+- Import the record as a new patient or link it to an existing patient, then confirm `/api/integration/intake/{session_id}/confirm` returns `patient_id` plus the four-letter `patient_code`.
 - Push one scale task from the B-end session.
 - In `chatbotagent`, login with `family_code`, pull pending scales for the returned `patient_id`, and submit the scale with that `patient_id`.
 - In `Rehab-main`, fetch `/api/integration/scale/results/{session_id}` and confirm the completed result is visible.

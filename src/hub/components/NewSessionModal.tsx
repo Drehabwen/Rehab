@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { CheckCircle, RefreshCw, Stethoscope, User, X } from 'lucide-react';
-import { generateCanonicalPatientId, usePatientStore } from '@/store/usePatientStore';
+import { generateCanonicalPatientId, generateShortCode, usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +12,8 @@ interface NewSessionModalProps {
 
 export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClose, onStartSession }) => {
   const [name, setName] = useState('');
-  const [patientId, setPatientId] = useState('');
+  const [patientId, setPatientId] = useState('');       // 内部ID (pat_xxx)
+  const [shortCode, setShortCode] = useState('');       // 临床短码 (4位)
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -22,14 +23,15 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
   useEffect(() => {
     if (!isOpen) return;
     setName('');
-    generateNewId();
+    generateNewCodes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const generateNewId = () => {
+  const generateNewCodes = () => {
     setIsGenerating(true);
     setTimeout(() => {
       setPatientId(generateCanonicalPatientId());
+      setShortCode(generateShortCode());
       setIsGenerating(false);
     }, 200);
   };
@@ -39,7 +41,7 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
 
     setIsCreating(true);
     try {
-      const patient = await addPatient(name.trim() || undefined, patientId);
+      const patient = await addPatient(name.trim() || undefined, patientId, shortCode);
       await startSession(patient.id);
       onStartSession(patient.id);
       onClose();
@@ -90,16 +92,20 @@ export const NewSessionModal: React.FC<NewSessionModalProps> = ({ isOpen, onClos
 
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-700">患者编号</span>
-              <button onClick={generateNewId} disabled={isGenerating} className="btn-secondary h-8 px-3 text-xs">
+              <span className="text-sm font-medium text-slate-700">患者编码</span>
+              <button onClick={generateNewCodes} disabled={isGenerating} className="btn-secondary h-8 px-3 text-xs">
                 <RefreshCw size={12} className={cn(isGenerating && 'animate-spin')} />
                 刷新编号
               </button>
             </div>
 
             <div className="mt-2 p-4 rounded-xl bg-slate-900 text-white border border-slate-700">
-              <div className="text-lg font-mono font-semibold tracking-tight break-all">{patientId || '--'}</div>
-              <div className="mt-1 text-xs text-slate-400">患者唯一编号，用于全系统身份标识</div>
+              <div className="text-3xl font-bold text-center tracking-[0.3em]">{shortCode || '----'}</div>
+              <div className="mt-1 text-xs text-slate-400 text-center">四位公开档案号，用于诊室、早筛和家长端展示</div>
+            </div>
+
+            <div className="mt-2 text-xs text-slate-400 text-center font-mono">
+              系统编号：{patientId || '--'}
             </div>
           </div>
         </div>

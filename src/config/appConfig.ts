@@ -13,7 +13,7 @@ export const APP_CONFIG = {
   },
   LLM_API_KEY: import.meta.env.VITE_DEEPSEEK_API_KEY || '',
   LLM_API_ENDPOINT: 'https://api.deepseek.com/v1/chat/completions',
-  LLM_MODEL: 'deepseek-chat',
+  LLM_MODEL: 'deepseek-v4-flash',
 } as const;
 
 export type AppConfig = typeof APP_CONFIG;

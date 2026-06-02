@@ -11,7 +11,7 @@ client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
 print("Sending...")
 response = client.chat.completions.create(
-    model="deepseek-chat",
+    model="deepseek-v4-flash",
     messages=[{"role": "user", "content": "Hello, respond with 'OK' only."}],
     stream=False
 )

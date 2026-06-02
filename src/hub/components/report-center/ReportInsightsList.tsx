@@ -43,7 +43,7 @@ export const ReportInsightsList: React.FC<ReportInsightsListProps> = ({
       <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
         <div className="min-w-0 flex-1 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400">综合判断</div>
+            <div className="text-xs font-semibold tracking-[0.14em] text-slate-400">综合判断</div>
             <h2 className="mt-1 text-lg font-semibold text-slate-900">AI 分析</h2>
             <p className="mt-1 text-sm text-slate-500">将多模块结果压缩成短结论卡片，帮助快速判断本次接诊重点。</p>
           </div>
@@ -75,7 +75,7 @@ export const ReportInsightsList: React.FC<ReportInsightsListProps> = ({
       <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
         <div className="min-w-0 flex-1 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400">执行建议</div>
+            <div className="text-xs font-semibold tracking-[0.14em] text-slate-400">执行建议</div>
             <h2 className="mt-1 text-lg font-semibold text-slate-900">康复建议</h2>
             <p className="mt-1 text-sm text-slate-500">只保留可执行建议，避免长段文字占据页面注意力。</p>
           </div>

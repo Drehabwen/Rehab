@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { HubSidebar } from './components/HubSidebar';
 
@@ -22,6 +22,7 @@ import { useSessionStore } from '@/store/useSessionStore';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { useMeasurementStore } from '@/store/useMeasurementStore';
 import { usePatientList } from './hooks/usePatientList';
+import { IntegrationService, type PatientReminders } from '@/services/integrationService';
 import type { Patient } from '@/types/patient';
 import { getPatientAvatar, getPatientDisplayName } from '@/lib/patient-utils';
 import { PatientHeaderBar, StatePanel } from '@/components/layout';
@@ -40,6 +41,9 @@ export const NexusHub: React.FC = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showDataSettings, setShowDataSettings] = useState(false);
   const [showSyncPanel, setShowSyncPanel] = useState(false);
+  const [remindersMap, setRemindersMap] = useState<Map<string, PatientReminders>>(new Map());
+  const [totalOverdue, setTotalOverdue] = useState(0);
+  const [totalDueSoon, setTotalDueSoon] = useState(0);
 
   const { patients, loadPatients, setCurrentPatient, getPatientById } = usePatientStore();
   const { sessions, loadSessions, getPatientSessions } = useSessionStore();
@@ -51,6 +55,29 @@ export const NexusHub: React.FC = () => {
     loadSessions();
     loadAssessments();
   }, [loadPatients, loadSessions, loadAssessments]);
+
+  // 定期拉取提醒数据
+  const refreshReminders = useCallback(async () => {
+    try {
+      const data = await IntegrationService.getAllReminders();
+      const map = new Map<string, PatientReminders>();
+      for (const p of data.patients) {
+        map.set(p.patient_id, p);
+      }
+      setRemindersMap(map);
+      setTotalOverdue(data.total_overdue);
+      setTotalDueSoon(data.total_due_soon);
+    } catch {
+      // 静默降级
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshReminders();
+    // 每5分钟刷新一次
+    const interval = setInterval(refreshReminders, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [refreshReminders]);
 
   useEffect(() => {
     const handleNavigateToReports = () => {
@@ -197,6 +224,10 @@ export const NexusHub: React.FC = () => {
             onNewPatient={() => setShowNewSessionModal(true)}
             onSearchPatient={() => setShowSearchModal(true)}
             onOpenSyncPanel={() => setShowSyncPanel(true)}
+            remindersMap={remindersMap}
+            totalOverdue={totalOverdue}
+            totalDueSoon={totalDueSoon}
+            onRefreshReminders={refreshReminders}
           />
         );
       case 'assessment':

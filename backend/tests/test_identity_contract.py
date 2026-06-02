@@ -1,4 +1,5 @@
 import os
+import json
 import sqlite3
 from unittest.mock import patch
 
@@ -99,7 +100,7 @@ def screening_payload(session_id="session_identity_1", subject_id="FAM1", displa
     }
 
 
-def confirm_screening(session_id, subject_id, patient_id, display_name="Student A"):
+def confirm_screening(session_id, subject_id, patient_id, display_name="Student A", patient_code=None):
     response = client.post(
         "/api/integration/sync-screening",
         json=screening_payload(session_id=session_id, subject_id=subject_id, display_name=display_name),
@@ -111,6 +112,7 @@ def confirm_screening(session_id, subject_id, patient_id, display_name="Student 
         json={
             "action": "create_patient",
             "patient_id": patient_id,
+            "patient_code": patient_code,
             "family_code": subject_id,
         },
     )
@@ -119,6 +121,54 @@ def confirm_screening(session_id, subject_id, patient_id, display_name="Student 
     assert data["patient_id"] == patient_id
     assert data["family_code"] == subject_id
     return data
+
+
+def test_patient_code_is_public_identifier_not_login_secret():
+    patient_id = "pat_identity_code_001"
+    family_code = "PARENT1"
+    patient_code = "KJHT"
+    session_id = "session_identity_code_1"
+
+    confirm = confirm_screening(
+        session_id,
+        family_code,
+        patient_id,
+        display_name="Student Code",
+        patient_code=patient_code,
+    )
+    assert confirm["patient_code"] == patient_code
+    assert confirm["short_code"] == patient_code
+
+    row = fetch_one(
+        "SELECT patient_id, short_code FROM patients WHERE patient_id = ?",
+        (patient_id,),
+    )
+    assert row["short_code"] == patient_code
+
+    login_by_family_code = client.post("/api/integration/family/login", json={"family_code": family_code})
+    assert login_by_family_code.status_code == 200
+    assert login_by_family_code.json()["patient_id"] == patient_id
+    assert login_by_family_code.json()["patient_code"] == patient_code
+
+    login_by_patient_code = client.post("/api/integration/family/login", json={"family_code": patient_code})
+    assert login_by_patient_code.status_code == 404
+
+    push = client.post(
+        "/api/integration/scale/push",
+        json={
+            "patient_id": patient_code,
+            "patient_name": "Student Code",
+            "session_id": f"{patient_code}-001",
+            "scale_id": "SRS-22",
+            "therapist_name": "Therapist",
+        },
+    )
+    assert push.status_code == 200
+    assert push.json()["patient_id"] == patient_id
+
+    pending = client.get(f"/api/integration/scale/pending/{patient_code}")
+    assert pending.status_code == 200
+    assert pending.json()[0]["patient_id"] == patient_id
 
 
 def test_intake_confirm_binds_family_code_to_patient_id_and_guards_scale_submit():
@@ -319,9 +369,81 @@ def test_full_closed_loop_data_flow_from_screening_to_c_end_and_back():
     assert scale_results.json()[0]["status"] == "completed"
     assert scale_results.json()[0]["scale_data"]["totalScore"] == 88
 
+    patient_scale_results = client.get(f"/api/integration/scale/results/by-patient/{patient_id}")
+    assert patient_scale_results.status_code == 200
+    assert len(patient_scale_results.json()) == 1
+    assert patient_scale_results.json()[0]["task_id"] == scale_task_id
+    assert patient_scale_results.json()[0]["status"] == "completed"
+    assert patient_scale_results.json()[0]["scale_data"]["totalScore"] == 88
+
+    patient_scale_results_by_code = client.get(
+        f"/api/integration/scale/results/by-patient/{family_code}?status=completed"
+    )
+    assert patient_scale_results_by_code.status_code == 200
+    assert len(patient_scale_results_by_code.json()) == 1
+    assert patient_scale_results_by_code.json()[0]["patient_id"] == patient_id
+
+    pending_patient_results = client.get(
+        f"/api/integration/scale/results/by-patient/{patient_id}?status=pending"
+    )
+    assert pending_patient_results.status_code == 200
+    assert pending_patient_results.json() == []
+
     old_session_results = client.get(f"/api/integration/scale/results/{session_1}")
     assert old_session_results.status_code == 200
     assert old_session_results.json() == []
+
+    parent_report = client.post(
+        "/api/integration/parent-report/submit",
+        json={
+            "patient_id": family_code,
+            "patient_name": display_name,
+            "session_id": session_2,
+            "report_type": "self_screening",
+            "risk_level": "moderate",
+            "risk_label": "家长自筛中风险",
+            "summary_text": "Parent screening suggests follow-up review.",
+            "recommendation": "Book therapist review.",
+            "payload": {
+                "total": 76,
+                "maxScore": 160,
+                "factors": {"adams": 20},
+            },
+            "source": "parent",
+        },
+    )
+    assert parent_report.status_code == 200
+    assert parent_report.json()["patient_id"] == patient_id
+    assert parent_report.json()["payload"]["total"] == 76
+
+    parent_report_update = client.post(
+        "/api/integration/parent-report/submit",
+        json={
+            "patient_id": patient_id,
+            "patient_name": display_name,
+            "session_id": session_2,
+            "report_type": "self_screening",
+            "risk_level": "moderate",
+            "risk_label": "家长自筛中风险",
+            "summary_text": "Updated parent screening summary.",
+            "recommendation": "Book therapist review.",
+            "payload": {
+                "total": 80,
+                "maxScore": 160,
+                "factors": {"adams": 20},
+            },
+            "source": "parent",
+        },
+    )
+    assert parent_report_update.status_code == 200
+    assert parent_report_update.json()["report_id"] == parent_report.json()["report_id"]
+    assert parent_report_update.json()["payload"]["total"] == 80
+
+    parent_reports = client.get(f"/api/integration/parent-report/{family_code}")
+    assert parent_reports.status_code == 200
+    assert len(parent_reports.json()) == 1
+    assert parent_reports.json()[0]["patient_id"] == patient_id
+    assert parent_reports.json()[0]["summary_text"] == "Updated parent screening summary."
 
     plan_1 = client.post(
         "/api/integration/plan/push",
@@ -439,6 +561,10 @@ def test_c_end_plan_summary_and_tracking_query_by_patient_id_not_name():
     assert plan_by_code.status_code == 200
     assert len(plan_by_code.json()) == 1
     assert plan_by_code.json()[0]["patient_id"] == patient_id
+    translated = json.loads(plan_by_code.json()[0]["translated_plan_content"])
+    assert translated["parent_title"]
+    assert translated["today_focus"]
+    assert translated["exercises"]
 
     plan_by_name = client.get(f"/api/integration/plan/pending/{display_name}")
     assert plan_by_name.status_code == 200
@@ -606,6 +732,17 @@ def test_family_access_management_rotates_without_exposing_stored_hashes():
     )
     assert extended.status_code == 200
     assert extended.json()["expires_at"] == "2099-12-31T23:59:59"
+
+    permanent = client.post(
+        f"/api/integration/family/access-link/{rotated_link['id']}/extend",
+        json={"expires_at": None},
+    )
+    assert permanent.status_code == 200
+    assert permanent.json()["expires_at"] is None
+
+    permanent_login = client.post("/api/integration/family/login", json={"family_code": "FAM44"})
+    assert permanent_login.status_code == 200
+    assert permanent_login.json()["patient_id"] == patient_id
 
     revoked = client.post(f"/api/integration/family/access-link/{rotated_link['id']}/revoke")
     assert revoked.status_code == 200

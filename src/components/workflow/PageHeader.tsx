@@ -30,11 +30,11 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       <div className={cn('flex flex-col gap-4 xl:flex-row xl:justify-between', compact ? 'xl:items-center' : 'xl:items-end')}>
         <div className="min-w-0">
           {eyebrow ? (
-            <div className={cn('font-semibold text-slate-400', compact ? 'text-[11px] tracking-[0.14em]' : 'text-[11px] uppercase tracking-[0.18em]')}>
+            <div className={cn('font-semibold tracking-[0.14em] text-slate-400', compact ? 'text-xs' : 'text-xs uppercase tracking-[0.18em]')}>
               {eyebrow}
             </div>
           ) : null}
-          <h1 className={cn('font-semibold tracking-tight text-slate-900', compact ? 'mt-1 text-[24px]' : 'mt-2 text-[28px]')}>{title}</h1>
+          <h1 className={cn('font-semibold tracking-tight text-slate-900', compact ? 'mt-1 text-2xl' : 'mt-2 text-3xl')}>{title}</h1>
           <p className={cn('max-w-3xl text-sm leading-6 text-slate-500', compact ? 'mt-1.5' : 'mt-2')}>{description}</p>
           {summary ? <div className={cn('flex flex-wrap items-center gap-2', compact ? 'mt-3' : 'mt-4')}>{summary}</div> : null}
         </div>

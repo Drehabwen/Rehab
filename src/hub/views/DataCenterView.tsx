@@ -112,7 +112,7 @@ export const DataCenterView: React.FC<DataCenterViewProps> = ({
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-900">{task.patientName}</div>
-                      <div className="mt-1 text-xs text-slate-500">接诊 ID {task.visitId}</div>
+                      <div className="mt-1 text-xs text-slate-500">接诊号 {task.visitId}</div>
                     </div>
                     <StatusTag status={task.reportReady ? 'completed' : 'pending'} />
                   </div>

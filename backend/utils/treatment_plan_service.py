@@ -78,7 +78,7 @@ async def generate_treatment_plan(assessment_data: Dict[str, Any]) -> str:
     client = _get_client()
 
     response = await client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
     )
@@ -91,7 +91,7 @@ async def generate_treatment_plan_from_session_report(session_report_data: Dict[
     client = _get_client()
 
     response = await client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.5,
     )
@@ -106,7 +106,7 @@ async def generate_treatment_plan_stream(
     client = _get_client()
 
     stream = await client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         messages=[{"role": "user", "content": prompt}],
         stream=True,
         temperature=0.7,
@@ -125,7 +125,7 @@ async def generate_treatment_plan_stream_from_session_report(
     client = _get_client()
 
     stream = await client.chat.completions.create(
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         messages=[{"role": "user", "content": prompt}],
         stream=True,
         temperature=0.5,

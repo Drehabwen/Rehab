@@ -46,7 +46,7 @@ export const ReportSummarySidebar: React.FC<ReportSummarySidebarProps> = ({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1 flex items-start justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400">当前接诊</div>
+              <div className="text-xs font-semibold tracking-[0.14em] text-slate-400">当前接诊</div>
               <h2 className="mt-1 text-lg font-semibold text-slate-900">接诊摘要</h2>
               <p className="mt-1 text-sm text-slate-500">不展开全文的情况下，快速确认当前患者、接诊与报告状态。</p>
             </div>
@@ -120,7 +120,7 @@ export const ReportSummarySidebar: React.FC<ReportSummarySidebarProps> = ({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1 flex items-start justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400">快速预览</div>
+              <div className="text-xs font-semibold tracking-[0.14em] text-slate-400">快速预览</div>
               <h2 className="mt-1 text-lg font-semibold text-slate-900">报告预览</h2>
               <p className="mt-1 text-sm text-slate-500">这里只显示摘要，避免长文本挤占阅读焦点。</p>
             </div>
@@ -145,7 +145,7 @@ export const ReportSummarySidebar: React.FC<ReportSummarySidebarProps> = ({
       <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_12px_30px_rgba(15,23,42,0.05)]">
         <div className="min-w-0 flex-1 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold tracking-[0.14em] text-slate-400">历史记录</div>
+            <div className="text-xs font-semibold tracking-[0.14em] text-slate-400">历史记录</div>
             <h2 className="mt-1 text-lg font-semibold text-slate-900">报告归档</h2>
             <p className="mt-1 text-sm text-slate-500">保留当前筛选范围内的综合报告，便于复查与导出。</p>
           </div>

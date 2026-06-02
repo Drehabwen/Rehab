@@ -2,6 +2,7 @@ import type { Assessment } from '@/types/assessment';
 import type { Patient } from '@/types/patient';
 import type { Session } from '@/types/session';
 import { generateSessionId } from '@/lib/session-utils';
+import { getPatientPublicCode } from '@/lib/patient-utils';
 
 export type WorkflowToolId = 'vision3' | 'rom' | 'medvoice' | 'scale';
 export type WorkflowStatus = 'completed' | 'pending';
@@ -86,7 +87,8 @@ export function buildVisitTaskSummary(
     : [];
 
   const sessionSequence = latestSession?.sequence ?? 1;
-  const visitId = latestSession?.id ?? generateSessionId(patient.id, sessionSequence);
+  const patientCode = getPatientPublicCode(patient);
+  const visitId = latestSession?.id ?? generateSessionId(patientCode, sessionSequence);
 
   const modules = WORKFLOW_MODULES.map<WorkflowModuleSummary>((module) => {
     const moduleAssessments = activeAssessments.filter((assessment) => assessment.type === module.assessmentType);
@@ -111,7 +113,7 @@ export function buildVisitTaskSummary(
 
   return {
     patient,
-    patientName: patient.name || `患者 ${patient.id}`,
+    patientName: patient.name || `患者 ${patientCode}`,
     visitId,
     sessionId: latestSession?.id ?? null,
     sessionSequence,
