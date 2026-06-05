@@ -109,14 +109,14 @@ export class DataProcessor {
     }
 
     // 2. 计算平移向量 (将下半身胯部中心移动到上半身胯部中心)
-    const upperHipCenter = { x: (u23.x + u24.x) / 2, y: (u23.y + u24.y) / 2 };
-    const lowerHipCenter = { x: (l23.x + l24.x) / 2, y: (l23.y + l24.y) / 2 };
+    const upperHipCenter = { x: (u23.x + u24.x) / 2, y: (u23.y + u24.y) / 2, z: ((u23.z ?? 0) + (u24.z ?? 0)) / 2 };
+    const lowerHipCenter = { x: (l23.x + l24.x) / 2, y: (l23.y + l24.y) / 2, z: ((l23.z ?? 0) + (l24.z ?? 0)) / 2 };
 
-    // 3. 应用变换
+    // 3. 应用变换 (x/y/z 全部经过中心对齐 -> 缩放 -> 平移回目标中心)
     return lower.map(p => ({
       x: (p.x - lowerHipCenter.x) * scale + upperHipCenter.x,
       y: (p.y - lowerHipCenter.y) * scale + upperHipCenter.y,
-      z: p.z * scale, 
+      z: ((p.z ?? 0) - lowerHipCenter.z) * scale + upperHipCenter.z,
       visibility: p.visibility
     }));
   }

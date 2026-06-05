@@ -5,10 +5,11 @@
     cervical: '颈椎',
     shoulder: '肩关节',
     elbow: '肘关节',
-    wrist: '腕关节',
-    hip: '髋关节',
-    knee: '膝关节',
-    ankle: '踝关节',
+    // @deprecated 以下关节暂不支持（单摄像头精度不足）
+    // wrist: '腕关节',
+    // hip: '髋关节',
+    // knee: '膝关节',
+    // ankle: '踝关节',
   },
   directions: {
     flexion: '屈曲',

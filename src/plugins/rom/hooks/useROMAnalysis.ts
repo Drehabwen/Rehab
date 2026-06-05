@@ -42,20 +42,17 @@ export function extractAngleFromResults(
   const landmarks = results.poseLandmarks;
 
   switch (joint) {
-    case 'shoulder':
-      return calculateShoulderAngle(landmarks, side);
-    case 'elbow':
-      return calculateElbowAngle(landmarks, side);
-    case 'wrist':
-      return calculateWristAngle(landmarks, side);
-    case 'hip':
-      return calculateHipAngle(landmarks, side);
-    case 'knee':
-      return calculateKneeAngle(landmarks, side);
-    case 'ankle':
-      return calculateAnkleAngle(landmarks, side);
     case 'cervical':
       return calculateCervicalAngle(landmarks, direction);
+    case 'shoulder':
+      return calculateShoulderAngle(landmarks, side, direction);
+    case 'elbow':
+      return calculateElbowAngle(landmarks, side);
+    // @deprecated 以下关节需要特写或全身视角，单摄像头无法可靠测量
+    // case 'wrist':     return calculateWristAngle(landmarks, side);
+    // case 'hip':       return calculateHipAngle(landmarks, side);
+    // case 'knee':      return calculateKneeAngle(landmarks, side);
+    // case 'ankle':     return calculateAnkleAngle(landmarks, side, direction);
     default:
       return 0;
   }
@@ -67,33 +64,50 @@ export function calculateCervicalAngle(landmarks: any[], direction: MovementDire
   const rightEar = landmarks[8];
   const leftShoulder = landmarks[11];
   const rightShoulder = landmarks[12];
-  const leftHip = landmarks[23];
-  const rightHip = landmarks[24];
 
-  if (!nose || !leftEar || !rightEar || !leftShoulder || !rightShoulder || !leftHip || !rightHip) {
+  if (!nose || !leftEar || !rightEar || !leftShoulder || !rightShoulder) {
     return 0;
   }
 
   const earMid = midpoint3D(leftEar, rightEar);
   const shoulderMid = midpoint3D(leftShoulder, rightShoulder);
-  const hipMid = midpoint3D(leftHip, rightHip);
 
-  const torsoVector = vector3D(hipMid, shoulderMid);
-  const headVector = vector3D(shoulderMid, earMid);
-
+  // ── 前屈 / 后伸（flexion / extension）──
+  // 在正面摄像头视图中，前屈时耳中相对肩中下移、后伸时上移。
+  // 测耳中→肩中连线与垂直方向的夹角，角度越大表示前屈/后伸幅度越大。
   if (direction === 'flexion' || direction === 'extension') {
-    return deviationFromSameLine(torsoVector, headVector);
+    const earToShoulder: Point3D = {
+      x: earMid.x - shoulderMid.x,
+      y: earMid.y - shoulderMid.y,
+      z: 0,
+    };
+    const vertical: Point3D = { x: 0, y: -1, z: 0 };
+    return safeAngleBetween(earToShoulder, vertical);
   }
 
+  // ── 左右侧屈（abduction / adduction → lateral flexion）──
+  // 正面投影中，侧屈时鼻尖偏离躯干中线。
+  // 测鼻子→肩中连线与垂直方向的夹角，角度越大表示侧屈幅度越大。
+  if (direction === 'abduction' || direction === 'adduction') {
+    const noseToMidShoulder: Point3D = {
+      x: nose.x - shoulderMid.x,
+      y: nose.y - shoulderMid.y,
+      z: 0,
+    };
+    const vertical: Point3D = { x: 0, y: -1, z: 0 };
+    return safeAngleBetween(noseToMidShoulder, vertical);
+  }
+
+  // ── 左右旋转（internal_rotation / external_rotation → rotation）──
+  // 测双耳连线与双肩连线的三维夹角，去除 deviationFromSameLine 的
+  // min(angle, 180-angle) 翻转，让旋转角度如实反映颈部转动幅度。
   if (direction === 'internal_rotation' || direction === 'external_rotation') {
     const shoulderLine = vector3D(leftShoulder, rightShoulder);
     const earLine = vector3D(leftEar, rightEar);
-    const transverseRotation = deviationFromSameLine(shoulderLine, earLine);
-    const noseOffset = Math.abs((nose.x || 0) - earMid.x) * 180;
-    return transverseRotation;
+    return safeAngleBetween(shoulderLine, earLine);
   }
 
-  return deviationFromSameLine(torsoVector, headVector);
+  return 0;
 }
 
 export function useROMAnalysis() {
@@ -167,7 +181,7 @@ export function useROMAnalysis() {
   };
 }
 
-function calculateShoulderAngle(landmarks: any[], side: 'left' | 'right'): number {
+function calculateShoulderAngle(landmarks: any[], side: 'left' | 'right', _direction: MovementDirection): number {
   const shoulderIndex = side === 'left' ? 11 : 12;
   const elbowIndex = side === 'left' ? 13 : 14;
   const hipIndex = side === 'left' ? 23 : 24;
@@ -182,7 +196,10 @@ function calculateShoulderAngle(landmarks: any[], side: 'left' | 'right'): numbe
 
   const torsoVector = vector3D(shoulder, hip);
   const armVector = vector3D(shoulder, elbow);
-  return deviationFromSameLine(torsoVector, armVector);
+  // 使用 safeAngleBetween 而非 deviationFromSameLine:
+  // deviationFromSameLine 在手臂过头(180°)时返回 0°，因为 min(180, |180-180|)=0
+  // 肩关节屈曲/外展范围 0-180°，应直接用原始3D夹角
+  return safeAngleBetween(torsoVector, armVector);
 }
 
 function calculateElbowAngle(landmarks: any[], side: 'left' | 'right'): number {
@@ -201,6 +218,7 @@ function calculateElbowAngle(landmarks: any[], side: 'left' | 'right'): number {
   return deviationFromStraight(vector3D(elbow, shoulder), vector3D(elbow, wrist));
 }
 
+/** @deprecated 腕关节角度计算 — 摄像头无法精确捕捉手腕小关节动作，保留代码以便后续硬件升级后恢复 */
 function calculateWristAngle(landmarks: any[], side: 'left' | 'right'): number {
   const elbowIndex = side === 'left' ? 13 : 14;
   const wristIndex = side === 'left' ? 15 : 16;
@@ -217,6 +235,7 @@ function calculateWristAngle(landmarks: any[], side: 'left' | 'right'): number {
   return deviationFromStraight(vector3D(wrist, elbow), vector3D(wrist, hand));
 }
 
+/** @deprecated 髋关节角度计算 — 需要全身视角，单摄像头实际使用率低，保留代码以便后续恢复 */
 function calculateHipAngle(landmarks: any[], side: 'left' | 'right'): number {
   const shoulderIndex = side === 'left' ? 11 : 12;
   const hipIndex = side === 'left' ? 23 : 24;
@@ -233,6 +252,7 @@ function calculateHipAngle(landmarks: any[], side: 'left' | 'right'): number {
   return deviationFromStraight(vector3D(hip, shoulder), vector3D(hip, knee));
 }
 
+/** @deprecated 膝关节角度计算 — 需要全身视角，单摄像头实际使用率低，保留代码以便后续恢复 */
 function calculateKneeAngle(landmarks: any[], side: 'left' | 'right'): number {
   const hipIndex = side === 'left' ? 23 : 24;
   const kneeIndex = side === 'left' ? 25 : 26;
@@ -249,7 +269,8 @@ function calculateKneeAngle(landmarks: any[], side: 'left' | 'right'): number {
   return deviationFromStraight(vector3D(knee, hip), vector3D(knee, ankle));
 }
 
-function calculateAnkleAngle(landmarks: any[], side: 'left' | 'right'): number {
+/** @deprecated 踝关节角度计算 — 摄像头无法精确捕捉脚踝小关节动作，保留代码以便后续硬件升级后恢复 */
+function calculateAnkleAngle(landmarks: any[], side: 'left' | 'right', _direction: MovementDirection): number {
   const kneeIndex = side === 'left' ? 25 : 26;
   const ankleIndex = side === 'left' ? 27 : 28;
   const footIndex = side === 'left' ? 31 : 32;
@@ -262,5 +283,9 @@ function calculateAnkleAngle(landmarks: any[], side: 'left' | 'right'): number {
   const ankle = landmarks[ankleIndex];
   const foot = landmarks[footIndex];
 
-  return deviationFromSameLine(vector3D(ankle, knee), vector3D(ankle, foot));
+  // 踝关节 ROM 从中立位(足与小腿垂直，~90°)测量
+  // deviationFromSameLine 不适用，因为中立位时足与小腿垂直(~90°)，不是共线(0°或180°)
+  // 正确计算: 测量实际3D夹角，再计算与中立位(90°)的偏离
+  const legFootAngle = safeAngleBetween(vector3D(ankle, knee), vector3D(ankle, foot));
+  return Math.abs(90 - legFootAngle);
 }

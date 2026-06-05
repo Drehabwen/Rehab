@@ -267,11 +267,13 @@ def analyze_posture(
         r_ankle = get_point(LANDMARKS["RIGHT_ANKLE"])
         mid_ankle_x = (l_ankle["x"] + r_ankle["x"]) / 2
         
-        # 4. Shoulder alignment
-        dx_s = abs(l_shoulder["x"] - r_shoulder["x"]) or 1
-        dy_s = abs(l_shoulder["y"] - r_shoulder["y"])
-        shoulder_slope = dy_s / dx_s
-        metrics.shoulderAngle = round(math.atan(shoulder_slope) * (180 / math.pi), 1)
+        # 4. Shoulder alignment (signed angle, positive = left higher, negative = right higher)
+        # Use atan2 to preserve sign, matching frontend convention
+        dy_s = r_shoulder["y"] - l_shoulder["y"]
+        dx_s = r_shoulder["x"] - l_shoulder["x"]
+        metrics.shoulderAngle = round(math.degrees(math.atan2(dy_s, dx_s)), 1)
+        # Preserve original slope magnitude for backward-compatible threshold checks
+        shoulder_slope = (abs(dy_s) / abs(dx_s)) if abs(dx_s) > 1e-6 else 0
 
         # 1.5 Head Tilt Analysis (Front View)
         l_ear = get_point(LANDMARKS["LEFT_EAR"])
@@ -317,11 +319,13 @@ def analyze_posture(
                 label=f"倾斜: {metrics.shoulderAngle}°"
             ))
 
-        # 2. Hip alignment
-        dx_h = abs(l_hip["x"] - r_hip["x"]) or 1
-        dy_h = abs(l_hip["y"] - r_hip["y"])
-        hip_slope = dy_h / dx_h
-        metrics.hipAngle = round(math.atan(hip_slope) * (180 / math.pi), 1)
+        # 2. Hip alignment (signed angle, positive = left higher, negative = right higher)
+        # Use atan2 to preserve sign, matching frontend convention
+        dy_h = r_hip["y"] - l_hip["y"]
+        dx_h = r_hip["x"] - l_hip["x"]
+        metrics.hipAngle = round(math.degrees(math.atan2(dy_h, dx_h)), 1)
+        # Preserve original slope magnitude for backward-compatible threshold checks
+        hip_slope = (abs(dy_h) / abs(dx_h)) if abs(dx_h) > 1e-6 else 0
 
         if hip_slope > config.POSTURE_THRESHOLDS['uneven_hips']['mild']:
             is_left_high = l_hip["y"] < r_hip["y"]

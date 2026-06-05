@@ -8,14 +8,10 @@ interface ROMEntryHubProps {
   onStartAssessment: (joint: JointType, direction: MovementDirection, side: 'left' | 'right') => void;
 }
 
-const jointLabels: Record<JointType, string> = {
+const jointLabels: Partial<Record<JointType, string>> = {
+  cervical: '颈椎',
   shoulder: '肩关节',
   elbow: '肘关节',
-  wrist: '腕关节',
-  hip: '髋关节',
-  knee: '膝关节',
-  ankle: '踝关节',
-  cervical: '颈椎',
 };
 
 const directionLabels: Record<MovementDirection, string> = {
@@ -27,14 +23,10 @@ const directionLabels: Record<MovementDirection, string> = {
   external_rotation: '外旋',
 };
 
-const defaultDirectionsByJoint: Record<JointType, MovementDirection[]> = {
-  shoulder: ['flexion', 'extension', 'abduction', 'external_rotation'],
-  elbow: ['flexion', 'extension', 'internal_rotation', 'external_rotation'],
-  wrist: ['flexion', 'extension', 'abduction', 'adduction'],
-  hip: ['flexion', 'extension', 'abduction', 'internal_rotation'],
-  knee: ['flexion', 'extension', 'abduction', 'adduction'],
-  ankle: ['flexion', 'extension', 'abduction', 'adduction'],
-  cervical: ['flexion', 'extension', 'internal_rotation', 'external_rotation'],
+const defaultDirectionsByJoint: Partial<Record<JointType, MovementDirection[]>> = {
+  cervical: ['abduction', 'adduction', 'internal_rotation', 'external_rotation'],
+  shoulder: ['flexion', 'abduction'],
+  elbow: ['flexion'],
 };
 
 const durationByDirection: Record<MovementDirection, string> = {
@@ -48,7 +40,7 @@ const durationByDirection: Record<MovementDirection, string> = {
 
 export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) => {
   const [selectedSide, setSelectedSide] = useState<'left' | 'right'>('left');
-  const joints: JointType[] = ['shoulder', 'elbow', 'wrist', 'hip', 'knee', 'ankle', 'cervical'];
+  const joints: JointType[] = ['cervical', 'shoulder', 'elbow'];
 
   const summaryText = useMemo(
     () => (selectedSide === 'left' ? '当前将执行左侧关节测量' : '当前将执行右侧关节测量'),
@@ -60,7 +52,7 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
       <div className="rehab-page-inner">
         <PageTitleSection
           title="关节活动度评估"
-          description="先选侧别，再从动作列表开始测量。单项流程可在 2 秒内启动。"
+          description="先选侧别，再从动作列表开始测量。当前版本支持颈椎、肩关节、肘关节，其余关节需要特写镜头暂不支持。单项流程可在 2 秒内启动。"
           right={
             <div className="flex items-center gap-2">
               <UnifiedStatusBadge status="processing" text={summaryText} className="hidden xl:inline-flex" />
@@ -88,7 +80,7 @@ export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) =
               <Sparkles size={14} className="text-emerald-600" />
               <span className="text-sm font-semibold">流程建议</span>
             </div>
-            <p className="text-xs text-slate-600">优先肩关节与髋关节，可快速识别代偿模式。</p>
+            <p className="text-xs text-slate-600">优先测量颈椎与肩关节，可快速识别代偿模式。保持动作稳定 3-5 秒。</p>
           </div>
           <div className="bento-card p-4">
             <div className="flex items-center gap-2 text-slate-900 mb-1">

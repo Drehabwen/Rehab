@@ -5,10 +5,14 @@ export const jointNameMap: Record<string, string> = {
   cervical: '颈椎',
   shoulder: '肩关节',
   elbow: '肘关节',
-  wrist: '腕关节',
-  hip: '髋关节',
-  knee: '膝关节',
-  ankle: '踝关节',
+  // @deprecated 腕关节：摄像头无法精确捕捉手腕动作
+  // wrist: '腕关节',
+  // @deprecated 髋关节：需要全身视角，单摄像头实际使用率低
+  // hip: '髋关节',
+  // @deprecated 膝关节：需要全身视角，单摄像头实际使用率低
+  // knee: '膝关节',
+  // @deprecated 踝关节：摄像头无法精确捕捉脚踝动作
+  // ankle: '踝关节',
 };
 
 export const directionNameMap: Record<string, string> = {
@@ -20,62 +24,24 @@ export const directionNameMap: Record<string, string> = {
   external_rotation: '外旋',
 };
 
-export const normalROMRanges: Record<JointType, Record<MovementDirection, { min: number; max: number }>> = {
+export const normalROMRanges: Partial<Record<JointType, Partial<Record<MovementDirection, { min: number; max: number }>>>> = {
+  // ── 颈椎：左右旋转 + 左右侧屈（正面摄像头可测）──
   cervical: {
-    flexion: { min: 0, max: 45 },
-    extension: { min: 0, max: 45 },
+    // 颈椎侧屈 (lateral flexion) — 使用 abduction/adduction 作为通用方向
     abduction: { min: 0, max: 45 },
     adduction: { min: 0, max: 45 },
-    internal_rotation: { min: 0, max: 45 },
-    external_rotation: { min: 0, max: 45 },
+    // 颈椎旋转
+    internal_rotation: { min: 0, max: 80 },
+    external_rotation: { min: 0, max: 80 },
   },
+  // ── 肩关节：前屈 + 外展（正面/侧面摄像头可测）──
   shoulder: {
     flexion: { min: 0, max: 180 },
-    extension: { min: 0, max: 60 },
     abduction: { min: 0, max: 180 },
-    adduction: { min: 0, max: 40 },
-    internal_rotation: { min: 0, max: 90 },
-    external_rotation: { min: 0, max: 90 },
   },
+  // ── 肘关节：屈曲（侧面摄像头可测）──
   elbow: {
     flexion: { min: 0, max: 145 },
-    extension: { min: 0, max: 0 },
-    abduction: { min: 0, max: 0 },
-    adduction: { min: 0, max: 0 },
-    internal_rotation: { min: 0, max: 90 },
-    external_rotation: { min: 0, max: 90 },
-  },
-  wrist: {
-    flexion: { min: 0, max: 80 },
-    extension: { min: 0, max: 70 },
-    abduction: { min: 0, max: 20 },
-    adduction: { min: 0, max: 30 },
-    internal_rotation: { min: 0, max: 0 },
-    external_rotation: { min: 0, max: 0 },
-  },
-  hip: {
-    flexion: { min: 0, max: 120 },
-    extension: { min: 0, max: 30 },
-    abduction: { min: 0, max: 45 },
-    adduction: { min: 0, max: 30 },
-    internal_rotation: { min: 0, max: 45 },
-    external_rotation: { min: 0, max: 45 },
-  },
-  knee: {
-    flexion: { min: 0, max: 135 },
-    extension: { min: 0, max: 0 },
-    abduction: { min: 0, max: 10 },
-    adduction: { min: 0, max: 10 },
-    internal_rotation: { min: 0, max: 30 },
-    external_rotation: { min: 0, max: 30 },
-  },
-  ankle: {
-    flexion: { min: 0, max: 20 },
-    extension: { min: 0, max: 45 },
-    abduction: { min: 0, max: 20 },
-    adduction: { min: 0, max: 20 },
-    internal_rotation: { min: 0, max: 30 },
-    external_rotation: { min: 0, max: 30 },
   },
 };
 
