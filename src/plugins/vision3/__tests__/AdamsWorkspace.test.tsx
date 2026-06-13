@@ -100,25 +100,25 @@ describe('AdamsWorkspace Component', () => {
     // Initial state: 0 degrees, normal risk
     expect(screen.getByText('0°')).toBeInTheDocument();
     expect(screen.getByText('水平正常')).toBeInTheDocument();
-    expect(screen.getByText(/未发现明显躯干旋转/)).toBeInTheDocument();
+    expect(screen.getByText(/脊柱轴线对称/)).toBeInTheDocument();
 
     // 1. Change to 3 degrees (Low risk)
     fireEvent.change(slider, { target: { value: 3 } });
     expect(screen.getByText('3°')).toBeInTheDocument();
     expect(screen.getByText('轻微偏斜 (低危)')).toBeInTheDocument();
-    expect(screen.getByText(/轻微体表不对称/)).toBeInTheDocument();
+    expect(screen.getByText(/保持坐姿端正/)).toBeInTheDocument();
 
     // 2. Change to 6 degrees (Medium risk)
     fireEvent.change(slider, { target: { value: 6 } });
     expect(screen.getByText('6°')).toBeInTheDocument();
     expect(screen.getByText('中度旋转 (中危)')).toBeInTheDocument();
-    expect(screen.getByText(/临床建议密切随访/)).toBeInTheDocument();
+    expect(screen.getByText(/Schroth/)).toBeInTheDocument();
 
     // 3. Change to 8 degrees (High risk)
     fireEvent.change(slider, { target: { value: 8 } });
     expect(screen.getByText('8°')).toBeInTheDocument();
     expect(screen.getByText('重度旋转 (高危)')).toBeInTheDocument();
-    expect(screen.getByText(/建议立即转诊至骨科拍 X 光/)).toBeInTheDocument();
+    expect(screen.getByText(/评估 Cobb 角/)).toBeInTheDocument();
   });
 
   it('should update clinical symmetry assessment selections correctly', async () => {
