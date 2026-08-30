@@ -30,11 +30,12 @@ from models import (
     TreatmentPlanRequest, TreatmentPlanResponse, TreatmentPlanStreamResponse,
     SessionTreatmentPlanRequest,
     SessionReportRequest, SessionReportResponse,
+    LLMReportRequest, LLMReportResponse,
 )
 from utils.posture_analysis import analyze_posture
 from utils.joint_analysis import calculate_joint_angle
 from utils.camera_stream import CameraManager
-from utils.llm_reporter import generate_posture_report, posture_agent
+from utils.llm_reporter import generate_posture_report, generate_workbench_report, posture_agent
 from utils.narrator import process_time_series
 from utils.treatment_plan_service import (
     generate_treatment_plan,
@@ -570,6 +571,28 @@ async def health_check():
             "medvoice_integrated": medvoice_integrated,
         },
     }
+
+
+@app.get("/ready")
+async def readiness_check():
+    try:
+        conn = integration.get_db_connection()
+        try:
+            conn.execute("SELECT 1").fetchone()
+        finally:
+            conn.close()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="database is not ready") from exc
+    return {"status": "ready"}
+
+
+@app.post("/api/llm/report", response_model=LLMReportResponse)
+async def generate_llm_report(request: LLMReportRequest) -> LLMReportResponse:
+    try:
+        content = await run_in_threadpool(generate_workbench_report, request.prompt)
+        return LLMReportResponse(content=content)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.post("/api/treatment-plan/generate")

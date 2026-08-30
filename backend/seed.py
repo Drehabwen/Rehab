@@ -20,7 +20,12 @@ if sys.platform == 'win32':
     import io
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rehab_integration.db")
+DB_PATH = os.path.abspath(
+    os.getenv(
+        "REHAB_DB_PATH",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "rehab_integration.db"),
+    )
+)
 FAMILY_CODE_HASH_NAMESPACE = "rehab-family-code:v1:"
 FAMILY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 SHORT_CODE_ALPHABET = "ABCDEFGHJKLMNPRTUVWXYZ"  # 20字符，无 I/O/Q 防混淆

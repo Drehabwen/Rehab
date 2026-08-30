@@ -14,10 +14,10 @@ class AssessmentDataUnavailableError(RuntimeError):
 
 
 def _get_api_key() -> str:
-    api_key = (os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY") or "").strip()
+    api_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
     if not api_key:
         raise TreatmentPlanConfigError(
-            "DEEPSEEK_API_KEY (or VITE_DEEPSEEK_API_KEY) is missing; treatment plan generation is unavailable."
+            "DEEPSEEK_API_KEY is missing; treatment plan generation is unavailable."
         )
     return api_key
 

@@ -14,7 +14,6 @@ class TranslationConfig:
     def api_key(self) -> str:
         return (
             os.environ.get("DEEPSEEK_API_KEY")
-            or os.environ.get("VITE_DEEPSEEK_API_KEY")
             or ""
         ).strip()
 

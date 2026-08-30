@@ -1,5 +1,9 @@
-const DEFAULT_API_BASE_URL = 'http://localhost:8000';
-const DEFAULT_WS_URL = 'ws://localhost:8000/ws/analyze';
+const browserOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+const browserWsOrigin = browserOrigin.replace(/^http/, 'ws');
+const DEFAULT_API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : browserOrigin;
+const DEFAULT_WS_URL = import.meta.env.DEV
+  ? 'ws://localhost:8000/ws/analyze'
+  : `${browserWsOrigin}/ws/analyze`;
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
 
