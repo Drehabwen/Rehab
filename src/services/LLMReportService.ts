@@ -1,20 +1,14 @@
-import { APP_CONFIG } from '../config/appConfig';
+import { CONFIG } from '../config';
 
 export class LLMReportService {
-  private apiKey: string;
   private apiEndpoint: string;
 
   constructor() {
-    this.apiKey = APP_CONFIG.LLM_API_KEY || '';
-    this.apiEndpoint = APP_CONFIG.LLM_API_ENDPOINT || 'https://api.deepseek.com/v1/chat/completions';
+    this.apiEndpoint = `${CONFIG.api.baseUrl}/api/llm/report`;
   }
 
   async generateReport(prompt: string, format: 'markdown' | 'html' | 'pdf'): Promise<string> {
     try {
-      if (!this.apiKey) {
-        throw new Error('LLM API密钥未配置');
-      }
-
       const response = await this.callLLM(prompt);
       let content = this.extractContent(response);
 
@@ -32,30 +26,12 @@ export class LLMReportService {
   }
 
   private async callLLM(prompt: string): Promise<any> {
-    const requestBody = {
-      model: APP_CONFIG.LLM_MODEL || 'deepseek-v4-flash',
-      messages: [
-        {
-          role: 'system',
-          content: '你是一位专业的康复医学专家，擅长分析评估数据并生成详细的康复报告。请根据提供的数据生成专业、准确、详细的报告。'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-      top_p: 0.95
-    };
-
     const response = await fetch(this.apiEndpoint, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({ prompt })
     });
 
     if (!response.ok) {
@@ -66,6 +42,9 @@ export class LLMReportService {
   }
 
   private extractContent(response: any): string {
+    if (typeof response?.content === 'string' && response.content.trim()) {
+      return response.content;
+    }
     if (response && response.choices && response.choices.length > 0) {
       return response.choices[0].message?.content || '';
     }

@@ -5,9 +5,10 @@ import type {
   FamilyAccessLink, ParentReportResult,
   PatientReminders, AllRemindersResponse,
 } from './integrationService.types';
+import { CONFIG } from '@/config';
 
 // Phase 5: 统一数据后端 — 所有 API 调用走 Rehab Python (:8000) 作为唯一数据源
-const API_URL = 'http://localhost:8000/api/integration';
+const API_URL = `${CONFIG.api.baseUrl}/api/integration`;
 
 export class IntegrationService {
   /**

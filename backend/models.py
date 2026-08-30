@@ -194,3 +194,11 @@ class SessionReportResponse(BaseModel):
     recommendations: List[str] = []
     createdAt: int
     sourceAssessmentIds: List[str] = []
+
+
+class LLMReportRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=60000)
+
+
+class LLMReportResponse(BaseModel):
+    content: str
