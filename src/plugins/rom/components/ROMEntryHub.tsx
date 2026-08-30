@@ -19,12 +19,14 @@ const directionLabels: Record<MovementDirection, string> = {
   extension: '伸展',
   abduction: '外展',
   adduction: '内收',
+  lateral_flexion: '侧屈',
   internal_rotation: '内旋',
   external_rotation: '外旋',
+  rotation: '旋转',
 };
 
 const defaultDirectionsByJoint: Partial<Record<JointType, MovementDirection[]>> = {
-  cervical: ['abduction', 'adduction', 'internal_rotation', 'external_rotation'],
+  cervical: ['flexion', 'extension', 'lateral_flexion', 'rotation'],
   shoulder: ['flexion', 'abduction'],
   elbow: ['flexion'],
 };
@@ -34,8 +36,10 @@ const durationByDirection: Record<MovementDirection, string> = {
   extension: '30-40 秒',
   abduction: '35-45 秒',
   adduction: '35-45 秒',
+  lateral_flexion: '35-45 秒',
   internal_rotation: '40-50 秒',
   external_rotation: '40-50 秒',
+  rotation: '40-50 秒',
 };
 
 export const ROMEntryHub: React.FC<ROMEntryHubProps> = ({ onStartAssessment }) => {

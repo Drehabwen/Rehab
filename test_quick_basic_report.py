@@ -7,7 +7,7 @@ import websockets
 
 async def test_quick_basic_report():
     """测试快速评估的基础报告生成"""
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     
     print("🧪 测试快速评估基础报告生成...")
     print(f"连接 WebSocket: {uri}")

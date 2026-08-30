@@ -38,7 +38,7 @@ console.log('   帧数:', testData.frames.length);
 console.log('   视角:', testData.frames[0].view);
 console.log('');
 
-const ws = new WebSocket('ws://localhost:8002/ws/analyze');
+const ws = new WebSocket('ws://localhost:8000/ws/analyze');
 
 let testPassed = {
   connection: false,

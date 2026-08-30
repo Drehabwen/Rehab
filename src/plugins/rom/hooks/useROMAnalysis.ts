@@ -85,10 +85,11 @@ export function calculateCervicalAngle(landmarks: any[], direction: MovementDire
     return safeAngleBetween(earToShoulder, vertical);
   }
 
-  // ── 左右侧屈（abduction / adduction → lateral flexion）──
+  // ── 左右侧屈（lateral_flexion）──
+  // 兼容旧版 abduction/adduction 标签，新版统一使用 lateral_flexion。
   // 正面投影中，侧屈时鼻尖偏离躯干中线。
   // 测鼻子→肩中连线与垂直方向的夹角，角度越大表示侧屈幅度越大。
-  if (direction === 'abduction' || direction === 'adduction') {
+  if (direction === 'lateral_flexion' || direction === 'abduction' || direction === 'adduction') {
     const noseToMidShoulder: Point3D = {
       x: nose.x - shoulderMid.x,
       y: nose.y - shoulderMid.y,
@@ -101,7 +102,7 @@ export function calculateCervicalAngle(landmarks: any[], direction: MovementDire
   // ── 左右旋转（internal_rotation / external_rotation → rotation）──
   // 测双耳连线与双肩连线的三维夹角，去除 deviationFromSameLine 的
   // min(angle, 180-angle) 翻转，让旋转角度如实反映颈部转动幅度。
-  if (direction === 'internal_rotation' || direction === 'external_rotation') {
+  if (direction === 'internal_rotation' || direction === 'external_rotation' || direction === 'rotation') {
     const shoulderLine = vector3D(leftShoulder, rightShoulder);
     const earLine = vector3D(leftEar, rightEar);
     return safeAngleBetween(shoulderLine, earLine);

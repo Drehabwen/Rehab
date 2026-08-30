@@ -218,6 +218,32 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     });
   }, [activeSessionInput]);
 
+  /** MedVoice 评估条目（如果有），用于提升到页面顶部渲染 */
+  const medvoiceEntry = useMemo(() => {
+    return assessmentOutputs.find((a) => a.type === 'medvoice') ?? null;
+  }, [assessmentOutputs]);
+
+  /** 非 MedVoice 的评估条目，传给 ModuleResultsGrid 按原有布局展示 */
+  const moduleOutputs = useMemo(() => {
+    return assessmentOutputs.filter((a) => a.type !== 'medvoice');
+  }, [assessmentOutputs]);
+
+  /** 如果 medvoice 存在，提取结构化病历中的字段用于 C 位卡片 */
+  const medvoiceCardData = useMemo(() => {
+    if (!medvoiceEntry?.output) return null;
+    const mvData = medvoiceEntry.output.sourceAssessment?.data?.medvoice;
+    if (!mvData?.structuredCase) return null;
+    const sc = mvData.structuredCase;
+    const chiefComplaint = sc['主诉'] || sc['S'] || '';
+    const diagnosis = sc['诊断'] || sc['A'] || '';
+    // 病程摘要：合并所有有内容的字段，取前 200 字
+    const allText = Object.values(sc)
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      .join(' ');
+    const summary = allText.length > 200 ? `${allText.slice(0, 200)}...` : allText;
+    return { chiefComplaint, diagnosis, summary };
+  }, [medvoiceEntry]);
+
   // Export handlers
   const exportToJson = (assessment: Assessment) => {
     const blob = new Blob([JSON.stringify(assessment, null, 2)], { type: 'application/json' });
@@ -425,8 +451,40 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
         ) : (
           <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-4">
+              {medvoiceCardData && (
+                <Card variant="default" padding="lg" className="border-violet-200 bg-white shadow-[0_4px_16px_rgba(139,92,246,0.08)]">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+                      <Mic size={22} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base font-semibold text-slate-900">本次接诊病历</h3>
+                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">语音问诊</span>
+                      </div>
+                      {medvoiceCardData.chiefComplaint && (
+                        <p className="mt-2 text-sm text-slate-700">
+                          <span className="font-medium text-slate-800">主诉：</span>
+                          {medvoiceCardData.chiefComplaint}
+                        </p>
+                      )}
+                      {medvoiceCardData.diagnosis && (
+                        <p className="mt-1 text-sm text-slate-700">
+                          <span className="font-medium text-slate-800">诊断：</span>
+                          {medvoiceCardData.diagnosis}
+                        </p>
+                      )}
+                      {medvoiceCardData.summary && (
+                        <p className="mt-2 text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-2">
+                          {medvoiceCardData.summary}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
               <ModuleResultsGrid
-                assessmentOutputs={assessmentOutputs}
+                assessmentOutputs={moduleOutputs}
                 onViewDetails={setSelectedAssessment}
                 readyCount={activeSessionInput.readiness.readyCount}
               />

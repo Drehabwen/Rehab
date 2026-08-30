@@ -2,7 +2,7 @@ import requests
 import json
 import time
 
-BASE_URL = "http://127.0.0.1:8002"
+BASE_URL = "http://127.0.0.1:8000"
 
 def main():
     print("==================================================")
@@ -16,7 +16,7 @@ def main():
         print(f"-> 状态码: {r.status_code}")
         print(f"-> 返回数据: {json.dumps(r.json(), ensure_ascii=False, indent=2)}")
     except Exception as e:
-        print(f"❌ 无法连接到服务，请确保 uvicorn 正在 localhost:8002 运行: {e}")
+        print(f"❌ 无法连接到服务，请确保 uvicorn 正在 localhost:8000 运行: {e}")
         return
 
     # 2. 模拟从早筛端同步一条新的受试者记录

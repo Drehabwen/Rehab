@@ -6,7 +6,7 @@ import math
 import random
 
 async def simulate_posture_sync():
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     print(f"Connecting to {uri}...")
     
     try:
@@ -66,7 +66,7 @@ async def simulate_posture_sync():
         print(f"Error: {e}")
 
 async def simulate_stepped_analysis():
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     print(f"\nConnecting to {uri} for stepped analysis...")
     
     try:

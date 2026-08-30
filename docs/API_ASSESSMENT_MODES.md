@@ -175,11 +175,11 @@ interface UseVision3EventHandlerReturn {
 
 ### 1. WebSocket 连接
 
-**端点**: `ws://localhost:8002/ws/analyze`
+**端点**: `ws://localhost:8000/ws/analyze`
 
 **连接示例**:
 ```javascript
-const ws = new WebSocket('ws://localhost:8002/ws/analyze');
+const ws = new WebSocket('ws://localhost:8000/ws/analyze');
 
 ws.onopen = () => {
   console.log('WebSocket connected');

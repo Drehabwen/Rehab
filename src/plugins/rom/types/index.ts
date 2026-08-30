@@ -7,13 +7,15 @@ export type JointType =
   | 'knee'        // 膝关节
   | 'ankle';      // 踝关节
 
-export type MovementDirection = 
-  | 'flexion'     // 屈曲
-  | 'extension'   // 伸展
-  | 'abduction'   // 外展
-  | 'adduction'   // 内收
-  | 'internal_rotation'  // 内旋
-  | 'external_rotation'; // 外旋
+export type MovementDirection =
+  | 'flexion'     // 屈曲/前屈
+  | 'extension'   // 伸展/后伸
+  | 'abduction'   // 外展（肩/髋用）
+  | 'adduction'   // 内收（肩/髋用）
+  | 'lateral_flexion'  // 侧屈（脊柱）
+  | 'internal_rotation'  // 内旋（四肢）
+  | 'external_rotation' // 外旋（四肢）
+  | 'rotation';   // 旋转（脊柱：颈椎）
 
 export interface ROMData {
   joint: JointType;

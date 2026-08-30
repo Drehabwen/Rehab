@@ -3,8 +3,7 @@ import time
 from websocket import create_connection
 
 def test_basic_ws():
-    # Changed port to 8002 to avoid conflicts
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     print(f"📡 Connecting to {uri}...")
     
     try:

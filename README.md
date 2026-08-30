@@ -53,8 +53,8 @@ python main.py
 
 默认后端地址：
 
-- HTTP: `http://localhost:8002`
-- WebSocket: `ws://localhost:8002/ws/analyze`
+- HTTP: `http://localhost:8000`
+- WebSocket: `ws://localhost:8000/ws/analyze`
 
 ## 常用命令
 

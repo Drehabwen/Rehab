@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # 测试配置
-WS_URL = "ws://localhost:8002/ws/analyze"
+WS_URL = "ws://localhost:8000/ws/analyze"
 TEST_TIMEOUT = 30  # 秒
 
 class DataFlowTest:

@@ -16,23 +16,23 @@ export const jointNameMap: Record<string, string> = {
 };
 
 export const directionNameMap: Record<string, string> = {
-  flexion: '屈曲',
-  extension: '伸展',
+  flexion: '前屈',
+  extension: '后伸',
   abduction: '外展',
   adduction: '内收',
+  lateral_flexion: '侧屈',
   internal_rotation: '内旋',
   external_rotation: '外旋',
+  rotation: '旋转',
 };
 
 export const normalROMRanges: Partial<Record<JointType, Partial<Record<MovementDirection, { min: number; max: number }>>>> = {
-  // ── 颈椎：左右旋转 + 左右侧屈（正面摄像头可测）──
+  // ── 颈椎：前屈 + 后伸 + 侧屈 + 旋转（正面摄像头可测）──
   cervical: {
-    // 颈椎侧屈 (lateral flexion) — 使用 abduction/adduction 作为通用方向
-    abduction: { min: 0, max: 45 },
-    adduction: { min: 0, max: 45 },
-    // 颈椎旋转
-    internal_rotation: { min: 0, max: 80 },
-    external_rotation: { min: 0, max: 80 },
+    flexion: { min: 0, max: 45 },           // 前屈
+    extension: { min: 0, max: 45 },          // 后伸
+    lateral_flexion: { min: 0, max: 45 },    // 侧屈（左右对称）
+    rotation: { min: 0, max: 80 },  // 左旋/右旋对称，共用一个范围
   },
   // ── 肩关节：前屈 + 外展（正面/侧面摄像头可测）──
   shoulder: {

@@ -2,7 +2,7 @@
 
 class Config:
     # WebSocket 配置
-    WEBSOCKET_URL = 'ws://localhost:8002/ws/analyze'
+    WEBSOCKET_URL = 'ws://localhost:8000/ws/analyze'
     
     # 视频配置
     DEFAULT_VIDEO_WIDTH = 640

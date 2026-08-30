@@ -16,8 +16,10 @@
     extension: '伸展',
     abduction: '外展',
     adduction: '内收',
+    lateral_flexion: '侧屈',
     internal_rotation: '内旋',
     external_rotation: '外旋',
+    rotation: '旋转',
   },
   status: {
     normal: '正常',

@@ -6,8 +6,8 @@
 
 ## 1. Base Addresses
 
-- HTTP base: `http://localhost:8002`
-- WebSocket: `ws://localhost:8002/ws/analyze`
+- HTTP base: `http://localhost:8000`
+- WebSocket: `ws://localhost:8000/ws/analyze`
 
 前端默认配置来源：
 

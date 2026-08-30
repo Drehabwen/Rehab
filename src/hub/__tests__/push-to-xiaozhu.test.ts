@@ -12,8 +12,8 @@ describe('Therapist to Chatbot "小柱" (Xiao Zhu) Push Integration Flow', () =>
     const sessionId = 'session-2026-05-23';
     const therapistName = '张医生';
 
-    // Step 1: Mock Integration Server on Port 8002
-    console.log('Step 1: Mocking Integration Server database state on port 8002...');
+    // Step 1: Mock Integration Server on Port 8000
+    console.log('Step 1: Mocking Integration Server database state on port 8000...');
     const databaseStore = {
       pendingTasks: [] as Array<{
         task_id: string;
@@ -26,7 +26,7 @@ describe('Therapist to Chatbot "小柱" (Xiao Zhu) Push Integration Flow', () =>
       }>
     };
 
-    // Global fetch mock to simulate ports 8002 communication
+    // Global fetch mock to simulate port 8000 communication
     const mockFetch = vi.fn().mockImplementation(async (url: string, options?: RequestInit) => {
       // 1. POST /api/integration/scale/push
       if (url.includes('/api/integration/scale/push') && options?.method === 'POST') {
@@ -41,7 +41,7 @@ describe('Therapist to Chatbot "小柱" (Xiao Zhu) Push Integration Flow', () =>
           status: 'pending' as const
         };
         databaseStore.pendingTasks.push(newTask);
-        console.log(`[Integration DB 8002] Pushed new scale task: ${newTask.task_id} (${newTask.scale_id})`);
+        console.log(`[Integration DB 8000] Pushed new scale task: ${newTask.task_id} (${newTask.scale_id})`);
         return {
           ok: true,
           json: async () => ({ task_id: newTask.task_id, status: 'success' })
@@ -51,7 +51,7 @@ describe('Therapist to Chatbot "小柱" (Xiao Zhu) Push Integration Flow', () =>
       // 2. GET /api/integration/scale/pending/:patientId
       if (url.includes(`/api/integration/scale/pending/${patientId}`)) {
         const matchedTasks = databaseStore.pendingTasks.filter(t => t.patient_id === patientId && t.status === 'pending');
-        console.log(`[Integration DB 8002] Retrieved pending tasks count: ${matchedTasks.length} for patient: ${patientId}`);
+        console.log(`[Integration DB 8000] Retrieved pending tasks count: ${matchedTasks.length} for patient: ${patientId}`);
         return {
           ok: true,
           json: async () => matchedTasks.map(t => ({
@@ -87,7 +87,7 @@ describe('Therapist to Chatbot "小柱" (Xiao Zhu) Push Integration Flow', () =>
     console.log('\nStep 3: Chatbot Agent "小柱" (parent client) initializes for李奶奶 (patient-101)...');
     
     // Simulate useAgentStore.getState().initWithPatient() fetching pending scales
-    const pendingScalesResponse = await fetch(`http://localhost:8002/api/integration/scale/pending/${patientId}`);
+    const pendingScalesResponse = await fetch(`http://localhost:8000/api/integration/scale/pending/${patientId}`);
     expect(pendingScalesResponse.ok).toBe(true);
     
     const pendingScales = await pendingScalesResponse.json() as Array<{

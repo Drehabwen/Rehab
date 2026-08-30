@@ -50,7 +50,7 @@ async def test_data_flow():
     }
     
     try:
-        async with websockets.connect("ws://localhost:8002/ws/analyze") as websocket:
+        async with websockets.connect("ws://localhost:8000/ws/analyze") as websocket:
             print("2. WebSocket 连接成功 ✓")
             test_passed["connection"] = True
             

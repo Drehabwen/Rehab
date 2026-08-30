@@ -53,7 +53,7 @@ def create_realistic_landmarks():
 
 async def test_deep_analysis():
     """测试深度报告请求"""
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     
     try:
         print("=" * 60)

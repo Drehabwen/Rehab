@@ -2,7 +2,7 @@
 
 Last verified: 2026-05-30
 
-This document describes the current screening-to-rehab closed loop in this repository family. The working integration hub is `Rehab-main`; its backend owns `/api/integration/*` on `http://localhost:8002`.
+This document describes the current screening-to-rehab closed loop in this repository family. The working integration hub is `Rehab-main`; its backend owns `/api/integration/*` on `http://localhost:8000`.
 
 The product framing is a posture and spinal screening workflow. It records screening evidence, risk triage, report readiness, follow-up tasks, and retest outcomes. It must not be treated as a medical diagnosis system.
 
@@ -43,7 +43,7 @@ The loop is complete only when the B-end can see the early-screening record, imp
 
 The early screening app sends `SyncScreeningPayload` to:
 
-- `POST http://localhost:8002/api/integration/sync-screening`
+- `POST http://localhost:8000/api/integration/sync-screening`
 
 Required high-level fields:
 
@@ -167,7 +167,7 @@ Trust this order when behavior and documentation disagree:
 ## 6. Current Gaps And Risks
 
 - Current runtime exposes `/api/chatbot/bind`, `/api/chatbot/query`, `/api/chatbot/chat`, and `/api/chatbot/health` in OpenAPI. The source entry file still needs a clear, reproducible router mount so these routes do not disappear after a restart or deployment rebuild.
-- `chatbotagent` uses `/api/integration` as a relative base. Its dev server or deployment needs a proxy to `http://localhost:8002/api/integration`.
+- `chatbotagent` uses `/api/integration` as a relative base. Its dev server or deployment needs a proxy to `http://localhost:8000/api/integration`.
 - Protocol names should be normalized. Current code accepts or references `static_posture`, `adams_forward_bend`, `squat`, and `squat_screening`; choose one canonical name per protocol before adding more reports.
 - `青跃康复工作台` does not currently implement the integration endpoints. If it becomes the main workbench, migrate `/api/integration/*` first or point it to the `Rehab-main` integration backend.
 - The legacy `/api/integration/subject/link` path has been removed from the active C-end flow. New and existing C-end login must use `/api/integration/family/login`.
@@ -175,7 +175,7 @@ Trust this order when behavior and documentation disagree:
 
 ## 7. Verification Checklist
 
-- Start `Rehab-main` backend on port `8002`.
+- Start `Rehab-main` backend on port `8000`.
 - Confirm the test data follows [IDENTITY_CONTRACT.md](IDENTITY_CONTRACT.md): early screening owns `subject_id`, B-end owns `patient_id`, and C-end resolves access through `family_code`.
 - From `早筛`, submit one completed screening session to `/api/integration/sync-screening`.
 - In `Rehab-main`, open the sync panel and confirm the record appears as `pending`.

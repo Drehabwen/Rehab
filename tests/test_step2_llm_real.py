@@ -4,7 +4,7 @@ import json
 import time
 
 async def test_llm_connectivity():
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     print(f"📡 Connecting to {uri}...")
     
     try:

@@ -19,6 +19,7 @@ import { useSessionStore } from '@/store/useSessionStore';
 import { useVoiceRecorder } from './hooks/useVoiceRecorder';
 import { CONFIG } from '@/config';
 import { PageTitleSection, UnifiedStatusBadge, StatePanel } from '@/components/layout';
+import { IntegrationService } from '@/services/integrationService';
 
 type ViewMode = 'standard' | 'soap';
 
@@ -111,6 +112,8 @@ export const MedVoicePlugin: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [waveformPower, setWaveformPower] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
+  const [recommendedScales, setRecommendedScales] = useState<string[]>([]);
+  const [pushFeedback, setPushFeedback] = useState<string | null>(null);
 
   const { structuredCase, setStructuredCase, patientInfo } = useCaseStore();
   const { addAssessment } = useAssessmentStore();
@@ -122,7 +125,7 @@ export const MedVoicePlugin: React.FC = () => {
 
   const { activeMeasurements, savedMeasurements } = useMeasurementStore();
 
-  const { isRecording, recordTime, startRecording, stopRecording } = useVoiceRecorder({
+  const { isRecording, recordTime, isSupported, startRecording, stopRecording } = useVoiceRecorder({
     onTranscriptUpdate: (text) => {
       setTranscript(text);
       setIsSaved(false);
@@ -190,6 +193,24 @@ export const MedVoicePlugin: React.FC = () => {
         if (!normalized[activeSection]) {
           setActiveSection(sections[0].id);
         }
+
+        // ── 根据病历内容自动推荐量表 ──
+        const chiefComplaint = normalized['主诉'] || normalized['S'] || '';
+        const diagnosis = normalized['诊断'] || normalized['A'] || '';
+        const combined = chiefComplaint + diagnosis;
+
+        const scaleRecommendations: string[] = [];
+        if (/腰|背|痛|疼/.test(combined)) scaleRecommendations.push('ODI');
+        if (/脊柱|侧弯|驼背|弯曲/.test(combined)) scaleRecommendations.push('SRS-22');
+        if (/疼|痛/.test(combined)) scaleRecommendations.push('VAS');
+        if (/焦虑|抑郁|情绪|睡眠/.test(combined)) scaleRecommendations.push('HAM-A');
+        if (/走路|自理|吃饭|穿衣|洗澡/.test(combined)) scaleRecommendations.push('MBI');
+        if (/平衡|跌倒|站不稳/.test(combined)) scaleRecommendations.push('Berg');
+        if (/无力|肌力|没劲/.test(combined)) scaleRecommendations.push('MMT');
+        if (/僵硬|痉挛|紧张/.test(combined)) scaleRecommendations.push('MAS');
+
+        setRecommendedScales([...new Set(scaleRecommendations)]);
+        setPushFeedback(null);
       }
     } catch (error) {
       console.error('Structuring failed', error);
@@ -241,6 +262,30 @@ export const MedVoicePlugin: React.FC = () => {
     setStructuredCase(null);
     setWaveformPower(0);
     setIsSaved(false);
+    setRecommendedScales([]);
+    setPushFeedback(null);
+  };
+
+  const handlePushScale = async (scaleId: string) => {
+    if (!currentPatient || !currentSession) {
+      setPushFeedback('请先选择患者');
+      setTimeout(() => setPushFeedback(null), 3000);
+      return;
+    }
+    try {
+      await IntegrationService.pushScaleTask({
+        patient_id: currentPatient.id,
+        patient_name: currentPatient.name,
+        session_id: currentSession.id,
+        scale_id: scaleId as 'SRS-22' | 'ODI' | 'VAS' | 'MBI' | 'Berg' | 'MMT' | 'MAS' | 'HAM-A',
+        therapist_name: '康复师',
+      });
+      setPushFeedback(`已推送 ${scaleId} 量表至家长端`);
+    } catch (error) {
+      setPushFeedback(`推送 ${scaleId} 失败: ${error instanceof Error ? error.message : '请检查网络'}`);
+    } finally {
+      setTimeout(() => setPushFeedback(null), 4000);
+    }
   };
 
   const handleExportText = () => {
@@ -271,6 +316,15 @@ export const MedVoicePlugin: React.FC = () => {
             </>
           }
         />
+
+        {!isSupported && (
+          <section className="bento-card p-4">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 flex items-center gap-2">
+              <span role="img" aria-label="warning">⚠️</span>
+              <span>您的浏览器不支持语音输入，请使用 Chrome 浏览器。</span>
+            </div>
+          </section>
+        )}
 
         <section className="bento-card p-4 flex flex-wrap items-center gap-2">
           {isRecording ? (
@@ -428,6 +482,40 @@ export const MedVoicePlugin: React.FC = () => {
             </div>
           </article>
         </section>
+
+        {recommendedScales.length > 0 && (
+          <section className="bento-card p-4 border-violet-200 bg-violet-50/60">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+                <span className="text-base">💡</span>
+                <span>根据病历内容，建议推送以下量表：</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {recommendedScales.map((scale) => (
+                  <button
+                    key={scale}
+                    onClick={() => handlePushScale(scale)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-violet-300 bg-white px-3 py-1.5 text-sm font-medium text-violet-700 shadow-sm hover:bg-violet-100 hover:border-violet-400 transition-colors"
+                  >
+                    {scale}
+                  </button>
+                ))}
+                <span className="text-xs text-slate-500 ml-1">点击即可推送至家长端 →</span>
+              </div>
+            </div>
+            {pushFeedback && (
+              <div
+                className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+                  pushFeedback.includes('失败') || pushFeedback.includes('请先选择')
+                    ? 'bg-rose-100 text-rose-700'
+                    : 'bg-emerald-100 text-emerald-700'
+                }`}
+              >
+                {pushFeedback}
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

@@ -1,11 +1,15 @@
-﻿import { useState, useRef, useCallback, useEffect } from 'react';
-import { CONFIG } from '@/config';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface UseVoiceRecorderProps {
   onTranscriptUpdate: (text: string) => void;
   onTranscriptComplete: (text: string) => void;
   onWaveformUpdate: (power: number) => void;
 }
+
+/** 检查浏览器是否支持 Web Speech API 语音识别 */
+const isSpeechSupported = (): boolean => {
+  return !!(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+};
 
 export const useVoiceRecorder = ({
   onTranscriptUpdate,
@@ -14,113 +18,125 @@ export const useVoiceRecorder = ({
 }: UseVoiceRecorderProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordTime, setRecordTime] = useState(0);
-  const isRecordingRef = useRef(false);
+  const [isSupported, setIsSupported] = useState(true);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const transcriptRef = useRef('');
+  const isManualStopRef = useRef(false);
 
-  // 保持 ref 与最新录音状态同步。
+  /** 挂载时检测浏览器是否支持 */
   useEffect(() => {
-    isRecordingRef.current = isRecording;
-  }, [isRecording]);
-
-  // 建立后端驱动的录音 WebSocket 连接，并避免重复创建。
-  const connectWS = useCallback(() => {
-    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
-      return wsRef.current;
-    }
-
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
-    }
-
-    const ws = new WebSocket(CONFIG.medvoice.wsRecordUrl);
-
-    ws.onopen = () => {
-      console.log('Backend-driven WebSocket connected');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.status === 'update') {
-          onTranscriptUpdate(data.text || '');
-        } else if (data.status === 'complete') {
-          onTranscriptComplete(data.text || '');
-          setIsRecording(false);
-        } else if (data.status === 'started') {
-          console.log('Recording started successfully');
-          setIsRecording(true);
-          setRecordTime(0);
-          if (timerRef.current) clearInterval(timerRef.current);
-          timerRef.current = setInterval(() => {
-            setRecordTime((prev) => prev + 1);
-          }, 1000);
-        } else if (data.status === 'power') {
-          onWaveformUpdate(data.power || 0);
-        } else if (data.status === 'error') {
-          console.error('ASR Error:', data.message);
-          alert(`语音识别异常: ${data.message}`);
-          setIsRecording(false);
-        }
-      } catch (err) {
-        console.error('Failed to parse WS message', err);
-      }
-    };
-
-    ws.onerror = (err) => {
-      console.error('WebSocket Error:', err);
-      setIsRecording(false);
-    };
-
-    ws.onclose = (event) => {
-      console.log('Backend-driven WebSocket closed', event.code, event.reason);
-      setIsRecording(false);
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-
-    wsRef.current = ws;
-    return ws;
-  }, [onTranscriptUpdate, onTranscriptComplete, onWaveformUpdate]);
-
-  const startRecording = async () => {
-    const ws = connectWS();
-    let retryCount = 0;
-    const maxRetries = 50; // 最多等待 5 秒。
-
-    const sendStart = () => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ command: 'start' }));
-      } else if (ws.readyState === WebSocket.CONNECTING && retryCount < maxRetries) {
-        retryCount += 1;
-        setTimeout(sendStart, 100);
-      } else {
-        console.error('Failed to start recording: WebSocket not open', ws.readyState);
-        setIsRecording(false);
-      }
-    };
-
-    sendStart();
-  };
-
-  const stopRecording = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ command: 'stop' }));
-    }
-    if (timerRef.current) clearInterval(timerRef.current);
-    setIsRecording(false);
+    setIsSupported(isSpeechSupported());
   }, []);
 
-  // 组件卸载时主动停止录音并关闭连接。
+  const startRecording = useCallback(() => {
+    const SpeechRecognitionCtor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) {
+      alert('您的浏览器不支持语音识别。请使用 Chrome 浏览器。');
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = 'zh-CN';       // 中文普通话
+    recognition.interimResults = true; // 实时中间结果
+    recognition.continuous = true;     // 持续识别
+    recognition.maxAlternatives = 1;
+
+    transcriptRef.current = '';
+    isManualStopRef.current = false;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          final += result[0].transcript;
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+
+      const current = transcriptRef.current + final + interim;
+      if (final) {
+        transcriptRef.current += final;
+      }
+
+      onTranscriptUpdate(current);
+
+      // 模拟音频波形（Web Speech API 不提供真实波形数据）
+      onWaveformUpdate(Math.random() * 0.7 + 0.3);
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error('Speech recognition error:', event.error, event.message);
+      if (event.error === 'no-speech') {
+        // 没有说话，静默处理
+      } else if (event.error === 'aborted') {
+        // 用户主动停止，忽略
+      } else {
+        console.warn('语音识别出错:', event.error);
+      }
+    };
+
+    recognition.onend = () => {
+      // 如果不是主动停止，自动重启（保持连续识别）
+      if (!isManualStopRef.current) {
+        try {
+          recognition.start();
+        } catch {
+          // recognition 可能已结束，忽略
+        }
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+    setRecordTime(0);
+
+    // 启动计时器
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setRecordTime((prev) => prev + 1);
+    }, 1000);
+  }, [onTranscriptUpdate, onWaveformUpdate]);
+
+  const stopRecording = useCallback(() => {
+    isManualStopRef.current = true;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // recognition 可能已经停止
+      }
+      recognitionRef.current = null;
+    }
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    setIsRecording(false);
+    onTranscriptComplete(transcriptRef.current);
+  }, [onTranscriptComplete]);
+
+  // 组件卸载时清理
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (wsRef.current) {
-        if (wsRef.current.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ command: 'stop' }));
+      isManualStopRef.current = true;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
         }
-        wsRef.current.close();
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
       }
     };
   }, []);
@@ -128,6 +144,7 @@ export const useVoiceRecorder = ({
   return {
     isRecording,
     recordTime,
+    isSupported,
     startRecording,
     stopRecording,
   };

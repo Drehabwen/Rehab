@@ -3,7 +3,7 @@ import websockets
 import json
 
 async def test_posture_stepped_analysis():
-    async with websockets.connect("ws://localhost:8002/ws/analyze") as websocket:
+    async with websockets.connect("ws://localhost:8000/ws/analyze") as websocket:
         # 构造 POSTURE_STEPPED_ANALYSIS 请求
         message = {
             "type": "POSTURE_STEPPED_ANALYSIS",

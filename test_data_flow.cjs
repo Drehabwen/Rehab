@@ -50,7 +50,7 @@ let testPassed = {
 const socket = new net.Socket();
 let buffer = '';
 
-socket.connect(8002, 'localhost', () => {
+socket.connect(8000, 'localhost', () => {
   console.log('2. TCP 连接成功 ✓');
   testPassed.connection = true;
   
@@ -58,7 +58,7 @@ socket.connect(8002, 'localhost', () => {
   const key = Buffer.from(Math.random().toString()).toString('base64');
   const handshake = [
     'GET /ws/analyze HTTP/1.1',
-    'Host: localhost:8002',
+    'Host: localhost:8000',
     'Upgrade: websocket',
     'Connection: Upgrade',
     `Sec-WebSocket-Key: ${key}`,

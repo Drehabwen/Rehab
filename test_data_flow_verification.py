@@ -21,7 +21,7 @@ def create_mock_landmarks():
 
 async def test_quick_assessment_data_flow():
     """测试快速评估数据流"""
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     
     try:
         print("=" * 60)

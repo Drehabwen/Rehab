@@ -75,7 +75,7 @@ def create_realistic_landmarks():
 
 async def test_posture_sync():
     """测试 POSTURE_SYNC (实时模式)"""
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     
     try:
         print("=" * 60)

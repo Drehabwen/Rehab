@@ -454,7 +454,7 @@ describe('usePostureWS', () => {
     it('should use default URL when no URL is provided', () => {
       const { result } = renderHook(() => usePostureWS());
 
-      expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:8002/ws/analyze');
+      expect(global.WebSocket).toHaveBeenCalledWith('ws://localhost:8000/ws/analyze');
     });
   });
 

@@ -219,8 +219,8 @@ Vision3 has plugin-local state in [src/plugins/vision3/store/usePostureAssessmen
 
 [src/config/index.ts](C:/Users/DORAT/Desktop/Rehab-main/src/config/index.ts) is the current frontend runtime source of truth:
 
-- API base URL default: `http://localhost:8002`
-- WebSocket default: `ws://localhost:8002/ws/analyze`
+- API base URL default: `http://localhost:8000`
+- WebSocket default: `ws://localhost:8000/ws/analyze`
 - MedVoice base URL default: `${apiBaseUrl}/medvoice`
 
 ## 6. Interface Map
@@ -401,7 +401,7 @@ Across [DESIGN_SYSTEM.md](C:/Users/DORAT/Desktop/Rehab-main/DESIGN_SYSTEM.md), [
 
 - [README.md](C:/Users/DORAT/Desktop/Rehab-main/README.md)
   - updated on `2026-03-10`.
-  - now reflects the actual app shell, stack, local run commands, and current backend port `8002`.
+  - now reflects the actual app shell, stack, local run commands, and current backend port `8000`.
 - [docs/API_SPECIFICATION.md](C:/Users/DORAT/Desktop/Rehab-main/docs/API_SPECIFICATION.md)
   - updated on `2026-05-30` for `/api/integration/*`.
   - now covers the current backend routes in `backend/main.py`, the WebSocket path `/ws/analyze`, and the screening / identity / scale integration API.

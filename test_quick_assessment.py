@@ -6,7 +6,7 @@ import websockets
 import json
 
 async def test_quick_assessment():
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     
     print("正在连接到后端...")
     async with websockets.connect(uri) as websocket:

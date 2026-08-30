@@ -38,7 +38,7 @@ describe('TreatmentPlanApi', () => {
 
       expect(chunks).toEqual(['治疗', '计划']);
       expect(fetch).toHaveBeenCalledWith(
-        'http://localhost:8002/api/treatment-plan/generate/stream',
+        'http://localhost:8000/api/treatment-plan/generate/stream',
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -222,7 +222,7 @@ describe('TreatmentPlanApi', () => {
       await TreatmentPlanApi.generateStream('assessment_001', 'patient_001', () => {});
 
       const url = vi.mocked(fetch).mock.calls[0][0];
-      expect(url).toContain('localhost:8002');
+      expect(url).toContain('localhost:8000');
     });
   });
 });

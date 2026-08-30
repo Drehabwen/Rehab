@@ -3,7 +3,7 @@ import websockets
 import json
 
 async def test_llm_mock():
-    uri = "ws://localhost:8002/ws/analyze"
+    uri = "ws://localhost:8000/ws/analyze"
     print(f"Connecting to {uri}...")
     try:
         async with websockets.connect(uri) as websocket:
