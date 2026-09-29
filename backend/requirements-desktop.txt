@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pydantic
+python-multipart
+numpy
+opencv-python-headless
+python-docx
+reportlab
+fpdf2
+jinja2
+openai
+python-dotenv
+requests
+websocket-client
+pyinstaller

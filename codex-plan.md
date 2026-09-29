@@ -381,3 +381,35 @@
   - Runtime caveat: local `:8000` still has an old listener mapped to PID `3388`, but Windows process tools cannot find that PID (`taskkill` also reports not found). Clear that listener or restart the local environment before live-testing the new parent-report endpoint on `:8000`.
   - Refreshed the therapist Vite app on `http://localhost:5173/` and the parent Vite app on `http://localhost:5175/`; no browser console errors were observed.
 - Open product decision: returned parent scale data is displayed in the therapist workspace, but not auto-imported into the local report assessment table yet. Auto-import needs an idempotent import marker or explicit "include in report" action to avoid duplicate assessment records.
+
+## Current Task: Therapist Workbench First Release Closure
+
+### Objective
+- Package the therapist workbench as a reversible internal gray release for 1–3 therapists while keeping early screening and the family app outside the first-release acceptance boundary.
+
+### Constraints
+- Product output remains screening, functional assessment, risk prompts, and workflow support; it is not medical diagnosis.
+- Production secrets stay server-side and runtime databases stay outside Git.
+- The first release is limited to one managed workstation/browser profile because part of the core data remains in IndexedDB.
+- The existing public Git history is not rewritten without explicit approval.
+
+### Steps
+- [completed] Remove the tracked runtime SQLite database from the release branch and ignore future runtime databases.
+- [completed] Move LLM configuration to the backend and remove browser-side API-key configuration.
+- [completed] Add production same-origin routing, health/readiness checks, and opt-in demo seeding.
+- [completed] Add Docker/Nginx packaging, Basic Auth boundary, deployment guide, backup, and rollback instructions.
+- [completed] Add a disposable HTTP acceptance script for the integration closed loop.
+- [completed] Run frontend, backend, workflow-gate, secret-scan, and diff verification.
+
+### Verification
+- `python scripts/release_acceptance.py`
+- `npm run check`
+- `npm run build`
+- `npm test -- --run src/hub/__tests__/report-center-utils.test.ts`
+- `python -m py_compile backend/main.py backend/models.py backend/routers/integration.py backend/utils/llm_reporter.py`
+- `git diff --check`
+
+### Outcome
+- Release packaging is ready on `codex/project-closure` for deployment to an HTTPS-protected internal server.
+- The disposable API acceptance flow passes health/readiness, screening intake, identity binding, family login, scale authorization guard, submission, and result retrieval.
+- Residual blockers: the public Git history still contains an old database artifact; Docker/Nginx image validation is unavailable on this workstation; application-level therapist accounts/audit logs and multi-device server persistence remain future work.

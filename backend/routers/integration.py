@@ -222,7 +222,11 @@ class TrackingRecordResponse(BaseModel):
     submitted_at: str
 
 # Database Helper Function
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "rehab_integration.db")
+DEFAULT_DB_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "rehab_integration.db",
+)
+DB_PATH = os.path.abspath(os.getenv("REHAB_DB_PATH", DEFAULT_DB_PATH))
 FAMILY_CODE_HASH_NAMESPACE = "rehab-family-code:v1:"
 FAMILY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -232,8 +236,12 @@ SHORT_CODE_ALPHABET = "ABCDEFGHJKLMNPRTUVWXYZ"  # 20字符，无 I/O/Q 防混淆
 SHORT_CODE_LENGTH = 4
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 30000")
     return conn
 
 def normalize_code(value: Optional[str]) -> str:
@@ -678,12 +686,13 @@ def init_db():
 # Initialize DB on import
 init_db()
 
-# Phase 5: 种子数据（首次启动自动插入，幂等）
-try:
-    from seed import seed_all
-    seed_all()
-except Exception as e:
-    print(f"[Seed] Warning: seed data migration skipped ({e})")
+# Demo data must be explicitly enabled and is disabled for production by default.
+if os.getenv("REHAB_SEED_DEMO_DATA", "false").lower() == "true":
+    try:
+        from seed import seed_all
+        seed_all()
+    except Exception as e:
+        print(f"[Seed] Warning: seed data migration skipped ({e})")
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
 

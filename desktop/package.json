@@ -1,0 +1,52 @@
+{
+  "name": "rehab-main-desktop",
+  "version": "0.1.0-internal",
+  "private": true,
+  "main": "main.cjs",
+  "description": "Local-first Rehab-main rehabilitation workbench for internal testing",
+  "author": "Rehab-main Team",
+  "build": {
+    "appId": "cn.rehabmain.workbench",
+    "productName": "Rehab-main",
+    "electronVersion": "36.9.5",
+    "compression": "normal",
+    "directories": {
+      "output": "../release-lean"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "galen-connector.cjs",
+      "assets/qingyue-logo-v1.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist",
+        "to": "web"
+      },
+      {
+        "from": "../backend/dist",
+        "to": "backend"
+      }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "Rehab-main-Internal-${version}-${arch}.${ext}",
+      "icon": "assets/qingyue-logo-v1.ico",
+      "signAndEditExecutable": true
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Rehab-main 康复工作台",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "asar": true,
+    "npmRebuild": false
+  }
+}

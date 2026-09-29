@@ -27,7 +27,7 @@ class ChatRequest(BaseModel):
     systemPrompt: Optional[str] = None
 
 def _get_api_key() -> str:
-    return (os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY") or "").strip()
+    return (os.getenv("DEEPSEEK_API_KEY") or "").strip()
 
 @router.get("/health")
 async def health_endpoint():

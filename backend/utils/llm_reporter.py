@@ -42,13 +42,40 @@ if not DEBUG_LLM_LOGS:
 
 # Initialize Deepseek client (OpenAI compatible)
 client = None
-api_key = (os.getenv("DEEPSEEK_API_KEY") or os.getenv("VITE_DEEPSEEK_API_KEY") or "").strip()
+api_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
 if api_key:
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
         timeout=300.0  # Increased timeout to 5 minutes
     )
+
+
+def generate_workbench_report(prompt: str) -> str:
+    """Generate therapist-facing report text without exposing the provider key to browsers."""
+    if not client:
+        raise RuntimeError("DEEPSEEK_API_KEY is not configured")
+
+    response = client.chat.completions.create(
+        model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "你是康复师工作台的报告助手。只根据输入证据生成筛查与康复工作流报告；"
+                    "不得虚构数值、诊断、病程或治疗效果，不得输出 Cobb 角结论。"
+                    "信息不足时明确标记缺失并建议复采或人工复核。"
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.3,
+        max_tokens=2400,
+    )
+    content = response.choices[0].message.content if response.choices else ""
+    if not content:
+        raise RuntimeError("LLM returned empty report content")
+    return content
 
 class PostureAgent:
     """

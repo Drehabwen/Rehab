@@ -7,7 +7,21 @@
 - `MedVoice` 语音接诊与结构化病历
 - 报告中心、数据中心、前后对比
 
-当前前端入口是 [src/App.tsx](C:/Users/DORAT/Desktop/Rehab-main/src/App.tsx)，实际应用壳子是 [src/hub/NexusHub.tsx](C:/Users/DORAT/Desktop/Rehab-main/src/hub/NexusHub.tsx)。当前后端入口是 [backend/main.py](C:/Users/DORAT/Desktop/Rehab-main/backend/main.py)。
+当前前端入口是 [src/App.tsx](src/App.tsx)，实际应用壳子是 [src/hub/NexusHub.tsx](src/hub/NexusHub.tsx)。当前后端入口是 [backend/main.py](backend/main.py)。
+
+当前首发范围是 1–3 名内部康复师使用的单工作站灰度版。生产部署、数据边界、备份与回滚见 [康复师工作台首发说明](docs/THERAPIST_WORKBENCH_RELEASE.md)。
+
+## 生态关键节点：Galen
+
+RehabMain 与 [Galen](https://github.com/Drehabwen/Galen) 共同组成康复科研双向闭环。两者彼此都是体系中的关键节点。
+
+- **RehabMain** 负责真实世界评估、结构化数据生产和复采 / 复测执行。
+- **Galen** 负责科研任务编排、数据治理、观察核验、分析和研究产物。
+- RehabMain 自动向 `%LOCALAPPDATA%\Rehab\GalenConnector\latest.json` 发布最小研究快照。
+- Galen 通过同目录的 `feedback.json` 返回接受、排除、纠正、复采与复测任务。
+- 闭环为：`评估采集 → Galen 研究处理 → RehabMain 执行反馈 → 新数据回流`。
+
+因此 RehabMain 不是 Galen 的普通插件；它是 Galen 的真实世界数据与执行节点，而 Galen 是 RehabMain 的科研计算与反馈节点。
 
 ## 技术栈
 
@@ -63,6 +77,7 @@ npm run dev
 npm run build
 npm run check
 npm run test -- --run
+python scripts/release_acceptance.py
 ```
 
 ## 目录速览
@@ -118,6 +133,7 @@ backend/
 
 - 项目总盘点：[PROJECT_INFO_MAP.md](C:/Users/DORAT/Desktop/Rehab-main/PROJECT_INFO_MAP.md)
 - 闭环工作流：[docs/CLOSED_LOOP_WORKFLOW.md](docs/CLOSED_LOOP_WORKFLOW.md)
+- 首发部署与回滚：[docs/THERAPIST_WORKBENCH_RELEASE.md](docs/THERAPIST_WORKBENCH_RELEASE.md)
 - 患者身份契约：[docs/IDENTITY_CONTRACT.md](docs/IDENTITY_CONTRACT.md)
 - API 规范：[docs/API_SPECIFICATION.md](C:/Users/DORAT/Desktop/Rehab-main/docs/API_SPECIFICATION.md)
 - 开发规范：[docs/DEVELOPMENT_STANDARDS.md](C:/Users/DORAT/Desktop/Rehab-main/docs/DEVELOPMENT_STANDARDS.md)

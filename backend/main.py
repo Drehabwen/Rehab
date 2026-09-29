@@ -30,11 +30,12 @@ from models import (
     TreatmentPlanRequest, TreatmentPlanResponse, TreatmentPlanStreamResponse,
     SessionTreatmentPlanRequest,
     SessionReportRequest, SessionReportResponse,
+    LLMReportRequest, LLMReportResponse,
 )
 from utils.posture_analysis import analyze_posture
 from utils.joint_analysis import calculate_joint_angle
 from utils.camera_stream import CameraManager
-from utils.llm_reporter import generate_posture_report, posture_agent
+from utils.llm_reporter import generate_posture_report, generate_workbench_report, posture_agent
 from utils.narrator import process_time_series
 from utils.treatment_plan_service import (
     generate_treatment_plan,
@@ -74,7 +75,7 @@ def debug_print(*args, **kwargs):
 def load_cors_origins() -> List[str]:
     raw = os.getenv(
         "CORS_ALLOW_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,null",
     )
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
     return origins or ["http://localhost:5173", "http://localhost:5174"]
@@ -572,6 +573,28 @@ async def health_check():
     }
 
 
+@app.get("/ready")
+async def readiness_check():
+    try:
+        conn = integration.get_db_connection()
+        try:
+            conn.execute("SELECT 1").fetchone()
+        finally:
+            conn.close()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="database is not ready") from exc
+    return {"status": "ready"}
+
+
+@app.post("/api/llm/report", response_model=LLMReportResponse)
+async def generate_llm_report(request: LLMReportRequest) -> LLMReportResponse:
+    try:
+        content = await run_in_threadpool(generate_workbench_report, request.prompt)
+        return LLMReportResponse(content=content)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.post("/api/treatment-plan/generate")
 async def generate_plan(request: TreatmentPlanRequest) -> TreatmentPlanResponse:
     """Generate a treatment plan."""
@@ -678,5 +701,9 @@ except Exception as e:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "8000")),
+    )
 
