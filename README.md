@@ -11,6 +11,18 @@
 
 当前首发范围是 1–3 名内部康复师使用的单工作站灰度版。生产部署、数据边界、备份与回滚见 [康复师工作台首发说明](docs/THERAPIST_WORKBENCH_RELEASE.md)。
 
+## 生态关键节点：Galen
+
+RehabMain 与 [Galen](https://github.com/Drehabwen/Galen) 共同组成康复科研双向闭环。两者彼此都是体系中的关键节点。
+
+- **RehabMain** 负责真实世界评估、结构化数据生产和复采 / 复测执行。
+- **Galen** 负责科研任务编排、数据治理、观察核验、分析和研究产物。
+- RehabMain 自动向 `%LOCALAPPDATA%\Rehab\GalenConnector\latest.json` 发布最小研究快照。
+- Galen 通过同目录的 `feedback.json` 返回接受、排除、纠正、复采与复测任务。
+- 闭环为：`评估采集 → Galen 研究处理 → RehabMain 执行反馈 → 新数据回流`。
+
+因此 RehabMain 不是 Galen 的普通插件；它是 Galen 的真实世界数据与执行节点，而 Galen 是 RehabMain 的科研计算与反馈节点。
+
 ## 技术栈
 
 前端：

@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { X, Download, Upload, Trash2, Shield, Database, AlertTriangle, CheckCircle, RefreshCw, HardDrive } from 'lucide-react';
+import { X, Download, Upload, Trash2, Shield, Database, AlertTriangle, CheckCircle, RefreshCw, HardDrive, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { exportAllData, downloadBackup, importData, readBackupFile, clearAllData, getDatabaseStats } from '@/lib/backup';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
+import { getGalenConnectorStatus, getGalenResearchFeedback, publishCurrentGalenSnapshot, type GalenConnectorStatus, type GalenResearchFeedbackItem } from '@/lib/galenConnector';
 
-type SettingsTab = 'backup' | 'restore' | 'privacy';
+type SettingsTab = 'connector' | 'backup' | 'restore' | 'privacy';
 
 interface DataSettingsModalProps {
   isOpen: boolean;
@@ -13,24 +14,51 @@ interface DataSettingsModalProps {
 }
 
 export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('backup');
+  const [activeTab, setActiveTab] = useState<SettingsTab>('connector');
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
   const [stats, setStats] = useState<{ patients: number; sessions: number; assessments: number; total: number } | null>(null);
+  const [connectorStatus, setConnectorStatus] = useState<GalenConnectorStatus | null>(null);
+  const [connectorMessage, setConnectorMessage] = useState<string | null>(null);
+  const [isPublishingConnector, setIsPublishingConnector] = useState(false);
+  const [researchFeedback, setResearchFeedback] = useState<GalenResearchFeedbackItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (isOpen) {
       loadStats();
+      void loadConnectorStatus();
+      const refresh = window.setInterval(() => void loadConnectorStatus(), 5000);
+      return () => window.clearInterval(refresh);
     }
   }, [isOpen]);
 
   const loadStats = async () => {
     const s = await getDatabaseStats();
     setStats(s);
+  };
+
+  const loadConnectorStatus = async () => {
+    const [status, feedback] = await Promise.all([getGalenConnectorStatus(), getGalenResearchFeedback()]);
+    setConnectorStatus(status);
+    setResearchFeedback(feedback?.items ?? []);
+  };
+
+  const handlePublishConnector = async () => {
+    setIsPublishingConnector(true);
+    setConnectorMessage(null);
+    try {
+      const result = await publishCurrentGalenSnapshot();
+      await loadConnectorStatus();
+      setConnectorMessage(`已同步 ${result.patientCount} 个对象、${result.assessmentCount} 条评估到 Galen 候选数据队列`);
+    } catch (error) {
+      setConnectorMessage(error instanceof Error ? error.message : 'Galen Connector 刷新失败');
+    } finally {
+      setIsPublishingConnector(false);
+    }
   };
 
   const handleExport = async () => {
@@ -114,6 +142,7 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
 
         <div className="flex border-b border-slate-100">
           {[
+            { id: 'connector', label: 'Galen 连接', icon: Link2 },
             { id: 'backup', label: '数据备份', icon: Download },
             { id: 'restore', label: '数据恢复', icon: Upload },
             { id: 'privacy', label: '隐私清理', icon: Trash2 },
@@ -136,6 +165,94 @@ export const DataSettingsModal: React.FC<DataSettingsModalProps> = ({ isOpen, on
         </div>
 
         <div className="flex-1 overflow-y-auto p-8">
+          {activeTab === 'connector' && (
+            <div className="space-y-6">
+              <div className="flex items-start gap-4 p-6 bg-emerald-50 rounded-[2rem] border border-emerald-100">
+                <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-sm">
+                  <Link2 size={22} className="text-emerald-700" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-slate-900">Galen 第一方连接器</h3>
+                    <span className={cn(
+                      'rounded-full px-2 py-1 text-[10px] font-black',
+                      connectorStatus?.available ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600',
+                    )}>
+                      {connectorStatus?.available ? '已就绪' : window.rehabDesktop ? '等待首次同步' : '仅桌面版'}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-600">
+                    RehabMain 只向 Galen 提供 RehabID、时点和数值筛查观察。姓名、备注、图像、病历文本与估算 Cobb 角不会进入快照。
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <span className="text-slate-400">最近同步</span>
+                  <strong className="mt-1 block text-slate-800">
+                    {connectorStatus?.lastModified ? new Date(connectorStatus.lastModified).toLocaleString() : '尚未生成'}
+                  </strong>
+                </div>
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <span className="text-slate-400">快照大小</span>
+                  <strong className="mt-1 block text-slate-800">
+                    {connectorStatus?.available ? `${Math.max(1, Math.round(connectorStatus.bytes / 1024))} KB` : '—'}
+                  </strong>
+                </div>
+              </div>
+
+              {connectorStatus?.path && (
+                <div className="rounded-2xl border border-slate-200 p-4">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">本地 Bridge</span>
+                  <code className="mt-2 block break-all text-xs text-slate-600">{connectorStatus.path}</code>
+                </div>
+              )}
+
+              <div className="rounded-[2rem] border border-slate-200 p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900">Galen 研究反馈</h4>
+                    <p className="mt-1 text-xs text-slate-500">按上游评估记录回流，可直接进入复采与复测执行。</p>
+                  </div>
+                  <strong className="rounded-full bg-slate-900 px-3 py-1 text-xs text-white">{researchFeedback.length}</strong>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {researchFeedback.length === 0 ? (
+                    <p className="rounded-2xl bg-slate-50 p-4 text-xs text-slate-500">尚无研究反馈。Galen 完成观察审核后会自动出现在这里。</p>
+                  ) : researchFeedback.slice().reverse().slice(0, 20).map((item) => (
+                    <article key={item.feedbackId} className="rounded-2xl bg-slate-50 p-4 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <strong className="text-slate-900">{item.rehabId} · {item.metric}</strong>
+                        <span className="rounded-full bg-white px-2 py-1 font-black text-slate-600">
+                          {item.followUpAction === 'recapture' ? '待复采' : item.followUpAction === 'schedule_retest' ? '待复测' : item.action === 'correct' ? '已纠正' : item.action === 'reject' ? '已排除' : '已接受'}
+                        </span>
+                      </div>
+                      <p className="mt-2 leading-relaxed text-slate-600">{item.reason}</p>
+                      <code className="mt-2 block break-all text-[10px] text-slate-400">评估 {item.sourceAssessmentId} · {item.reviewedAt}</code>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={handlePublishConnector}
+                disabled={isPublishingConnector || !window.rehabDesktop}
+                className={cn(
+                  'w-full flex items-center justify-center gap-3 py-5 bg-slate-900 text-white rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all hover:bg-slate-800',
+                  (isPublishingConnector || !window.rehabDesktop) && 'opacity-50 cursor-not-allowed',
+                )}
+              >
+                <RefreshCw size={19} className={isPublishingConnector ? 'animate-spin' : ''} />
+                {isPublishingConnector ? '正在刷新...' : '立即刷新 Galen 快照'}
+              </button>
+
+              {connectorMessage && (
+                <p className="rounded-2xl bg-slate-50 p-4 text-xs font-medium text-slate-700">{connectorMessage}</p>
+              )}
+            </div>
+          )}
+
           {activeTab === 'backup' && (
             <div className="space-y-6">
               <div className="flex items-center gap-4 p-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-[2rem]">

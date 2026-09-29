@@ -1,4 +1,9 @@
 node_modules
+.venv-desktop/
+release/
+release-lean/
+backend/build/
+backend/dist/
 dist
 .vscode
 .worktrees
@@ -19,3 +24,16 @@ temp-utf8-test.txt
 # Medical Config (Crucial for privacy)
 Deeprehab-MedVoice-AI--/config.json
 Deeprehab-MedVoice-AI--/src/core/config.json
+
+# Test artifacts & one-off scripts
+vitest-report.json
+/test_*.py
+/test_*.cjs
+/test_*.js
+/test_*.md
+/tests/
+backend/scratch/
+presentations/exports/
+check_mic.py
+count_lines.py
+scan_large_files.ps1

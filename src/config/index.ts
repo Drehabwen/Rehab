@@ -1,8 +1,11 @@
 const browserOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+const isDesktopFile = browserOrigin.startsWith('file:');
 const browserWsOrigin = browserOrigin.replace(/^http/, 'ws');
-const DEFAULT_API_BASE_URL = import.meta.env.DEV ? 'http://localhost:8000' : browserOrigin;
+const DEFAULT_API_BASE_URL = import.meta.env.DEV || isDesktopFile ? 'http://127.0.0.1:8000' : browserOrigin;
 const DEFAULT_WS_URL = import.meta.env.DEV
-  ? 'ws://localhost:8000/ws/analyze'
+  ? 'ws://127.0.0.1:8000/ws/analyze'
+  : isDesktopFile
+  ? 'ws://127.0.0.1:8000/ws/analyze'
   : `${browserWsOrigin}/ws/analyze`;
 
 const trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');

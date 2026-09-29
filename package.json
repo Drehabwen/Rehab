@@ -3,6 +3,9 @@
   "name": "trae-project",
   "private": true,
   "version": "0.0.0",
+  "main": "desktop/main.cjs",
+  "description": "Local-first rehabilitation assessment workbench for internal testing",
+  "author": "Qingyue Rehab",
   "type": "module",
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js",
@@ -10,7 +13,9 @@
     "lint": "eslint .",
     "preview": "node node_modules/vite/bin/vite.js preview",
     "check": "tsc -b --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "desktop:backend": "powershell -ExecutionPolicy Bypass -File desktop/build-backend.ps1",
+    "desktop:build": "powershell -ExecutionPolicy Bypass -File desktop/build-desktop.ps1"
   },
   "dependencies": {
     "@mediapipe/camera_utils": "^0.3.1675466862",
@@ -55,6 +60,8 @@
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "electron": "^36.3.2",
+    "electron-builder": "^26.0.12"
   }
 }

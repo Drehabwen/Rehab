@@ -75,7 +75,7 @@ def debug_print(*args, **kwargs):
 def load_cors_origins() -> List[str]:
     raw = os.getenv(
         "CORS_ALLOW_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,null",
     )
     origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
     return origins or ["http://localhost:5173", "http://localhost:5174"]
@@ -701,5 +701,9 @@ except Exception as e:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "8000")),
+    )
 
