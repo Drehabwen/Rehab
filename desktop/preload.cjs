@@ -6,4 +6,6 @@ contextBridge.exposeInMainWorld('rehabDesktop', {
   publishGalenSnapshot: snapshot => ipcRenderer.invoke('galen-connector:publish', snapshot),
   getGalenConnectorStatus: () => ipcRenderer.invoke('galen-connector:status'),
   getGalenResearchFeedback: () => ipcRenderer.invoke('galen-connector:feedback'),
+  exportGalenResearch: pkg => ipcRenderer.invoke('galen-research:export', pkg),
+  listGalenResearchBatches: () => ipcRenderer.invoke('galen-research:batches'),
 });

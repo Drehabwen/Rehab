@@ -8,7 +8,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['src/test/setup.ts'],
-    exclude: [...configDefaults.exclude, '**/.worktrees/**'],
+    // desktop/*.test.cjs 用 node --test 运行（见 npm run test:desktop），不交给 vitest
+    exclude: [...configDefaults.exclude, '**/.worktrees/**', 'desktop/**/*.test.cjs'],
   },
   resolve: {
     alias: {

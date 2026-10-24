@@ -18,6 +18,7 @@ import {
 import { buildSessionDraftReport, buildSessionInsightCards } from '../report-center-insights';
 import { exportMarkdownToPdf } from '@/utils/exportPdf';
 import { IntegrationService } from '@/services/integrationService';
+import { Slot } from '@/kernel/react';
 
 // Sub-components
 import { ReportFilterPanel } from './report-center/ReportFilterPanel';
@@ -488,6 +489,8 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
                 onViewDetails={setSelectedAssessment}
                 readyCount={activeSessionInput.readiness.readyCount}
               />
+              {/* 报告段落由插件贡献（report.sections）；没有贡献时整块不渲染 */}
+              <Slot name="report.sections" modules={moduleOutputs} />
               <ReportInsightsList
                 generatedSessionReport={generatedSessionReport}
                 insightCards={insightCards}

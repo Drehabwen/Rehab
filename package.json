@@ -14,6 +14,8 @@
     "preview": "node node_modules/vite/bin/vite.js preview",
     "check": "tsc -b --noEmit",
     "test": "vitest",
+    "test:desktop": "node --test desktop/galen-connector.test.cjs desktop/galen-research-export.test.cjs",
+    "research:e2e": "node scripts/research-e2e.mjs",
     "desktop:backend": "powershell -ExecutionPolicy Bypass -File desktop/build-backend.ps1",
     "desktop:build": "powershell -ExecutionPolicy Bypass -File desktop/build-desktop.ps1"
   },
@@ -43,12 +45,15 @@
     "@eslint/js": "^9.25.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^22.15.30",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.4.1",
     "@vitest/ui": "^4.0.18",
     "autoprefixer": "^10.4.21",
+    "electron": "^36.3.2",
+    "electron-builder": "^26.0.12",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
@@ -60,8 +65,6 @@
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
     "vite-tsconfig-paths": "^5.1.4",
-    "vitest": "^4.0.18",
-    "electron": "^36.3.2",
-    "electron-builder": "^26.0.12"
+    "vitest": "^4.0.18"
   }
 }

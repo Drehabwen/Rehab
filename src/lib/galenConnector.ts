@@ -77,7 +77,8 @@ function optionalText(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function sanitizeAssessment(assessment: Assessment): JsonRecord {
+/** 只保留研究可用的结构化数值字段；研究事件流与研究批次共用。 */
+export function sanitizeAssessment(assessment: Assessment): JsonRecord {
   const source = assessment as unknown as JsonRecord;
   const data = (source.data && typeof source.data === 'object' ? source.data : {}) as JsonRecord;
   const sanitizedData: JsonRecord = {};

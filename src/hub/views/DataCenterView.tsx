@@ -4,7 +4,8 @@ import type { Assessment } from '@/types/assessment';
 import type { Session } from '@/types/session';
 import type { VisitTaskSummary } from '../workflow';
 import { PageHeader, ProgressBar, StatusTag } from '@/components/workflow';
-import { Card } from '@/components/ui';
+import { Card, StatCard } from '@/components/ui';
+import { ResearchDataPanel } from '@/hub/components/ResearchDataPanel';
 import { formatDate } from '@/lib/session-utils';
 
 interface DataCenterViewProps {
@@ -72,30 +73,20 @@ export const DataCenterView: React.FC<DataCenterViewProps> = ({
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: '患者人数', value: metrics.patientCount, icon: Users, accent: 'bg-slate-900 text-white' },
-            { label: '接诊次数', value: metrics.sessionCount, icon: ClipboardList, accent: 'bg-blue-50 text-blue-700' },
-            { label: '评估记录', value: metrics.assessmentCount, icon: Database, accent: 'bg-violet-50 text-violet-700' },
-            { label: '已出报告', value: metrics.completedReports, icon: FileText, accent: 'bg-emerald-50 text-emerald-700' },
-          ].map((card) => {
-            const Icon = card.icon;
-            return (
-              <Card key={card.label} variant="default" padding="md" className="border-slate-200 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[30px] font-semibold leading-none text-slate-900 tabular-nums">{card.value}</div>
-                    <div className="mt-2 text-sm text-slate-500">{card.label}</div>
-                  </div>
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${card.accent}`}>
-                    <Icon size={18} />
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+            { label: '患者人数', value: metrics.patientCount, icon: Users, tone: 'neutral' as const },
+            { label: '接诊次数', value: metrics.sessionCount, icon: ClipboardList, tone: 'info' as const },
+            { label: '评估记录', value: metrics.assessmentCount, icon: Database, tone: 'violet' as const },
+            { label: '已出报告', value: metrics.completedReports, icon: FileText, tone: 'success' as const },
+          ].map((card) => (
+            <StatCard key={card.label} value={card.value} label={card.label} icon={card.icon} tone={card.tone} />
+          ))}
         </section>
 
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-          <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+        {/* 研究数据：RehabID 覆盖 → 质量校验 → 一键传输到 Galen */}
+        <ResearchDataPanel />
+
+        <section className="grid flex-1 grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <Card variant="default" padding="lg" className="h-full border-slate-200 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-slate-900">历史接诊记录</div>
@@ -126,8 +117,8 @@ export const DataCenterView: React.FC<DataCenterViewProps> = ({
             </div>
           </Card>
 
-          <div className="space-y-4">
-            <Card variant="default" padding="lg" className="border-slate-200 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+          <div className="flex h-full flex-col gap-4">
+            <Card variant="default" padding="lg" className="flex-1 border-slate-200 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
               <div className="text-sm font-semibold text-slate-900">模块覆盖情况</div>
               <p className="mt-1 text-sm text-slate-500">统计已沉淀的评估数据量，帮助判断当前数据厚度。</p>
               <div className="mt-4 space-y-3">

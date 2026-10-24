@@ -4,9 +4,16 @@ import type { Patient } from '@/types/patient';
 import type { VisitTaskSummary } from '../workflow';
 import type { PatientReminders } from '@/services/integrationService';
 import { PageHeader, VisitCard } from '@/components/workflow';
-import { Button, Card } from '@/components/ui';
-import { StatePanel } from '@/components/layout';
+import { Button, Card, EmptyState, StatCard } from '@/components/ui';
 import { getPatientPublicCode } from '@/lib/patient-utils';
+
+/** 统计卡色调映射（设计系统 A：统一由 StatCard 渲染） */
+const summaryTones = {
+  totalPatients: 'brand',
+  pending: 'warn',
+  inProgress: 'info',
+  readyForReport: 'success',
+} as const;
 
 interface DashboardStats {
   totalPatients: number;
@@ -121,22 +128,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         />
 
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {summaryCards.map((card) => {
-            const Icon = card.icon;
-            return (
-              <Card key={card.key} variant="default" padding="md" className="border-slate-200 bg-white/95 shadow-[0_10px_30px_rgba(15,23,42,0.05)]">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[30px] font-semibold leading-none text-slate-900 tabular-nums">{stats[card.key]}</div>
-                    <div className="mt-2 text-sm text-slate-500">{card.label}</div>
-                  </div>
-                  <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${card.accent}`}>
-                    <Icon size={18} />
-                  </div>
-                </div>
-              </Card>
-            );
-          })}
+          {summaryCards.map((card) => (
+            <StatCard
+              key={card.key}
+              value={stats[card.key]}
+              label={card.label}
+              icon={card.icon}
+              tone={summaryTones[card.key]}
+            />
+          ))}
         </section>
 
         {/* ── 待办提醒卡片 ── */}
@@ -229,13 +229,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </Card>
 
         {filteredTasks.length === 0 ? (
-          <StatePanel
+          <EmptyState
+            fill
+            icon={ClipboardList}
             title="暂无可显示的接诊任务"
             description="可以先新建患者，或调整筛选条件后再继续。"
             actions={
               <>
-                <button onClick={onNewPatient} className="btn-primary">新建患者</button>
-                <button onClick={() => setKeyword('')} className="btn-secondary">清空筛选</button>
+                <Button size="sm" onClick={onNewPatient}>新建患者</Button>
+                <Button size="sm" variant="secondary" onClick={() => setKeyword('')}>清空筛选</Button>
               </>
             }
           />

@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>青跃智衡 · 报告中心（HTML 重建 v1）</title>
+<link rel="stylesheet" href="app.css" />
+<style>
+  /* 报告页：左栏两段，末段吃满高度；右栏归档吃满 */
+  .content--reports{grid-template-columns:minmax(0,1.65fr) minmax(0,1fr)}
+  .stack{display:flex;flex-direction:column;gap:16px;min-height:0;height:100%}
+  .stack>.panel:last-child{flex:1;min-height:0}
+  .rail>.panel:nth-child(2){flex:0 1 auto}
+  .rail>.panel.panel--grow{flex:1;min-height:0}
+  .module .tag{align-self:flex-start}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand__mark">R</div>
+      <div><div class="brand__name">青跃智衡</div><div class="brand__sub">康复师工作台</div></div>
+    </div>
+    <nav class="nav">
+      <button class="nav__item"><svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>接诊中心</button>
+      <button class="nav__item"><svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>评估中心</button>
+      <button class="nav__item is-active"><svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>报告中心<span class="dot"></span></button>
+      <button class="nav__item"><svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>数据中心</button>
+    </nav>
+    <div class="sidebar__foot">
+      <button class="nav__item"><svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9 2 2 0 1 1-2.8 2.8 1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5 2 2 0 1 1-4 0 1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3 2 2 0 1 1-2.8-2.8 1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1 2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9 2 2 0 1 1 2.8-2.8 1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5 2 2 0 1 1 4 0 1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3 2 2 0 1 1 2.8 2.8 1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1 2 2 0 1 1 0 4 1.7 1.7 0 0 0-1.5 1z"/></svg>系统设置</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="page-head">
+      <div>
+        <div class="page-head__eyebrow">接诊 → 评估 → 报告</div>
+        <h1>报告中心</h1>
+        <p>聚合当前接诊结果，突出模块结论、AI 分析与康复建议；详细文本放弹层，页面只保留决策所需信息。</p>
+        <div class="page-head__meta">
+          <span class="chip">当前接诊 V-10231 · 陈志远</span>
+          <span class="chip">准备度 3/5 · 2 个模块待补</span>
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <button class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4V2M15 22v-2M8 4V2M8 22v-2M3 8h2M3 16h2M19 8h2M19 16h2M8 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8z"/></svg>生成康复建议</button>
+        <button class="btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>推送家长端</button>
+        <button class="btn btn--primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/></svg>生成综合报告</button>
+      </div>
+    </header>
+
+    <!-- 筛选 -->
+    <section class="panel" style="padding:16px 20px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="panel__title">报告范围</div>
+        <div class="panel__desc" style="margin:0">先确定患者与接诊，再决定是否生成综合报告与康复建议。</div>
+        <span class="chip" style="margin-left:auto">当前接诊 V-10231</span>
+      </div>
+      <div class="filters">
+        <div class="field">
+          <div class="field__label">患者范围</div>
+          <div class="field__value">陈志远 · CS-2418
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field__label">接诊范围</div>
+          <div class="field__value">V-10231 · 10/19 第 3 次随访
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field__label">报告准备度</div>
+          <div class="field__value">3/5 模块已就绪 <span style="font-size:11px;color:var(--ink-faint)">60%</span></div>
+          <div class="readiness__bar"><span style="width:60%"></span></div>
+          <div class="chips">
+            <span class="chip-sm is-on">体态</span>
+            <span class="chip-sm is-on">脊柱</span>
+            <span class="chip-sm is-on">ROM</span>
+            <span class="chip-sm">语音</span>
+            <span class="chip-sm">量表</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 内容 -->
+    <section class="content content--reports">
+      <div class="stack">
+        <div class="panel">
+          <div class="panel__head">
+            <div><div class="panel__title">模块结果</div><div class="panel__desc">同一接诊下各评估模块的结构化结论。</div></div>
+            <span class="tag tag--warn">2 项待补</span>
+          </div>
+          <div class="modules">
+            <article class="module">
+              <div class="module__head">
+                <div class="module__icon" style="background:var(--info-bg);color:var(--info)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></div>
+                <div><div class="module__title">体态评估</div><div class="module__desc">MediaPipe · 正面/侧面</div></div>
+                <span class="tag tag--success" style="margin-left:auto">已完成</span>
+              </div>
+              <div class="module__summary">头前伸 12°，骨盆前倾 8°，双肩高度差 6mm；建议先做胸椎伸展与肩胛稳定训练。</div>
+              <div class="module__foot"><span>10:18 · 3 项指标</span><a class="link" href="#">查看结果 →</a></div>
+            </article>
+
+            <article class="module">
+              <div class="module__head">
+                <div class="module__icon" style="background:var(--success-bg);color:var(--success)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg></div>
+                <div><div class="module__title">ROM 评估</div><div class="module__desc">左膝 / 右肩</div></div>
+                <span class="tag tag--success" style="margin-left:auto">已完成</span>
+              </div>
+              <div class="module__summary">左膝屈曲 118°（较上次 +6°），右肩前屈 132°；伸展末段仍有 5° 疼痛限制。</div>
+              <div class="module__foot"><span>10:42 · 4 个关节</span><a class="link" href="#">查看结果 →</a></div>
+            </article>
+
+            <article class="module">
+              <div class="module__head">
+                <div class="module__icon" style="background:var(--warn-bg);color:var(--warn)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+                <div><div class="module__title">语音问诊</div><div class="module__desc">结构化病历</div></div>
+                <span class="tag tag--warn" style="margin-left:auto">待补充</span>
+              </div>
+              <div class="module__summary">已完成主诉与现病史采集，缺"近一周训练依从性"与"疼痛变化"两问。</div>
+              <div class="module__foot"><span>09:56 · 12 条记录</span><a class="link" href="#">继续采集 →</a></div>
+            </article>
+
+            <article class="module">
+              <div class="module__head">
+                <div class="module__icon" style="background:var(--surface-sunken);color:var(--ink-muted)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div>
+                <div><div class="module__title">量表评定</div><div class="module__desc">FMA-UE / VAS</div></div>
+                <span class="tag tag--warn" style="margin-left:auto">待填写</span>
+              </div>
+              <div class="module__summary">FMA-UE 家属端已推送 2 天未提交；VAS 可在本次接诊现场补录。</div>
+              <div class="module__foot"><span>未开始</span><a class="link" href="#">重新推送 →</a></div>
+            </article>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel__head">
+            <div><div class="panel__title">插件段落</div><div class="panel__desc">由评估插件贡献的报告片段（report.sections）。</div></div>
+            <span class="tag tag--info">2 段</span>
+          </div>
+          <div style="margin-top:14px">
+            <div class="section-block">
+              <span class="section-block__tag">体态评估</span>
+              <div style="font-size:13px;font-weight:600;color:var(--ink-strong)">体态结论与训练重点</div>
+              <ul>
+                <li>头前伸 12°、骨盆前倾 8°，与上次相比分别改善 2° / 1°。</li>
+                <li>建议本周维持胸椎伸展 + 肩胛稳定训练，每组 10 次，每日 2 组。</li>
+              </ul>
+            </div>
+            <div class="section-block">
+              <span class="section-block__tag">ROM 评估</span>
+              <div style="font-size:13px;font-weight:600;color:var(--ink-strong)">关节活动度结论</div>
+              <ul>
+                <li>左膝屈曲较上次 +6°，达到 118°；伸展末段疼痛 5°，训练时避免末端加压。</li>
+                <li>右肩前屈 132°，外展 118°；建议加入肩胛上回旋控制训练。</li>
+              </ul>
+            </div>
+          </div>
+          <div class="panel__foot">
+            <span>段落由插件生成 · 可在插件管理里停用</span>
+            <a class="link" href="#">插件管理 →</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="rail">
+        <div class="panel">
+          <div class="panel__head">
+            <div><div class="panel__title">报告归档</div><div class="panel__desc">当前患者最近 3 次报告</div></div>
+            <span class="tag tag--success">已归档 3</span>
+          </div>
+          <div class="list" style="margin-top:6px">
+            <div class="row">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--success);margin-top:6px;flex-shrink:0"></span>
+              <div class="row__main"><div class="row__title">第 2 次随访报告</div><div class="row__meta">10/12 · 已推送家长端</div></div>
+              <a class="link" href="#">PDF</a>
+            </div>
+            <div class="row">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--success);margin-top:6px;flex-shrink:0"></span>
+              <div class="row__main"><div class="row__title">第 1 次随访报告</div><div class="row__meta">10/05 · 已归档</div></div>
+              <a class="link" href="#">PDF</a>
+            </div>
+            <div class="row">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--info);margin-top:6px;flex-shrink:0"></span>
+              <div class="row__main"><div class="row__title">首次评估报告</div><div class="row__meta">09/28 · 已归档</div></div>
+              <a class="link" href="#">PDF</a>
+            </div>
+            <div class="row">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--warn);margin-top:6px;flex-shrink:0"></span>
+              <div class="row__main"><div class="row__title">本次综合报告</div><div class="row__meta">未生成 · 待 2 个模块</div></div>
+              <span class="tag tag--warn">待生成</span>
+            </div>
+          </div>
+          <div class="panel__foot">
+            <span>共 3 份归档 · 最近 10/12</span>
+            <a class="link" href="#">查看全部 →</a>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel__head">
+            <div><div class="panel__title">生成状态</div><div class="panel__desc">综合报告与康复建议</div></div>
+          </div>
+          <div class="list" style="margin-top:6px">
+            <div class="row"><div class="row__main"><div class="row__title">综合报告</div><div class="row__meta">需要 5/5 模块 · 当前 3/5</div></div><span class="tag tag--warn">未就绪</span></div>
+            <div class="row"><div class="row__main"><div class="row__title">康复建议</div><div class="row__meta">基于已有 3 个模块可先草拟</div></div><span class="tag tag--info">可生成</span></div>
+            <div class="row"><div class="row__main"><div class="row__title">家长端推送</div><div class="row__meta">上次推送 10/12 · 已读</div></div><span class="tag tag--success">已读</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

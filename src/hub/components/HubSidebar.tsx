@@ -31,7 +31,7 @@ export const HubSidebar: React.FC<SidebarProps> = ({ activeId, onSelect, isColla
         </div>
         {!isCollapsed ? (
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold tracking-tight">Medical AI Workspace</div>
+            <div className="truncate text-sm font-semibold tracking-tight">青跃智衡康复工作台</div>
           </div>
         ) : null}
       </div>

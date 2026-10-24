@@ -2,10 +2,8 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { HubSidebar } from './components/HubSidebar';
 
-import { Vision3Plugin } from '@/plugins/vision3/Vision3Plugin';
-import { MedVoicePlugin } from '@/plugins/medvoice/MedVoicePlugin';
-import { ROMPlugin } from '@/plugins/rom/ROMPlugin';
 import { ScaleAssessmentPanel } from '@/components/patient/ScaleAssessmentPanel';
+import { Slot } from '@/kernel/react';
 import { NexusReportCenter } from './components/NexusReportCenter';
 import { NewSessionModal } from './components/NewSessionModal';
 import { PatientSearchModal } from './components/PatientSearchModal';
@@ -159,13 +157,21 @@ export const NexusHub: React.FC = () => {
   };
 
   const renderAssessmentWorkspace = () => {
+    // 三个评估工具由插件贡献（src/plugins/*/plugin.tsx），内核按 key 分发
+    if (activePlugin === 'vision3' || activePlugin === 'medvoice' || activePlugin === 'rom') {
+      return (
+        <div className="h-full">
+          <Slot
+            name="assessment.workspace"
+            keyValue={activePlugin}
+            patientId={selectedPatient?.id}
+            sessionId={selectedVisitTask?.sessionId}
+            onBack={handleBackFromWorkspace}
+          />
+        </div>
+      );
+    }
     switch (activePlugin) {
-      case 'vision3':
-        return <Vision3Plugin />;
-      case 'medvoice':
-        return <MedVoicePlugin />;
-      case 'rom':
-        return <ROMPlugin />;
       case 'scale':
         return selectedPatient && selectedVisitTask?.sessionId ? (
           <ScaleAssessmentPanel
@@ -208,7 +214,13 @@ export const NexusHub: React.FC = () => {
           </div>
         );
       default:
-        return <Vision3Plugin />;
+        return (
+          <div className="rehab-page">
+            <div className="rehab-page-inner">
+              <StatePanel title="未找到评估工具" description="请到设置 → 插件检查该工具是否被停用。" />
+            </div>
+          </div>
+        );
     }
   };
 

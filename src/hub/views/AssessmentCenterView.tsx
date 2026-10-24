@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Activity, ClipboardList, FileText, Layers, Mic } from 'lucide-react';
+import { Activity, ClipboardList, FileText } from 'lucide-react';
 import type { Patient } from '@/types/patient';
 import type { VisitTaskSummary } from '../workflow';
 import { PageHeader, VisitCard } from '@/components/workflow';
-import { Button, Card } from '@/components/ui';
-import { StatePanel } from '@/components/layout';
+import { Button, Card, EmptyState, StatCard } from '@/components/ui';
+import { Slot } from '@/kernel/react';
 
 type AssessmentFilter = 'all' | 'pending' | 'inProgress' | 'ready';
 
@@ -21,10 +21,10 @@ const filterLabels: Record<AssessmentFilter, string> = {
 };
 
 const summaryDefinitions = [
-  { key: 'pending', label: '待开始评估', icon: ClipboardList, accent: 'bg-amber-50 text-amber-700' },
-  { key: 'inProgress', label: '进行中评估', icon: Activity, accent: 'bg-blue-50 text-blue-700' },
-  { key: 'ready', label: '已完成评估', icon: FileText, accent: 'bg-emerald-50 text-emerald-700' },
-] as const;
+  { key: 'pending', label: '待开始评估', icon: ClipboardList, tone: 'warn' as const },
+  { key: 'inProgress', label: '进行中评估', icon: Activity, tone: 'info' as const },
+  { key: 'ready', label: '已完成评估', icon: FileText, tone: 'success' as const },
+];
 
 export const AssessmentCenterView: React.FC<AssessmentCenterViewProps> = ({
   visitTasks,
@@ -64,38 +64,22 @@ export const AssessmentCenterView: React.FC<AssessmentCenterViewProps> = ({
 
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.4fr_0.6fr]">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {summaryDefinitions.map((item) => {
-              const Icon = item.icon;
-              const value = taskBuckets[item.key].length;
-              return (
-                <Card key={item.key} variant="default" padding="md" className="border-slate-200 bg-white/95 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[28px] font-semibold leading-none text-slate-900 tabular-nums">{value}</div>
-                      <div className="mt-2 text-sm text-slate-500">{item.label}</div>
-                    </div>
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${item.accent}`}>
-                      <Icon size={18} />
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
+            {summaryDefinitions.map((item) => (
+              <StatCard
+                key={item.key}
+                value={taskBuckets[item.key].length}
+                label={item.label}
+                icon={item.icon}
+                tone={item.tone}
+              />
+            ))}
           </div>
 
           <Card variant="default" padding="md" className="border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,1))] shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
             <div className="text-sm font-semibold text-slate-900">评估模块</div>
             <div className="mt-3 grid grid-cols-3 gap-2">
-              {[
-                { label: '体态评估', icon: Activity, accent: 'text-blue-600' },
-                { label: 'ROM 评估', icon: Layers, accent: 'text-emerald-600' },
-                { label: '语音问诊', icon: Mic, accent: 'text-violet-600' },
-              ].map((module) => (
-                <div key={module.label} className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-center">
-                  <module.icon size={16} className={`mx-auto ${module.accent}`} />
-                  <div className="mt-2 text-xs font-medium text-slate-600">{module.label}</div>
-                </div>
-              ))}
+              {/* 评估模块由插件贡献，见 src/plugins 下各插件的 plugin.tsx */}
+              <Slot name="assessment.tools" />
             </div>
           </Card>
         </section>
@@ -122,7 +106,9 @@ export const AssessmentCenterView: React.FC<AssessmentCenterViewProps> = ({
         </Card>
 
         {filteredTasks.length === 0 ? (
-          <StatePanel
+          <EmptyState
+            fill
+            icon={ClipboardList}
             title="当前筛选范围内没有评估任务"
             description="可以切换到其他筛选条件，或先前往接诊中心选择新的患者。"
           />

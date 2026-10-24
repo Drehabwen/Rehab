@@ -3,6 +3,8 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $unpackedRoot = Join-Path $projectRoot 'release-lean\win-unpacked'
 $desktopExe = Get-ChildItem -LiteralPath $unpackedRoot -Filter '*.exe' | Select-Object -First 1
 if (-not $desktopExe) { throw 'Desktop executable not found.' }
+$desktopLog = Join-Path $env:APPDATA 'rehab-main-desktop\logs\desktop.log'
+$launchStarted = Get-Date
 
 $desktopProcess = Start-Process -FilePath $desktopExe.FullName -WorkingDirectory $unpackedRoot -PassThru
 try {
@@ -18,6 +20,20 @@ try {
     }
   }
   if (-not $healthy) { throw 'Desktop-launched backend health check failed.' }
+
+  $rendererReady = $false
+  for ($attempt = 0; $attempt -lt 60; $attempt++) {
+    if ((Test-Path $desktopLog) -and
+        (Get-Item $desktopLog).LastWriteTime -ge $launchStarted.AddSeconds(-1) -and
+        (Select-String -LiteralPath $desktopLog -Pattern 'renderer-ready' -Quiet)) {
+      $rendererReady = $true
+      break
+    }
+    if ($desktopProcess.HasExited) { break }
+    Start-Sleep -Milliseconds 250
+  }
+  if (-not $rendererReady) { throw "Desktop renderer did not become ready. Log: $desktopLog" }
+  Write-Output 'renderer-ready'
 } finally {
   if (-not $desktopProcess.HasExited) { Stop-Process -Id $desktopProcess.Id -Force }
   Get-CimInstance Win32_Process | Where-Object {

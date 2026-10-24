@@ -51,6 +51,43 @@
 
     --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
     --shadow-layer: 0 12px 28px rgba(15, 23, 42, 0.12);
+
+    /* ── 语义别名（新代码优先用这些；旧变量保留兼容） ── */
+    --surface-page: var(--n50);
+    --surface-card: #ffffff;
+    --surface-sunken: var(--n100);
+    --surface-inverse: var(--n900);
+
+    --text-strong: var(--n900);
+    --text-body: var(--n700);
+    --text-muted: var(--n500);
+    --text-faint: var(--n400);
+    --text-inverse: #ffffff;
+
+    --line-subtle: var(--n200);
+    --line-strong: var(--n300);
+
+    --state-info: var(--processing);
+    --state-info-bg: var(--processing-bg);
+    --state-warn: var(--warning);
+    --state-warn-bg: var(--warning-bg);
+    --state-danger: var(--error);
+    --state-danger-bg: var(--error-bg);
+    --state-success: var(--success);
+    --state-success-bg: var(--success-bg);
+
+    /* 三档高度：卡片 / 悬浮层 / 弹层 */
+    --elev-1: var(--shadow-card);
+    --elev-2: 0 12px 28px rgba(15, 23, 42, 0.10);
+    --elev-3: 0 24px 56px rgba(15, 23, 42, 0.16);
+
+    --radius-xs: 8px;
+    --radius-xl: 28px;
+
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --dur-slow: 300ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   * {
@@ -152,6 +189,7 @@
   .rehab-page {
     height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: var(--space-24) var(--space-32) var(--space-32);
   }
 

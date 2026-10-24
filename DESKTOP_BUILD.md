@@ -17,7 +17,7 @@ npm run desktop:build
 
 桌面构建使用 `backend/requirements-desktop.txt`，不复用全局 Python 环境。姿态关键点推理位于现有前端，因此桌面后端不重复打包 Python MediaPipe；OpenCV 使用无 GUI 版本以减少体积。
 
-安装产物位于 `release-lean/`。当前内测版生成一键安装程序；`win-unpacked/` 可用于无需安装的技术验证。
+一键安装包位于 `release-lean/RehabMain-Setup-0.1.0-internal-x64.exe`。用户只需运行这一个文件；安装完成后应用自动启动，并创建桌面与开始菜单快捷方式。`win-unpacked/` 用于构建后的启动诊断。
 
 ## 内测隐私边界
 

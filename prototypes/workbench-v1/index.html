@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>青跃智衡 · 接诊中心（HTML 重建 v1）</title>
+<link rel="stylesheet" href="app.css" />
+</head>
+<body>
+<div class="app">
+  <!-- 侧栏 -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand__mark">R</div>
+      <div>
+        <div class="brand__name">青跃智衡</div>
+        <div class="brand__sub">康复师工作台</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <button class="nav__item is-active">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+        接诊中心<span class="dot"></span>
+      </button>
+      <button class="nav__item">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg>
+        评估中心
+      </button>
+      <button class="nav__item">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+        报告中心
+      </button>
+      <button class="nav__item">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/></svg>
+        数据中心
+      </button>
+    </nav>
+
+    <div class="sidebar__foot">
+      <button class="nav__item">
+        <svg class="nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        系统设置
+      </button>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <header class="page-head">
+      <div>
+        <div class="page-head__eyebrow">患者 → 接诊 → 评估 → 报告</div>
+        <h1>接诊中心</h1>
+        <p>围绕当前接诊任务组织患者列表。每张卡片只回答三个问题：现在处理谁、当前进度到哪、下一步该做什么。</p>
+        <div class="page-head__meta">
+          <span class="chip">今日 2026/10/19 · 周日</span>
+          <span class="chip">共 12 位患者 · 3 个待接诊</span>
+        </div>
+      </div>
+      <div class="page-head__actions">
+        <button class="btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 17a4 4 0 0 0-4-4H7a4 4 0 0 0 0 8h1"/><path d="M12 3a4 4 0 0 1 4 4v4a4 4 0 0 0 8 0"/></svg>
+          早筛同步
+        </button>
+        <button class="btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          搜索患者
+        </button>
+        <button class="btn btn--primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          新建患者
+        </button>
+      </div>
+    </header>
+
+    <!-- 统计卡 -->
+    <section class="stats">
+      <div class="stat">
+        <div><div class="stat__value">12</div><div class="stat__label">接诊患者</div><div class="stat__hint">本周新增 4</div></div>
+        <div class="stat__icon tone-brand"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.7-3.4 3.3-5.2 6.5-5.2s5.8 1.8 6.5 5.2"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14.6c2.9.1 5 1.7 5.6 4.6"/></svg></div>
+      </div>
+      <div class="stat">
+        <div><div class="stat__value">3</div><div class="stat__label">待开始接诊</div><div class="stat__hint">最早 09:30 到诊</div></div>
+        <div class="stat__icon tone-warn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+      </div>
+      <div class="stat">
+        <div><div class="stat__value">5</div><div class="stat__label">评估进行中</div><div class="stat__hint">体态 2 · ROM 2 · 语音 1</div></div>
+        <div class="stat__icon tone-info"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg></div>
+      </div>
+      <div class="stat">
+        <div><div class="stat__value">4</div><div class="stat__label">可进入报告</div><div class="stat__hint">2 份待人工确认</div></div>
+        <div class="stat__icon tone-success"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 14l2 2 4-4"/></svg></div>
+      </div>
+    </section>
+
+    <!-- 内容 -->
+    <section class="content">
+      <div class="panel">
+        <div class="panel__head">
+          <div>
+            <div class="panel__title">当前接诊任务</div>
+            <div class="panel__desc">每张卡片只保留患者、接诊号、评估进度和下一步操作。</div>
+          </div>
+          <div class="panel__tools">
+            <div class="segmented">
+              <button class="is-active">进行中</button>
+              <button>待开始</button>
+              <button>可看报告</button>
+              <button>全部</button>
+            </div>
+          </div>
+        </div>
+
+        <label class="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input placeholder="搜索患者姓名、患者编码或接诊号" />
+          <span style="font-size:11px;color:var(--ink-faint)">⌘K</span>
+        </label>
+
+        <div class="task-list">
+          <article class="task">
+            <div class="avatar" style="background:#0f9b8e">陈</div>
+            <div>
+              <div class="task__name">陈志远 <span style="font-weight:400;font-size:11px;color:var(--ink-faint);margin-left:6px">CS-2418 · 62 岁 · 男</span></div>
+              <div class="task__meta">接诊号 V-10231 · 卒中后右上肢功能障碍 · 第 3 次随访</div>
+              <div class="task__progress">
+                <div class="bar"><span style="width:66%"></span></div>
+                <span style="font-size:11px;color:var(--ink-muted)">2/3 模块</span>
+              </div>
+            </div>
+            <div class="task__right">
+              <span class="tag tag--info">评估中</span>
+              <a class="link" href="#">继续评估 →</a>
+            </div>
+          </article>
+
+          <article class="task">
+            <div class="avatar" style="background:#2563eb">林</div>
+            <div>
+              <div class="task__name">林慧敏 <span style="font-weight:400;font-size:11px;color:var(--ink-faint);margin-left:6px">CS-2421 · 55 岁 · 女</span></div>
+              <div class="task__meta">接诊号 V-10234 · 膝关节置换术后 · 首次评估</div>
+              <div class="task__progress">
+                <div class="bar"><span style="width:33%"></span></div>
+                <span style="font-size:11px;color:var(--ink-muted)">1/3 模块</span>
+              </div>
+            </div>
+            <div class="task__right">
+              <span class="tag tag--warn">待 ROM</span>
+              <a class="link" href="#">去完成 →</a>
+            </div>
+          </article>
+
+          <article class="task">
+            <div class="avatar" style="background:#7c3aed">王</div>
+            <div>
+              <div class="task__name">王建国 <span style="font-weight:400;font-size:11px;color:var(--ink-faint);margin-left:6px">CS-2390 · 68 岁 · 男</span></div>
+              <div class="task__meta">接诊号 V-10228 · 脊髓损伤 · 复测随访</div>
+              <div class="task__progress">
+                <div class="bar"><span style="width:100%"></span></div>
+                <span style="font-size:11px;color:var(--ink-muted)">3/3 模块</span>
+              </div>
+            </div>
+            <div class="task__right">
+              <span class="tag tag--success">可出报告</span>
+              <a class="link" href="#">查看报告 →</a>
+            </div>
+          </article>
+
+          <article class="task">
+            <div class="avatar" style="background:#b45309">赵</div>
+            <div>
+              <div class="task__name">赵一鸣 <span style="font-weight:400;font-size:11px;color:var(--ink-faint);margin-left:6px">CS-2433 · 41 岁 · 男</span></div>
+              <div class="task__meta">接诊号 V-10236 · 腰椎术后 · 待开始</div>
+              <div class="task__progress">
+                <div class="bar"><span style="width:0%"></span></div>
+                <span style="font-size:11px;color:var(--ink-muted)">0/3 模块</span>
+              </div>
+            </div>
+            <div class="task__right">
+              <span class="tag tag--warn">待开始</span>
+              <a class="link" href="#">开始接诊 →</a>
+            </div>
+          </article>
+        </div>
+
+        <div class="panel__foot">
+          <span>共 12 位患者 · 4 条进行中</span>
+          <a class="link" href="#">查看全部 →</a>
+        </div>
+      </div>
+
+      <div class="rail">
+        <div class="panel">
+          <div class="panel__head">
+            <div>
+              <div class="panel__title">今日提醒</div>
+              <div class="panel__desc">量表未填与随访到期</div>
+            </div>
+            <span class="tag tag--warn">2 条</span>
+          </div>
+          <div style="margin-top:8px">
+            <div class="reminder">
+              <span class="reminder__dot" style="background:var(--warn)"></span>
+              <div>
+                <div class="reminder__title">陈志远 · 量表未提交</div>
+                <div class="reminder__meta">FMA-UE 家属端已推送 · 2 天未填 · 可重新推送</div>
+              </div>
+            </div>
+            <div class="reminder">
+              <span class="reminder__dot" style="background:var(--info)"></span>
+              <div>
+                <div class="reminder__title">王建国 · 复测到期</div>
+                <div class="reminder__meta">距上次评估 14 天 · 建议本周完成复测</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel__head">
+            <div>
+              <div class="panel__title">评估模块</div>
+              <div class="panel__desc">由插件提供 · 停用即隐藏</div>
+            </div>
+          </div>
+          <div class="tools" style="margin-top:14px">
+            <button class="tool">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>
+              体态评估
+            </button>
+            <button class="tool">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>
+              ROM 评估
+            </button>
+            <button class="tool">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+              语音问诊
+            </button>
+          </div>
+          <div class="panel__foot">
+            <span>3 个插件已启用</span>
+            <a class="link" href="#">插件管理 →</a>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel__head">
+            <div>
+              <div class="panel__title">本周评估量</div>
+              <div class="panel__desc">体态 / ROM / 语音合计</div>
+            </div>
+            <span class="tag tag--info">+18%</span>
+          </div>
+          <div class="spark">
+            <i style="height:38%"></i><i style="height:52%"></i><i style="height:44%"></i><i style="height:68%"></i>
+            <i style="height:58%"></i><i style="height:82%"></i><i style="height:74%"></i>
+          </div>
+          <div class="spark-legend"><span>周一</span><span>周三</span><span>周五</span><span>周日</span></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

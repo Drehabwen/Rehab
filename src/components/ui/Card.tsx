@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { cn } from '@/lib/utils';
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -7,6 +7,15 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   hover?: boolean;
 }
 
+/**
+ * 卡片基元（设计系统 A）。
+ *
+ * - default：白底 + hairline 边框 + elev-1
+ * - elevated：白底 + elev-2（浮起面板）
+ * - outlined：透明底 + 强边框（分组用，不抢层级）
+ *
+ * 圆角/边框/阴影全部来自 token（src/index.css :root），不要在这里写死色值。
+ */
 export const Card: React.FC<CardProps> = ({
   children,
   className,
@@ -16,9 +25,9 @@ export const Card: React.FC<CardProps> = ({
   ...props
 }) => {
   const variantStyles = {
-    default: 'bento-card',
-    elevated: 'card-premium',
-    outlined: 'bg-transparent border border-slate-300',
+    default: 'bg-surface-card border border-line-subtle shadow-elev-1',
+    elevated: 'bg-surface-card shadow-elev-2',
+    outlined: 'border border-line-strong bg-transparent',
   };
 
   const paddingStyles = {
@@ -31,10 +40,10 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       className={cn(
-        'rounded-[20px] transition-all duration-200',
+        'overflow-hidden rounded-token-md transition-[border-color,box-shadow] duration-[var(--dur-base)]',
         variantStyles[variant],
         paddingStyles[padding],
-        hover && 'cursor-pointer hover:border-slate-300 hover:shadow-[0_8px_20px_rgba(15,23,42,0.08)]',
+        hover && 'cursor-pointer hover:border-line-strong hover:shadow-elev-2',
         className
       )}
       {...props}
@@ -50,7 +59,7 @@ export const CardHeader: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   ...props
 }) => {
   return (
-    <div className={cn('pb-4 border-b border-slate-200 mb-4', className)} {...props}>
+    <div className={cn('pb-4 border-b border-line-subtle mb-4', className)} {...props}>
       {children}
     </div>
   );
@@ -63,7 +72,7 @@ export const CardTitle: React.FC<React.HTMLAttributes<HTMLHeadingElement> & { as
   ...props
 }) => {
   return (
-    <Component className={cn('text-xl font-semibold text-slate-900', className)} {...props}>
+    <Component className={cn('text-xl font-semibold text-ink-strong', className)} {...props}>
       {children}
     </Component>
   );
@@ -75,7 +84,7 @@ export const CardDescription: React.FC<React.HTMLAttributes<HTMLParagraphElement
   ...props
 }) => {
   return (
-    <p className={cn('text-sm text-slate-500 mt-1', className)} {...props}>
+    <p className={cn('text-sm text-ink-muted mt-1', className)} {...props}>
       {children}
     </p>
   );
@@ -95,7 +104,7 @@ export const CardFooter: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
   ...props
 }) => {
   return (
-    <div className={cn('pt-4 border-t border-slate-200 mt-4', className)} {...props}>
+    <div className={cn('pt-4 border-t border-line-subtle mt-4', className)} {...props}>
       {children}
     </div>
   );

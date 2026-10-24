@@ -1,28 +1,53 @@
 import React from 'react';
 import { Activity } from 'lucide-react';
-import { AssessmentCard, StatusTag } from '@/components/workflow';
+import { StatusTag } from '@/components/workflow';
 import { Card } from '@/components/ui';
+import { ModuleResultCard } from '@/components/workflow/ModuleResultCard';
+import { Slot, useSlotHasEntries } from '@/kernel/react';
+import type { ReportModuleLike } from '@/kernel/types';
 import type { Assessment } from '@/types/assessment';
 
+interface ModuleResultItem extends ReportModuleLike {
+  type: 'posture' | 'rom' | 'medvoice' | 'scale' | 'adams';
+  presentation: {
+    title: string;
+    description: string;
+    icon: any;
+    accentClassName: string;
+  };
+}
+
 interface ModuleResultsGridProps {
-  assessmentOutputs: Array<{
-    type: 'posture' | 'rom' | 'medvoice' | 'scale' | 'adams';
-    output: any;
-    presentation: {
-      title: string;
-      description: string;
-      icon: any;
-      accentClassName: string;
-    };
-    summaryText: string;
-    evidenceText: string;
-  }>;
+  assessmentOutputs: ModuleResultItem[];
   onViewDetails: (assessment: Assessment) => void;
   readyCount: number;
 }
 
-const outputStatusToWorkflowStatus = (status: 'ready' | 'partial' | 'missing') =>
-  status === 'ready' ? ('completed' as const) : ('pending' as const);
+/**
+ * 单条模块结果：插件提供了该类型的渲染器就用渲染器，否则回落到默认卡片。
+ * 回退保证"停用插件 / 未知类型"时报告页不出现空洞。
+ */
+const ModuleResultSlot: React.FC<{
+  item: ModuleResultItem;
+  onViewDetails: (assessment: Assessment) => void;
+}> = ({ item, onViewDetails }) => {
+  const hasRenderer = useSlotHasEntries('assessment.result.renderers', item.type);
+  if (!hasRenderer) {
+    return (
+      <ModuleResultCard module={item} onViewDetails={onViewDetails as (assessment: unknown) => void} />
+    );
+  }
+  return (
+    <Slot
+      name="assessment.result.renderers"
+      keyValue={item.type}
+      assessmentType={item.type}
+      module={item}
+      assessment={(item.output as { sourceAssessment?: unknown } | undefined)?.sourceAssessment ?? null}
+      onViewDetails={onViewDetails as (assessment: unknown) => void}
+    />
+  );
+};
 
 export const ModuleResultsGrid: React.FC<ModuleResultsGridProps> = ({
   assessmentOutputs,
@@ -46,23 +71,9 @@ export const ModuleResultsGrid: React.FC<ModuleResultsGridProps> = ({
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {assessmentOutputs.map((item) => {
-          const Icon = item.presentation.icon;
-          return (
-            <AssessmentCard
-              key={item.type}
-              icon={Icon}
-              title={item.presentation.title}
-              description={item.presentation.description}
-              status={item.output ? outputStatusToWorkflowStatus(item.output.status) : 'pending'}
-              summary={item.summaryText}
-              meta={item.evidenceText}
-              actionLabel={item.output ? '查看结果' : undefined}
-              onAction={item.output ? () => onViewDetails(item.output.sourceAssessment) : undefined}
-              accentClassName={item.presentation.accentClassName}
-            />
-          );
-        })}
+        {assessmentOutputs.map((item) => (
+          <ModuleResultSlot key={item.type} item={item} onViewDetails={onViewDetails} />
+        ))}
       </div>
     </Card>
   );

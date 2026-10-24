@@ -1,5 +1,58 @@
 # Task Plan
 
+## Active Task: Galen Research Feedback Queue
+
+### Objective
+- Turn Galen observation reviews into actionable RehabMain research tasks linked to the original assessment record.
+
+### Steps
+- [completed] Add desktop IPC support for reading `feedback.json` from the shared connector directory.
+- [completed] Model accept, exclude, correction, recapture, and retest feedback in the RehabMain frontend.
+- [completed] Verify repeated feedback reads, frontend rendering contracts, and cross-project compatibility.
+
+### Verification
+- `node --test desktop/galen-connector.test.cjs`
+- `npm run check`
+- Galen Rust connector and review tests.
+
+### Outcome
+- RehabMain reads Galen's idempotent `feedback.json` and refreshes the queue every five seconds while the connector page is open.
+- Each item links a RehabID and source assessment to an accept, exclude, correction, recapture, or retest event.
+- Verification passed: desktop connector 3/3 and TypeScript check; Galen producer tests passed 11/11 connector, 8/8 timeline, and 2/2 review UI.
+
+## Active Task: RehabMain -> Galen First-Party Connector
+
+### Objective
+- Make the active RehabMain desktop app automatically publish the minimal de-identified snapshot that Galen already expects at `%LOCALAPPDATA%\Rehab\GalenConnector\latest.json`.
+
+### Constraints
+- Preserve the existing IndexedDB business schema and desktop packaging work.
+- Export only allowlisted identifiers and numeric screening observations; exclude names, notes, images, narrative reports, MedVoice content, and estimated Cobb angle.
+- Write snapshots atomically so Galen never reads a partial JSON file.
+- Keep screening observations reviewable; do not turn connector output into diagnostic conclusions.
+
+### Steps
+- [completed] Locate the active RehabMain repository and compare its actual export behavior with Galen's connector contract.
+- [completed] Add a de-identified snapshot builder, automatic IndexedDB publisher, and Electron IPC bridge writer.
+- [completed] Add privacy/contract tests and verify the frontend and desktop scripts.
+- [completed] Expose connector health and manual refresh in RehabMain data settings.
+- [completed] Confirm Galen registry and Rust import behavior against the bridge contract.
+- [completed] Run final focused verification and record the operational boundary.
+
+### Verification
+- `npm test -- --run src/lib/galenConnector.test.ts`
+- `npm run check`
+- Node-level atomic-writer smoke test against a temporary directory.
+- Galen connector discovery against an isolated generated snapshot.
+
+### Outcome
+- RehabMain desktop now automatically publishes a minimal allowlisted snapshot to Galen's Windows local bridge and serializes repeated writes.
+- Renderer and main-process privacy gates exclude names, notes, images, narrative/voice content, landmarks, recommendations, and estimated Cobb angle.
+- Data settings now shows connector readiness, last update, size, path, privacy boundary, and a manual refresh action.
+- Galen now advertises the real `%LOCALAPPDATA%` bridge instead of the stale `D:/DEV/Rehab` path.
+- Verification passed: RehabMain snapshot tests 2/2, desktop writer/privacy tests 2/2 including repeated replacement, TypeScript check, production build, Galen registry tests 3/3, and Galen Rust connector tests 10/10.
+- Operational boundary: this pass establishes the trusted RehabMain -> Galen evidence path. Galen -> RehabMain review/action/outcome feedback remains the next bidirectional-loop slice.
+
 ## Objective
 - Rebuild the frontend workspace into a clear five-center medical AI architecture with a persistent sidebar: 接诊中心、评估中心、报告中心、数据中心、系统设置。
 
@@ -413,3 +466,123 @@
 - Release packaging is ready on `codex/project-closure` for deployment to an HTTPS-protected internal server.
 - The disposable API acceptance flow passes health/readiness, screening intake, identity binding, family login, scale authorization guard, submission, and result retrieval.
 - Residual blockers: the public Git history still contains an old database artifact; Docker/Nginx image validation is unavailable on this workstation; application-level therapist accounts/audit logs and multi-device server persistence remain future work.
+# Desktop Packaging Task
+
+## Objective
+- Package Rehab-main as a Windows desktop app that launches locally with one click while preserving the current UI.
+
+## Constraints
+- Default local-first operation; no automatic patient-data upload.
+- Keep existing React UI and FastAPI backend behavior.
+- Make the first version suitable for internal distribution and feedback collection.
+
+## Steps
+- [completed] Inspect current frontend/backend startup and packaging constraints.
+- [completed] Add desktop launcher and Windows packaging configuration.
+- [completed] Add internal distribution and privacy notes.
+- [in_progress] Run type/build checks and verify the packaged startup path.
+
+## Verification
+- `npm run check`
+- `npm run build`
+- Validate launcher configuration and bundled runtime paths.
+
+## Outcome
+- `npm run check` passed.
+- `npm run build` passed.
+- Desktop source/configuration is present.
+- `npm run check` and `npm run build` passed.
+- Backend directory bundle completed at `backend/dist/rehab-backend/rehab-backend.exe` (approximately 975 MB including scientific-computing dependencies).
+- Electron packaging was started but had not produced files under `release/` within the execution window; packaging is still CPU/disk intensive because of the backend bundle.
+- Remaining risk: complete installer/portable artifact generation and validate one-click startup on a clean Windows machine.
+
+## Current Task: Lean Desktop Distribution
+
+### Objective
+- Produce a smaller, maintainable Windows internal-test package without changing the current Rehab-main UI or local-first privacy boundary.
+
+### Constraints
+- Use a dedicated Python environment instead of the polluted global Python environment.
+- Preserve local FastAPI, MediaPipe/OpenCV analysis, SQLite data, and optional online LLM calls.
+- Do not remove business features merely to reduce package size without recording the tradeoff.
+
+### Steps
+- [completed] Audit backend import chains and identify why heavy unrelated packages entered the bundle.
+- [completed] Build a clean packaging environment with only declared runtime dependencies.
+- [completed] Add explicit PyInstaller exclusions/spec configuration where safe.
+- [completed] Rebuild and compare backend/package sizes.
+- [completed] Smoke-test health startup and record distribution recommendation.
+
+### Verification
+- Import backend entrypoint in the clean environment.
+- Build the backend bundle and measure total bytes.
+- Launch bundled backend and request `/health`.
+- Build Electron unpacked/installer artifact if the backend smoke test passes.
+
+### Outcome
+- Global Python 3.14 pollution was the primary bundle-size cause; unrelated Torch/Transformers/Pandas/SciPy packages were being collected.
+- Added a dedicated Python 3.12 `.venv-desktop` build and `backend/requirements-desktop.txt`.
+- Python MediaPipe was removed from the desktop backend package because landmark inference is already frontend-side; OpenCV uses the headless runtime.
+- Backend bundle reduced from about 975 MB to about 183 MB and passed `/health` smoke testing.
+- Added an isolated desktop packaging project so compiled React assets are not duplicated with frontend `node_modules`.
+- Generated `release-lean/Qingyue-Rehab-0.1.0-internal-x64.exe` at about 182 MB.
+- The unpacked desktop app successfully launched its bundled backend and returned a healthy status.
+- Remaining release risk: installer is unsigned and uses the default Electron icon; Windows SmartScreen warnings are expected until code signing is added.
+
+## Current Task: One-Click Release Closure
+
+### Objective
+- Produce a single Rehab-main internal-test installer that installs, creates shortcuts, starts automatically, and manages its local backend/data without user configuration.
+
+### Constraints
+- Package only the mature `Rehab-main` frontend/backend.
+- Keep patient data local and persistent across application upgrades.
+- Do not bundle secrets, `.env` files, or test databases.
+
+### Steps
+- [completed] Harden desktop startup, single-instance handling, port checks, logs, and local data paths.
+- [completed] Rename all installer/application branding to Rehab-main and apply the new icon.
+- [completed] Rebuild the frontend, backend, unpacked application, and one-click installer.
+- [completed] Smoke-test bundled startup and record artifact hash/size.
+
+### Verification
+- `npm run check`
+- Bundled backend `/health` smoke test.
+- Unpacked desktop launches the bundled backend.
+- Installer artifact exists with Rehab-main naming and SHA-256 hash.
+
+### Outcome
+- Generated one-click installer: `release-lean/Rehab-main-Internal-0.1.0-internal-x64.exe` (174.01 MiB).
+- Installer creates desktop/Start Menu shortcuts and runs the application after installation.
+- Desktop app enforces a single instance, starts/stops its bundled backend, reports port conflicts, and writes backend logs locally.
+- Backend binds to `127.0.0.1` and stores its SQLite database under `%APPDATA%/rehab-main-desktop/data/`, outside the installation directory.
+- Rehab-main branding and the generated icon are applied to the packaged executable and installer.
+- Verification passed: TypeScript check, backend compile/build, desktop package build, bundled `/health` smoke test, local DB/log creation.
+- SHA-256: `2DDE824DB81A865BBF5CAC5FE6A356E03CFF7E4373A60BC26AB4BA2906CECBD8`.
+- Remaining release risk: installer is not certificate-signed, so Windows SmartScreen may show an unknown-publisher warning.
+
+## Current Task: Technical Debt Audit
+
+### Objective
+- Identify the highest-impact technical debt in Rehab-main with reproducible evidence, file/line references, and a prioritized remediation order.
+
+### Constraints
+- Audit only; do not change application behavior or refactor production code in this pass.
+- Distinguish correctness, privacy/data-integrity, maintainability, delivery, and cosmetic debt.
+- Preserve the user's existing working-tree changes.
+
+### Steps
+- [in_progress] Map repository boundaries, runtime architecture, and generated or duplicated content.
+- [pending] Audit frontend state, data persistence, assessment flows, and test coverage.
+- [pending] Audit Python backend, Electron boundary, packaging, and secret/data handling.
+- [pending] Reproduce quality signals and write a prioritized technical-debt report.
+
+### Verification
+- `npm run check`
+- `npm run lint` with source-only attribution
+- `npm test -- --run`
+- Backend test discovery and focused static checks
+- Evidence paths and line references verified against the current working tree
+
+### Outcome
+- Pending.

@@ -7,7 +7,7 @@
   "author": "Rehab-main Team",
   "build": {
     "appId": "cn.rehabmain.workbench",
-    "productName": "Rehab-main",
+    "productName": "青跃智衡康复工作台",
     "electronVersion": "36.9.5",
     "compression": "normal",
     "directories": {
@@ -17,6 +17,7 @@
       "main.cjs",
       "preload.cjs",
       "galen-connector.cjs",
+      "galen-research-export.cjs",
       "assets/qingyue-logo-v1.png",
       "package.json"
     ],
@@ -32,7 +33,7 @@
     ],
     "win": {
       "target": ["nsis"],
-      "artifactName": "Rehab-main-Internal-${version}-${arch}.${ext}",
+      "artifactName": "RehabMain-Setup-${version}-${arch}.${ext}",
       "icon": "assets/qingyue-logo-v1.ico",
       "signAndEditExecutable": true
     },
@@ -42,7 +43,7 @@
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Rehab-main 康复工作台",
+      "shortcutName": "青跃智衡康复工作台",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     },

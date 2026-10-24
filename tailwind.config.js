@@ -27,7 +27,48 @@ export default {
             start: "#0D9488",
             end: "#3B82F6",
           }
+        },
+        // 语义 token（来自 src/index.css 的 :root 变量；新代码优先使用）
+        brand: {
+          DEFAULT: "var(--brand)",
+          strong: "var(--brand-strong)",
+          soft: "var(--brand-soft)",
+        },
+        ink: {
+          strong: "var(--text-strong)",
+          body: "var(--text-body)",
+          muted: "var(--text-muted)",
+          faint: "var(--text-faint)",
+        },
+        line: {
+          subtle: "var(--line-subtle)",
+          strong: "var(--line-strong)",
+        },
+        surface: {
+          page: "var(--surface-page)",
+          card: "var(--surface-card)",
+          sunken: "var(--surface-sunken)",
+        },
+        state: {
+          info: "var(--state-info)",
+          "info-bg": "var(--state-info-bg)",
+          warn: "var(--state-warn)",
+          "warn-bg": "var(--state-warn-bg)",
+          danger: "var(--state-danger)",
+          "danger-bg": "var(--state-danger-bg)",
+          success: "var(--state-success)",
+          "success-bg": "var(--state-success-bg)",
         }
+      },
+      boxShadow: {
+        'elev-1': "var(--elev-1)",
+        'elev-2': "var(--elev-2)",
+        'elev-3': "var(--elev-3)",
+      },
+      borderRadius: {
+        'token-sm': "var(--radius-sm)",
+        'token-md': "var(--radius-md)",
+        'token-lg': "var(--radius-lg)",
       },
       spacing: {
         'xs': '4px',
