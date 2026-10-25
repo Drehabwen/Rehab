@@ -13,6 +13,8 @@ export interface WorkflowModuleDefinition {
   title: string;
   shortTitle: string;
   description: string;
+  /** 必需模块：缺失则不可生成报告；可选模块可跳过并说明。 */
+  required: boolean;
 }
 
 export interface WorkflowModuleSummary extends WorkflowModuleDefinition {
@@ -48,6 +50,7 @@ export const WORKFLOW_MODULES: WorkflowModuleDefinition[] = [
     title: '体态评估',
     shortTitle: '体态',
     description: '识别体态偏移、稳定性风险和关键异常指标。',
+    required: true,
   },
   {
     toolId: 'rom',
@@ -55,6 +58,7 @@ export const WORKFLOW_MODULES: WorkflowModuleDefinition[] = [
     title: 'ROM 评估',
     shortTitle: 'ROM',
     description: '记录关节活动范围，确认受限方向和左右差异。',
+    required: false,
   },
   {
     toolId: 'medvoice',
@@ -62,6 +66,7 @@ export const WORKFLOW_MODULES: WorkflowModuleDefinition[] = [
     title: '语音问诊',
     shortTitle: '问诊',
     description: '完成语音问诊并生成结构化病史信息。',
+    required: false,
   },
   {
     toolId: 'scale',
@@ -69,8 +74,13 @@ export const WORKFLOW_MODULES: WorkflowModuleDefinition[] = [
     title: '量表评估',
     shortTitle: '量表',
     description: '通过临床量表(SRS-22/ODI/VAS/MBI/Berg/MMT/MAS)评估主观平衡、肌力、痉挛、疼痛与自理能力。',
+    required: true,
   },
 ];
+
+function requiredRequiredTitles(requiredModules: WorkflowModuleSummary[]): string[] {
+  return requiredModules.filter((module) => module.status !== 'completed').map((module) => module.shortTitle);
+}
 
 const sortSessions = (sessions: Session[]) => [...sessions].sort((left, right) => right.createdAt - left.createdAt);
 const sortAssessments = (assessments: Assessment[]) => [...assessments].sort((left, right) => right.createdAt - left.createdAt);
@@ -106,9 +116,12 @@ export function buildVisitTaskSummary(
   });
 
   const completedModules = modules.filter((module) => module.status === 'completed').length;
+  const requiredModules = modules.filter((module) => module.required);
+  const completedRequired = requiredModules.filter((module) => module.status === 'completed').length;
+  const missingRequired = requiredRequiredTitles(requiredModules);
   const totalModules = modules.length;
   const hasAnyAssessment = completedModules > 0;
-  const reportReady = completedModules === totalModules && totalModules > 0;
+  const reportReady = requiredModules.length > 0 && completedRequired === requiredModules.length;
   const isSessionCompleted = latestSession?.status === 'completed';
 
   return {
@@ -130,7 +143,7 @@ export function buildVisitTaskSummary(
       : reportReady
       ? '进入报告中心'
       : hasAnyAssessment
-      ? '继续完成评估'
+      ? (missingRequired.length > 0 ? `完成必需评估：${missingRequired.join('、')}` : '进入报告中心（可选评估可补录）')
       : '创建接诊并开始评估',
     modules,
   };
@@ -141,11 +154,19 @@ export function buildVisitTaskList(
   getPatientSessions: (patientId: string) => Session[],
   assessments: Assessment[],
 ): VisitTaskSummary[] {
+  // 一次分组，避免对每位患者全量扫描 assessments（原实现 O(P×A)）
+  const assessmentsByPatient = new Map<string, Assessment[]>()
+  for (const assessment of assessments) {
+    const bucket = assessmentsByPatient.get(assessment.patientId)
+    if (bucket) bucket.push(assessment)
+    else assessmentsByPatient.set(assessment.patientId, [assessment])
+  }
+
   return patients
     .map((patient) => buildVisitTaskSummary(
       patient,
       getPatientSessions(patient.id),
-      assessments.filter((assessment) => assessment.patientId === patient.id),
+      assessmentsByPatient.get(patient.id) ?? [],
     ))
     .sort((left, right) => right.updatedAt - left.updatedAt);
 }

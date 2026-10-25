@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Mic, FileText, ChevronLeft, User, BarChart3 } from 'lucide-react';
+import { Camera, Mic, FileText, ChevronLeft, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Patient } from '@/types/patient';
 import { 

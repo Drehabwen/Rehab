@@ -33,6 +33,9 @@ interface NexusReportCenterProps {
   sessionId?: string | null;
 }
 
+// 必需评估类型（与 report-gate 的必需模块对齐：体态 + 量表）
+const REQUIRED_INPUT_TYPES = ['posture', 'scale'] as const;
+
 const modulePresentation = {
   posture: {
     title: '体态评估',
@@ -132,18 +135,40 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
     return map;
   }, [patients]);
 
-  const availablePatients = useMemo(() => {
+  // 一次分组：避免每次渲染全量扫描评估/报告（原实现 O(A+R) 重复执行）
+  const assessmentsByPatient = useMemo(() => {
+    const map = new Map<string, Assessment[]>();
+    for (const assessment of assessments) {
+      const bucket = map.get(assessment.patientId);
+      if (bucket) bucket.push(assessment);
+      else map.set(assessment.patientId, [assessment]);
+    }
+    return map;
+  }, [assessments]);
+
+  const reportPatientIds = useMemo(() => {
     const ids = new Set<string>();
-    assessments.forEach((a) => ids.add(a.patientId));
-    sessionReports.forEach((r) => ids.add(r.patientId));
-    return patients.filter((p) => ids.has(p.id));
-  }, [assessments, patients, sessionReports]);
+    for (const report of sessionReports) ids.add(report.patientId);
+    return ids;
+  }, [sessionReports]);
+
+  const availablePatients = useMemo(() => {
+    return patients.filter((p) => assessmentsByPatient.has(p.id) || reportPatientIds.has(p.id));
+  }, [assessmentsByPatient, reportPatientIds, patients]);
 
   const patientScopedAssessments = useMemo(() => {
     return selectedPatientId
-      ? assessments.filter((a) => a.patientId === selectedPatientId)
+      ? (assessmentsByPatient.get(selectedPatientId) ?? [])
       : assessments;
-  }, [assessments, selectedPatientId]);
+  }, [assessments, assessmentsByPatient, selectedPatientId]);
+
+  const requiredAssessmentLabel: Record<string, string> = { posture: '体态', scale: '量表' };
+  const missingRequiredTypeList = useMemo(
+    () => REQUIRED_INPUT_TYPES
+      .filter((type) => !patientScopedAssessments.some((assessment) => assessment.type === type && getAssessmentReadiness(assessment, type) === 'ready'))
+      .map((type) => requiredAssessmentLabel[type] ?? type),
+    [patientScopedAssessments],
+  );
 
   const sessionInputs = useMemo(
     () => buildSessionReportInputs(patientScopedAssessments, patientMap),
@@ -399,7 +424,13 @@ export const NexusReportCenter: React.FC<NexusReportCenterProps> = ({ patientId 
               >
                 推送至家长端
               </Button>
-              <Button variant="primary" icon={<Sparkles size={16} />} onClick={handleGenerateSessionReport} loading={isGeneratingSessionReport} disabled={!activeSessionInput}>生成综合报告</Button>
+              <Button
+            variant="primary"
+            icon={<Sparkles size={16} />}
+            onClick={handleGenerateSessionReport}
+            loading={isGeneratingSessionReport}
+            disabled={isGeneratingSessionReport || missingRequiredTypeList.length > 0}
+            title={missingRequiredTypeList.length > 0 ? `必需评估未就绪：${missingRequiredTypeList.join('、')}` : '生成综合报告'} disabled={!activeSessionInput}>生成综合报告</Button>
             </>
           }
         />

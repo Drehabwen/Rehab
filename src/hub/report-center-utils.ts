@@ -7,6 +7,7 @@ import type {
   SessionReportInputType,
 } from '@/types/report-center';
 import { sanitizeReadableText } from '@/components/shared/MarkdownReport';
+import { getAssessmentReadiness } from './report-readiness';
 
 const structuredCaseToMarkdown = (structuredCase: Record<string, string | undefined> | undefined): string | null => {
   if (!structuredCase) {
@@ -56,17 +57,9 @@ const getMedVoiceStatus = (assessment: Assessment): SessionReportInputStatus => 
   return 'missing';
 };
 
-const getScaleStatus = (assessment: Assessment): SessionReportInputStatus => {
-  if (assessment.data.scale?.aiInterpretation) {
-    return 'ready';
-  }
-
-  if (assessment.data.scale?.totalScore !== undefined || (assessment.data.scale?.answers?.length ?? 0) > 0) {
-    return 'partial';
-  }
-
-  return 'missing';
-};
+const getScaleStatus = (assessment: Assessment): SessionReportInputStatus =>
+  // 统一走 report-readiness：有总分即可引用，AI 解读是增强项
+  getAssessmentReadiness(assessment, 'scale');
 
 const getAdamsStatus = (assessment: Assessment): SessionReportInputStatus => {
   if (assessment.data.adams?.remarks) {

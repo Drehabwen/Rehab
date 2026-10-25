@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js",
     "build": "tsc -b && node node_modules/vite/bin/vite.js build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 900",
     "preview": "node node_modules/vite/bin/vite.js preview",
     "check": "tsc -b --noEmit",
     "test": "vitest",

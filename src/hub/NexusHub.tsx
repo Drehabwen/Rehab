@@ -79,7 +79,6 @@ export const NexusHub: React.FC = () => {
 
   useEffect(() => {
     const handleNavigateToReports = () => {
-      console.log('[NexusHub] Switching active center to reports');
       setActiveCenter('reports');
     };
     window.addEventListener('rehab-navigate-to-reports', handleNavigateToReports);

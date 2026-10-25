@@ -49,6 +49,15 @@ export const TrendChart: React.FC<TrendChartProps> = ({
     return 'stable';
   }, [chartData]);
 
+  // 如果数据点过多，进行采样
+  const sampledData = useMemo(() => {
+    const maxPoints = 20;
+    if (chartData.length <= maxPoints) return chartData;
+    
+    const step = Math.ceil(chartData.length / maxPoints);
+    return chartData.filter((_, index) => index % step === 0);
+  }, [chartData]);
+
   if (chartData.length === 0) {
     return (
       <div className="w-full h-64 flex items-center justify-center bg-slate-50 rounded-2xl border border-slate-100">
@@ -59,15 +68,6 @@ export const TrendChart: React.FC<TrendChartProps> = ({
       </div>
     );
   }
-
-  // 如果数据点过多，进行采样
-  const sampledData = useMemo(() => {
-    const maxPoints = 20;
-    if (chartData.length <= maxPoints) return chartData;
-    
-    const step = Math.ceil(chartData.length / maxPoints);
-    return chartData.filter((_, index) => index % step === 0);
-  }, [chartData]);
 
   return (
     <div className="w-full h-64 p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -176,18 +176,16 @@ interface VirtualTrendChartProps extends TrendChartProps {
 
 export const VirtualTrendChart: React.FC<VirtualTrendChartProps> = ({
   data,
-  containerHeight = 600,
+  containerHeight: _containerHeight = 600,
   ...props
 }) => {
+  // Hook 必须在任意 return 之前调用（原实现条件调用，违反 Hooks 规则）
+  const recentData = useMemo(() => data.slice(-10), [data]);
+
   // 如果数据量不大，使用普通版本
   if (data.length <= 10) {
     return <TrendChart data={data} {...props} />;
   }
-
-  // 大数据量时，只显示最近 10 条
-  const recentData = useMemo(() => {
-    return data.slice(-10);
-  }, [data]);
 
   return (
     <div>

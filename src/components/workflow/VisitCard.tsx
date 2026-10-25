@@ -4,6 +4,7 @@ import { Button, Card } from '@/components/ui';
 import { ProgressBar } from './ProgressBar';
 import { StatusTag } from './StatusTag';
 import type { VisitTaskSummary } from '@/hub/workflow';
+import { evaluateReportGate } from '@/hub/report-gate';
 import {
   getPatientAvatar,
   getPatientColor,
@@ -19,6 +20,10 @@ interface VisitCardProps {
 }
 
 export const VisitCard: React.FC<VisitCardProps> = ({ task, onOpen }) => {
+  // 门禁与接诊流共用同一实现（report-gate），避免两个页面结论不一致
+  const gate = evaluateReportGate(task);
+  const actionLabel = task.reportReady ? '查看报告' : gate.allowed ? '生成报告' : '进入评估';
+
   return (
     <Card variant="default" padding="lg" hover className="h-full border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,0.06)]">
       <div className="flex h-full flex-col gap-5">
@@ -48,6 +53,12 @@ export const VisitCard: React.FC<VisitCardProps> = ({ task, onOpen }) => {
 
         <ProgressBar value={task.completedModules} total={task.totalModules} />
 
+        <div className={`text-xs ${gate.allowed ? 'text-slate-500' : 'text-amber-700'}`} title={gate.hint}>
+          {gate.allowed
+            ? (gate.optionalPending.length > 0 ? `可选补录：${gate.optionalPending.join('、')}` : '必需评估已完成')
+            : `还差必需评估：${gate.missingRequired.join('、')}`}
+        </div>
+
         <div className="grid gap-2 sm:grid-cols-3">
           {task.modules.map((module) => (
             <div key={module.toolId} className="rounded-2xl border border-slate-200 bg-white px-3 py-3">
@@ -64,8 +75,8 @@ export const VisitCard: React.FC<VisitCardProps> = ({ task, onOpen }) => {
             <Calendar size={12} />
             最近更新 {formatDate(task.updatedAt)}
           </span>
-          <Button variant={task.reportReady ? 'secondary' : 'primary'} size="md" icon={<ClipboardList size={15} />} iconPosition="left" onClick={onOpen}>
-            {task.reportReady ? '查看报告' : '进入评估'}
+          <Button variant={task.reportReady ? 'secondary' : 'primary'} size="md" icon={<ClipboardList size={15} />} iconPosition="left" onClick={onOpen} title={gate.hint}>
+            {actionLabel}
             <ChevronRight size={14} />
           </Button>
         </div>

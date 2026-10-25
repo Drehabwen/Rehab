@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ClipboardList, FileText, Plus, Search, Stethoscope, Users, Cloud, Bell, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { Patient } from '@/types/patient';
 import type { VisitTaskSummary } from '../workflow';
@@ -41,25 +41,21 @@ const summaryCards = [
     key: 'totalPatients',
     label: '接诊患者',
     icon: Users,
-    accent: 'bg-slate-900 text-white',
   },
   {
     key: 'pending',
     label: '待开始接诊',
     icon: Stethoscope,
-    accent: 'bg-amber-50 text-amber-700',
   },
   {
     key: 'inProgress',
     label: '评估进行中',
     icon: ClipboardList,
-    accent: 'bg-blue-50 text-blue-700',
   },
   {
     key: 'readyForReport',
     label: '可进入报告',
     icon: FileText,
-    accent: 'bg-emerald-50 text-emerald-700',
   },
 ] as const;
 
@@ -77,20 +73,79 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onRefreshReminders,
 }) => {
   const [keyword, setKeyword] = useState('');
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const [debouncedKeyword, setDebouncedKeyword] = useState('');
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedKeyword(keyword), 120);
+    return () => window.clearTimeout(timer);
+  }, [keyword]);
+
+  // 预计算一次搜索索引，避免每次按键重复 toLowerCase / 访问对象
+  const searchIndex = useMemo(
+    () => visitTasks.map((task) => ({
+      task,
+      haystack: [
+        getPatientPublicCode(task.patient),
+        task.patient.id,
+        task.patientName,
+        task.visitId,
+      ].join(' ').toLowerCase(),
+    })),
+    [visitTasks],
+  );
 
   const filteredTasks = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
+    const q = debouncedKeyword.trim().toLowerCase();
     if (!q) return visitTasks;
+    return searchIndex.filter((entry) => entry.haystack.includes(q)).map((entry) => entry.task);
+  }, [debouncedKeyword, searchIndex, visitTasks]);
 
-    return visitTasks.filter((task) => {
-      return (
-        getPatientPublicCode(task.patient).toLowerCase().includes(q) ||
-        task.patient.id.toLowerCase().includes(q) ||
-        task.patientName.toLowerCase().includes(q) ||
-        task.visitId.toLowerCase().includes(q)
-      );
-    });
-  }, [keyword, visitTasks]);
+  // 增量渲染：首屏 40 张，底部哨兵进入视口再追加 40 张（避免一次创建上千张卡片）
+  const PAGE_SIZE = 40;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [debouncedKeyword, visitTasks]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleCount((current) => Math.min(current + PAGE_SIZE, filteredTasks.length));
+      }
+    }, { rootMargin: '240px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [filteredTasks.length]);
+
+  // 键盘优先：Ctrl/Cmd+K 聚焦搜索，Enter 打开第一条结果，Esc 清空
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setKeyword('');
+      return;
+    }
+    if (event.key === 'Enter' && filteredTasks.length > 0) {
+      event.preventDefault();
+      onSelectPatient(filteredTasks[0].patient);
+    }
+  };
+
+  const visibleTasks = useMemo(() => filteredTasks.slice(0, visibleCount), [filteredTasks, visibleCount]);
 
   // 有提醒的患者列表（按逾期数排序）
   const patientsWithReminders = useMemo(() => {
@@ -122,7 +177,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <>
               <Button variant="secondary" icon={<Cloud size={16} />} onClick={onOpenSyncPanel}>早筛同步</Button>
               <Button variant="secondary" icon={<Users size={16} />} onClick={onSearchPatient}>搜索患者</Button>
-              <Button variant="primary" icon={<Plus size={16} />} onClick={onNewPatient}>新建患者</Button>
+              <Button variant="primary" icon={<Plus size={16} />} onClick={onNewPatient}>开始接诊</Button>
             </>
           }
         />
@@ -172,7 +227,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 return (
                   <button
                     key={pr.patient_id}
-                    onClick={() => onSelectPatient(patient || { id: pr.patient_id, name: patientName } as Patient)}
+                    onClick={() => { if (patient) onSelectPatient(patient); }}
+                    disabled={!patient}
+                    title={patient ? undefined : '患者档案未同步，稍后重试'}
                     className="flex items-start gap-3 rounded-xl border border-red-100 bg-white p-3 text-left transition-all hover:border-red-200 hover:shadow-sm"
                   >
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 text-red-700 font-bold text-xs flex-shrink-0">
@@ -215,10 +272,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <label className="relative w-full lg:max-w-[460px]">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
+                ref={searchRef}
                 type="text"
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
-                placeholder="搜索患者姓名、患者编码或接诊号"
+                onKeyDown={handleSearchKeyDown}
+                placeholder="搜索患者姓名、患者编码或接诊号（Ctrl+K）"
+                aria-label="搜索接诊任务"
                 className="field-input pl-10"
               />
             </label>
@@ -233,20 +293,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             fill
             icon={ClipboardList}
             title="暂无可显示的接诊任务"
-            description="可以先新建患者，或调整筛选条件后再继续。"
+            description="点「开始接诊」创建本次接诊，或调整筛选条件后继续。"
             actions={
               <>
-                <Button size="sm" onClick={onNewPatient}>新建患者</Button>
+                <Button size="sm" onClick={onNewPatient}>开始接诊</Button>
                 <Button size="sm" variant="secondary" onClick={() => setKeyword('')}>清空筛选</Button>
               </>
             }
           />
         ) : (
+          <>
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            {filteredTasks.map((task) => (
-              <VisitCard key={`${task.patient.id}-${task.visitId}`} task={task} onOpen={() => onSelectPatient(task.patient)} />
+            {visibleTasks.map((task) => (
+              <div key={`${task.patient.id}-${task.visitId}`} style={{ contentVisibility: 'auto', containIntrinsicSize: '320px' }}>
+                <VisitCard task={task} onOpen={() => onSelectPatient(task.patient)} />
+              </div>
             ))}
           </section>
+          {visibleCount < filteredTasks.length ? (
+            <div ref={sentinelRef} className="py-6 text-center text-xs text-slate-400">
+              正在加载更多接诊任务…（{visibleCount}/{filteredTasks.length}）
+            </div>
+          ) : null}
+          </>
         )}
       </div>
     </div>
