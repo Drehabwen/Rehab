@@ -1,4 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
+import { useAssessmentStore } from '@/store/useAssessmentStore';
+import type { ScaleAnswer } from '@/types/assessment';
 
 const ITEMS = [
   '疼痛程度（今天）',
@@ -14,13 +16,23 @@ const ITEMS = [
 ];
 
 interface ScaleScreenProps {
+  patientId: string;
+  sessionId: string;
   previousScores?: number[];
   onSaved: (total: number) => void;
   onBack: () => void;
 }
 
+const categoryOf = (index: number): ScaleAnswer['category'] => {
+  if (index === 0) return 'pain';
+  if (index === 5) return 'mental_health';
+  if (index === 6) return 'satisfaction';
+  return 'function';
+};
+
 /** 屏 4：量表（点选式，上次值虚线提示，必填校验，实时总分） */
-export const ScaleScreen: React.FC<ScaleScreenProps> = ({ previousScores, onSaved, onBack }) => {
+export const ScaleScreen: React.FC<ScaleScreenProps> = ({ patientId, sessionId, previousScores, onSaved, onBack }) => {
+  const addAssessment = useAssessmentStore((state) => state.addAssessment);
   const [scores, setScores] = useState<Array<number | null>>(() => ITEMS.map(() => null));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,15 +42,51 @@ export const ScaleScreen: React.FC<ScaleScreenProps> = ({ previousScores, onSave
   const previousTotal = previousScores?.length ? previousScores.reduce((a, b) => a + b, 0) * 2 : null;
   const missing = ITEMS.map((label, index) => ({ label, index })).filter((item) => scores[item.index] === null);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (missing.length > 0) {
       setError(`还有 ${missing.length} 项未填写：${missing[0].label} 等为必填项`);
       return;
     }
     setError(null);
     setSubmitting(true);
-    onSaved(total);
-    setSubmitting(false);
+    try {
+      const answers: ScaleAnswer[] = scores.map((value, index) => ({
+        questionId: index + 1,
+        questionText: ITEMS[index],
+        category: categoryOf(index),
+        score: value ?? 0,
+        answerText: String(value ?? 0),
+      }));
+      await addAssessment({
+        sessionId,
+        patientId,
+        type: 'scale',
+        mode: 'stepped',
+        data: {
+          scale: {
+            scaleId: 'ODI',
+            scaleName: 'ODI 功能障碍指数',
+            filledBy: 'therapist',
+            totalScore: total,
+            maxScore: 100,
+            percentageScore: total,
+            dimensions: {
+              functionActive: scores.slice(1, 5).reduce<number>((sum, value) => sum + (value ?? 0), 0) * 2,
+              pain: (scores[0] ?? 0) * 2,
+              selfImage: 0,
+              mentalHealth: (scores[5] ?? 0) * 2,
+            },
+            answers,
+            createdAt: Date.now(),
+          },
+        },
+      });
+      onSaved(total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存评估失败，请重试');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

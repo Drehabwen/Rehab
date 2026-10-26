@@ -3,7 +3,7 @@ import { generateCanonicalPatientId, generateShortCode, usePatientStore } from '
 import { useSessionStore } from '@/store/useSessionStore';
 
 interface NewVisitScreenProps {
-  onStarted: (patientId: string) => void;
+  onStarted: (patientId: string, sessionId: string) => void;
   onCancel: () => void;
 }
 
@@ -24,8 +24,8 @@ export const NewVisitScreen: React.FC<NewVisitScreenProps> = ({ onStarted, onCan
     setError(null);
     try {
       const patient = await addPatient(name.trim() || undefined, patientId, shortCode);
-      await startSession(patient.id);
-      onStarted(patient.id);
+      const session = await startSession(patient.id);
+      onStarted(patient.id, session.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建接诊失败，请重试');
     } finally {

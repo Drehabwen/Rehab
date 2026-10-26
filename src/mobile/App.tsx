@@ -2,6 +2,7 @@
 import { VisitsScreen } from './screens/VisitsScreen';
 import { NewVisitScreen } from './screens/NewVisitScreen';
 import { ScaleScreen } from './screens/ScaleScreen';
+import { ReportScreen } from './screens/ReportScreen';
 
 type MobileRoute = 'visits' | 'new' | 'scale' | 'report' | 'sync';
 
@@ -11,6 +12,7 @@ type MobileRoute = 'visits' | 'new' | 'scale' | 'report' | 'sync';
  */
 export const MobileApp: React.FC = () => {
   const [route, setRoute] = useState<MobileRoute>('visits');
+  const [visit, setVisit] = useState<{ patientId: string; sessionId: string; total?: number } | null>(null);
   return (
     <div className="min-h-screen bg-[#eef2f7] text-slate-800">
       <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white">
@@ -28,20 +30,30 @@ export const MobileApp: React.FC = () => {
             />
           ) : route === 'new' ? (
             <NewVisitScreen
-              onStarted={() => setRoute('scale')}
+              onStarted={(patientId, sessionId) => { setVisit({ patientId, sessionId }); setRoute('scale'); }}
               onCancel={() => setRoute('visits')}
             />
           ) : route === 'scale' ? (
-            <ScaleScreen
-              onSaved={() => setRoute('report')}
+            visit ? (
+              <ScaleScreen
+                patientId={visit.patientId}
+                sessionId={visit.sessionId}
+                onSaved={(total) => { setVisit({ ...visit, total }); setRoute('report'); }}
+                onBack={() => setRoute('visits')}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs text-slate-400">请先新建接诊</div>
+            )
+          ) : route === 'report' ? (
+            <ReportScreen
+              total={visit?.total ?? 0}
+              onContinue={() => setRoute('visits')}
               onBack={() => setRoute('visits')}
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-              <div className="text-sm font-bold text-slate-900">{route === 'report' ? '接诊报告' : '待同步'}</div>
-              <div className="max-w-[240px] text-xs text-slate-500">
-                {route === 'report' ? '保存后自动生成一页报告（下一屏实现）' : '弱网与失败重试队列（下一屏实现）'}
-              </div>
+              <div className="text-sm font-bold text-slate-900">待同步</div>
+              <div className="max-w-[240px] text-xs text-slate-500">弱网与失败重试队列（下一屏实现）</div>
             </div>
           )}
         </section>
