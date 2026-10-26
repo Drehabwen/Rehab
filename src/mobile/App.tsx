@@ -1,4 +1,7 @@
 ﻿import React, { useState } from 'react';
+import { VisitsScreen } from './screens/VisitsScreen';
+import { NewVisitScreen } from './screens/NewVisitScreen';
+import { ScaleScreen } from './screens/ScaleScreen';
 
 type MobileRoute = 'visits' | 'new' | 'scale' | 'report' | 'sync';
 
@@ -17,8 +20,30 @@ export const MobileApp: React.FC = () => {
           </span>
           <span className="text-[11px] text-slate-400">青跃智衡</span>
         </header>
-        <section className="flex-1 overflow-y-auto p-4">
-          <p className="text-sm text-slate-500">路由：{route}（按原型 docs/prototype-mobile-v1 实现）</p>
+        <section className="flex-1 overflow-hidden p-4">
+          {route === 'visits' ? (
+            <VisitsScreen
+              onStartVisit={() => setRoute('new')}
+              onOpenPatient={() => setRoute('scale')}
+            />
+          ) : route === 'new' ? (
+            <NewVisitScreen
+              onStarted={() => setRoute('scale')}
+              onCancel={() => setRoute('visits')}
+            />
+          ) : route === 'scale' ? (
+            <ScaleScreen
+              onSaved={() => setRoute('report')}
+              onBack={() => setRoute('visits')}
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+              <div className="text-sm font-bold text-slate-900">{route === 'report' ? '接诊报告' : '待同步'}</div>
+              <div className="max-w-[240px] text-xs text-slate-500">
+                {route === 'report' ? '保存后自动生成一页报告（下一屏实现）' : '弱网与失败重试队列（下一屏实现）'}
+              </div>
+            </div>
+          )}
         </section>
         <nav className="flex h-14 items-center justify-around border-t border-slate-200 text-[11px] text-slate-400">
           <button onClick={() => setRoute('visits')} className={route === 'visits' ? 'font-bold text-[#0f9b8e]' : ''}>接诊</button>
