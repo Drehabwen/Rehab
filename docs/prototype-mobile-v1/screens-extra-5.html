@@ -1,0 +1,144 @@
+﻿<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root{--teal:#0f9b8e;--teal2:#2dd4bf;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--warn:#f59e0b;--err:#e11d48}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
+body{background:#eef2f7;padding:28px;display:flex;gap:24px;align-items:flex-start}
+.phone{width:390px;height:844px;background:#fff;border-radius:34px;box-shadow:0 20px 50px rgba(15,23,42,.2);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.st{height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:12px;font-weight:600;color:var(--ink)}
+.nav{height:48px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)}
+.back{font-size:17px;color:var(--muted)} .nav .t{font-size:15px;font-weight:700;color:var(--ink)} .nav .s{margin-left:auto;font-size:11px;color:var(--muted)}
+.body{flex:1;overflow:hidden;padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.muted{color:var(--muted);font-size:11.5px}.title{font-size:14px;font-weight:700;color:var(--ink)}
+.tag{font-size:10.5px;padding:3px 8px;border-radius:999px;background:#f1f5f9;color:#475569;font-weight:600}
+.tag.t{background:rgba(15,155,142,.1);color:var(--teal)} .tag.w{background:rgba(245,158,11,.14);color:#b45309} .tag.e{background:rgba(225,29,72,.1);color:var(--err)}
+.btn{height:48px;border-radius:13px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;margin-top:auto}
+.btn.ghost{background:#fff;color:var(--teal);border:1.5px solid var(--teal)} .btn.soft{background:#f1f5f9;color:#334155}
+.search{height:38px;border:1px solid var(--line);border-radius:11px;display:flex;align-items:center;gap:7px;padding:0 11px;font-size:12px;color:#94a3b8}
+.filters{display:flex;gap:6px}.f{font-size:11px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);color:#475569}
+.f.on{background:var(--teal);border-color:var(--teal);color:#fff;font-weight:600}
+.item{display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid var(--line);border-radius:14px}
+.av{width:36px;height:36px;border-radius:11px;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.circle{width:60px;height:60px;border-radius:20px;background:rgba(15,155,142,.1);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--teal)}
+.mic{width:80px;height:80px;border-radius:50%;background:radial-gradient(circle at 40% 35%,var(--teal2),var(--teal));display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;margin:6px auto 0;box-shadow:0 14px 30px rgba(15,155,142,.3)}
+.wave{display:flex;gap:4px;align-items:flex-end;justify-content:center;height:32px;margin-top:9px}.wave i{width:4px;background:var(--teal);border-radius:2px;display:block}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:11px;padding:5px 9px;border-radius:999px;border:1px solid var(--line);color:#475569}
+.chip.on{background:rgba(15,155,142,.1);border-color:var(--teal);color:var(--teal);font-weight:600}
+.field{height:44px;border:1.5px solid var(--teal);border-radius:12px;display:flex;align-items:center;padding:0 12px;font-size:14px;color:var(--ink);box-shadow:0 0 0 3px rgba(45,212,191,.12)}
+.caret{width:1.5px;height:18px;background:var(--teal);margin-left:2px;animation:none}
+.kb{height:250px;background:#dbe3ee;border-top:1px solid #cbd5e1;display:grid;grid-template-columns:repeat(10,1fr);gap:5px;padding:8px}
+.kb i{background:#fff;border-radius:5px;height:32px}
+.sec{font-size:10.5px;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}
+.kv{display:flex;justify-content:space-between;font-size:11.5px;padding:5px 0;border-bottom:1px dashed #f1f5f9}.kv:last-child{border-bottom:none}
+.trend{display:flex;align-items:flex-end;gap:6px;height:48px;margin-top:5px}.trend i{width:13px;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--teal2),var(--teal))}
+.tl{position:relative;padding-left:16px}.tl::before{content:"";position:absolute;left:5px;top:6px;bottom:6px;width:2px;background:#e2e8f0}
+.tli{position:relative;padding:7px 0;font-size:11.5px;color:#334155}.tli::before{content:"";position:absolute;left:-15px;top:12px;width:8px;height:8px;border-radius:50%;background:var(--teal)}
+</style></head><body>
+
+<!-- E 首日空状态 -->
+<div class="phone">
+ <div class="st"><span>9:38</span><span>5G ▮▮▮</span></div>
+ <div class="nav"><span class="t">今日接诊</span><span class="s">首次使用</span></div>
+ <div class="body">
+  <div class="empty">
+   <div class="circle">＋</div>
+   <div class="title" style="font-size:16px">今天还没有接诊</div>
+   <div class="muted" style="max-width:240px">3 分钟走完第一位患者：建档 → 量表 → 报告</div>
+  </div>
+  <div class="card" style="background:#f8fafc"><div class="sec">你可以从这里开始</div>
+   <div class="kv"><span>新建第一位患者</span><span style="color:var(--teal)">推荐</span></div>
+   <div class="kv"><span>导入历史名单</span><span>Excel / CSV</span></div>
+   <div class="kv"><span>载入演示患者</span><span>3 个示例</span></div>
+  </div>
+  <div class="btn">＋ 新建第一位患者</div>
+  <div class="btn ghost">导入历史名单（Excel）</div>
+  <div class="btn soft">载入 3 个演示患者试试</div>
+ </div>
+</div>
+
+<!-- F 今日接诊 -->
+<div class="phone">
+ <div class="st"><span>9:43</span><span>5G ▮▮▮</span></div>
+ <div class="nav"><span class="t">今日接诊</span><span class="s">10/26 周三</span></div>
+ <div class="body">
+  <div class="card" style="padding:11px 14px"><div class="row"><div><div class="muted">今天</div><div style="font-size:24px;font-weight:700;color:var(--ink)">7 <span class="muted" style="font-size:11.5px">位待处理</span></div></div>
+   <div style="display:flex;gap:14px;text-align:right"><div><div class="muted">已完成</div><div style="font-weight:700">3</div></div><div><div class="muted">待报告</div><div style="font-weight:700;color:var(--teal)">2</div></div><div><div class="muted">待同步</div><div style="font-weight:700;color:#b45309">1</div></div></div></div></div>
+  <div class="search">🔍 搜索姓名 / 编码 / 接诊号</div>
+  <div class="filters"><span class="f on">全部 7</span><span class="f">待评估 4</span><span class="f">可报告 2</span><span class="f">待同步 1</span></div>
+  <div class="item"><div class="av">王</div><div style="flex:1"><div class="title">王 · CS-2501</div><div class="muted">女 62 · 上次 42 分 · 下一步：量表</div></div><span class="tag">待评估</span></div>
+  <div class="item"><div class="av" style="background:#0f9b8e">李</div><div style="flex:1"><div class="title">李 · CS-2507</div><div class="muted">男 55 · 量表完成 · 可出报告</div></div><span class="tag t">可报告</span></div>
+  <div class="item"><div class="av" style="background:#64748b">赵</div><div style="flex:1"><div class="title">赵 · CS-2512</div><div class="muted">女 48 · 语音已录 · 待同步</div></div><span class="tag w">待同步</span></div>
+  <div class="item"><div class="av" style="background:#94a3b8">陈</div><div style="flex:1"><div class="title">陈 · CS-2514</div><div class="muted">男 71 · 已完成 · 报告已发送</div></div><span class="tag t">已完成</span></div>
+  <div class="btn">＋ 开始接诊</div>
+ </div>
+</div>
+
+<!-- G 语音问诊 -->
+<div class="phone">
+ <div class="st"><span>9:48</span><span>5G ▮▮▮</span></div>
+ <div class="nav"><span class="back">‹</span><span class="t">语音问诊 · 王</span><span class="s">00:32</span></div>
+ <div class="body">
+  <div class="card" style="text-align:center;padding:13px">
+   <div class="mic">●</div>
+   <div style="margin-top:7px;font-size:14px;font-weight:700">正在录音</div>
+   <div class="wave"><i style="height:9px"></i><i style="height:22px"></i><i style="height:30px"></i><i style="height:15px"></i><i style="height:26px"></i><i style="height:11px"></i><i style="height:20px"></i><i style="height:13px"></i><i style="height:28px"></i></div>
+   <div class="muted" style="margin-top:6px">安静环境下效果最佳 · 转写仅作参考</div>
+  </div>
+  <div class="card"><div class="sec">实时转写（可编辑）</div><div style="font-size:11.5px;line-height:1.7;color:#334155">…腰疼两个月，走路久了加重，晚上翻身也疼，之前做过理疗…</div></div>
+  <div class="card"><div class="sec">关键要点（必选，不依赖转写）</div>
+   <div class="chips"><span class="chip on">疼痛部位·腰</span><span class="chip on">病程 2 月</span><span class="chip on">活动加重</span><span class="chip">夜间痛</span><span class="chip">既往理疗</span><span class="chip">＋</span></div>
+  </div>
+  <div class="card" style="padding:9px 14px"><div class="row"><span class="muted">已选要点 3/3</span><span style="color:var(--teal);font-weight:700;font-size:11.5px">可以结束</span></div></div>
+  <div class="btn">结束录音 →</div>
+  <div class="btn ghost" style="margin-top:7px">重录</div>
+ </div>
+</div>
+
+<!-- H 新建患者 -->
+<div class="phone">
+ <div class="st"><span>9:40</span><span>5G ▮▮▮</span></div>
+ <div class="nav"><span class="back">‹</span><span class="t">新建接诊</span><span class="s">第 2 次</span></div>
+ <div class="body">
+  <div class="card"><div class="sec">患者姓名（可选，不上传）</div>
+   <div class="field">王<span class="caret"></span></div>
+   <div class="muted" style="margin-top:6px">同名患者 1 位（王·CS-2488），是否复用？<span style="color:var(--teal)">复用</span> / <span style="color:var(--muted)">新建</span></div>
+  </div>
+  <div class="card"><div class="sec">基础信息</div>
+   <div class="kv"><span>性别</span><span style="color:#334155">女</span></div>
+   <div class="kv"><span>年龄</span><span style="color:#334155">62</span></div>
+   <div class="kv"><span>主诉/诊断</span><span style="color:#334155">腰椎间盘突出</span></div>
+  </div>
+  <div class="card" style="background:#f8fafc"><div class="row"><span class="muted">系统编号</span><span style="font-family:monospace;font-size:11.5px;color:#334155">RID-A3F9C2</span></div>
+   <div class="muted" style="margin-top:4px">自动生成，用于科研数据对齐；姓名仅存本机</div>
+  </div>
+  <div class="btn">确认并开始接诊 →</div>
+ </div>
+ <div class="kb"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+</div>
+
+<!-- I 患者档案 -->
+<div class="phone">
+ <div class="st"><span>10:02</span><span>5G ▮▮▮</span></div>
+ <div class="nav"><span class="back">‹</span><span class="t">患者档案</span><span class="s">CS-2501</span></div>
+ <div class="body">
+  <div class="card"><div class="row"><div><div class="title">王 · CS-2501</div><div class="muted" style="margin-top:2px">女 · 62 岁 · 腰椎间盘突出</div></div><span class="tag t">第 4 次</span></div></div>
+  <div class="card" style="padding:10px 14px"><div class="sec">ODI 总分趋势</div>
+   <div class="trend"><i style="height:16px"></i><i style="height:22px"></i><i style="height:30px"></i><i style="height:36px"></i></div>
+   <div class="muted" style="margin-top:4px">46 → 42 → 38 → 36（持续改善）</div>
+  </div>
+  <div class="card"><div class="sec">接诊时间线</div>
+   <div class="tl">
+    <div class="tli"><b>10/26 · 第 4 次</b><div class="muted">ODI 36 · 语音要点 4 项 · 已同步</div></div>
+    <div class="tli"><b>10/12 · 第 3 次</b><div class="muted">ODI 38 · 报告已发送家属</div></div>
+    <div class="tli"><b>09/28 · 第 2 次</b><div class="muted">ODI 42 · 体态评估（可选）</div></div>
+    <div class="tli"><b>09/14 · 首次</b><div class="muted">ODI 46 · 建队基线</div></div>
+   </div>
+  </div>
+  <div class="card" style="padding:10px 14px"><div class="sec">下次复评</div><div class="row"><span style="font-size:12.5px;color:#334155">11/09（ODI + 疼痛）</span><span class="tag w">14 天后</span></div></div>
+  <div class="btn">开始本次接诊</div>
+  <div class="btn ghost" style="margin-top:7px">查看历史报告</div>
+ </div>
+</div>
+
+</body></html>

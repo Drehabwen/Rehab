@@ -1,0 +1,129 @@
+﻿<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>
+:root{--teal:#0f9b8e;--teal2:#2dd4bf;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--warn:#f59e0b;--err:#e11d48}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Microsoft YaHei","PingFang SC",sans-serif}
+body{background:#eef2f7;padding:28px;display:flex;gap:24px;align-items:flex-start}
+.phone{width:390px;height:844px;background:#fff;border-radius:34px;box-shadow:0 20px 50px rgba(15,23,42,.2);overflow:hidden;display:flex;flex-direction:column;position:relative}
+.st{height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:12px;font-weight:600;color:var(--ink)}
+.nav{height:48px;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid var(--line)}
+.back{font-size:18px;color:var(--muted)}
+.nav .t{font-size:15px;font-weight:700;color:var(--ink)}
+.nav .s{margin-left:auto;font-size:11px;color:var(--muted)}
+.body{flex:1;overflow:hidden;padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.muted{color:var(--muted);font-size:11.5px}
+.title{font-size:14px;font-weight:700;color:var(--ink)}
+.tag{font-size:10.5px;padding:3px 8px;border-radius:999px;background:#f1f5f9;color:#475569;font-weight:600}
+.tag.t{background:rgba(15,155,142,.1);color:var(--teal)}
+.tag.w{background:rgba(245,158,11,.14);color:#b45309}
+.tag.e{background:rgba(225,29,72,.1);color:var(--err)}
+.bar{height:5px;border-radius:3px;background:#eef2f7;overflow:hidden}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--teal2))}
+.qi{padding:10px 0;border-bottom:1px solid #f1f5f9}
+.qi.err{background:rgba(225,29,72,.04);margin:0 -14px;padding:10px 14px;border-left:3px solid var(--err)}
+.qtext{font-size:12.5px;color:#1e293b;line-height:1.55;margin-bottom:7px}
+.qmeta{font-size:10.5px;color:#94a3b8;margin-top:5px}
+.dots{display:flex;gap:5px}.dot{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;color:#94a3b8}
+.dot.on{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:700}
+.dot.prev{border-style:dashed;color:#94a3b8;position:relative}
+.dot.prev::after{content:"";position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:2px;background:#cbd5e1}
+.btn{height:48px;border-radius:13px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:700;margin-top:auto}
+.btn.dis{background:#cbd5e1;color:#fff}
+.btn.ghost{background:#fff;color:var(--teal);border:1.5px solid var(--teal)}
+.btn.soft{background:#f1f5f9;color:#334155}
+.toast{position:absolute;left:16px;right:16px;bottom:86px;background:#0f172a;color:#fff;border-radius:12px;padding:10px 13px;font-size:11.5px;display:flex;gap:8px;align-items:center;opacity:.96}
+.spin{width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff}
+.errbox{background:rgba(225,29,72,.06);border:1px solid rgba(225,29,72,.25);border-radius:12px;padding:10px 12px;font-size:11.5px;color:#9f1239;display:flex;gap:8px;align-items:flex-start}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{font-size:11px;padding:5px 9px;border-radius:999px;border:1px solid var(--line);color:#475569}
+.paper{background:#fbfdff;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:10.8px;line-height:1.75;color:#334155}
+.h{font-size:11px;font-weight:700;color:#0f172a;margin-bottom:4px}
+.trend{display:flex;align-items:flex-end;gap:6px;height:52px;margin-top:6px}
+.trend i{width:14px;border-radius:4px 4px 0 0;background:linear-gradient(180deg,var(--teal2),var(--teal))}
+.trend span{font-size:9px;color:#94a3b8}
+.kv{display:flex;justify-content:space-between;font-size:11.5px;padding:5px 0;border-bottom:1px dashed #f1f5f9}
+.kv:last-child{border-bottom:none}
+.sec{font-size:10.5px;letter-spacing:.08em;color:var(--muted);margin-bottom:5px}
+</style></head><body>
+
+<!-- A 量表 正常填写中 -->
+<div class="phone">
+ <div class="st"><span>9:45</span><span>5G ▮▮▮</span></div>
+ <div class="nav"><span class="back">‹</span><span class="t">量表 · ODI</span><span class="s">6/10</span></div>
+ <div class="body">
+  <div class="card">
+   <div class="row"><div><div class="title">王 · CS-2501</div><div class="muted" style="margin-top:3px">女 · 62 岁 · 腰椎间盘突出 · 第 2 次接诊</div></div><span class="tag t">上次 42</span></div>
+   <div class="bar" style="margin-top:9px"><i style="width:60%"></i></div>
+  </div>
+  <div class="card" style="padding:2px 14px">
+   <div class="qi"><div class="qtext">1. 疼痛程度（今天）</div><div class="dots"><span class="dot">0</span><span class="dot">1</span><span class="dot">2</span><span class="dot on">3</span><span class="dot">4</span><span class="dot">5</span></div><div class="qmeta">0 = 无痛　5 = 极度疼痛</div></div>
+   <div class="qi"><div class="qtext">2. 行走能力</div><div class="dots"><span class="dot">0</span><span class="dot on">1</span><span class="dot">2</span><span class="dot">3</span><span class="dot">4</span><span class="dot">5</span></div><div class="qmeta">上次 2 · 推荐 1</div></div>
+   <div class="qi"><div class="qtext">3. 自理能力（穿衣/洗漱）</div><div class="dots"><span class="dot">0</span><span class="dot">1</span><span class="dot on">2</span><span class="dot">3</span><span class="dot">4</span><span class="dot">5</span></div></div>
+   <div class="qi" style="border-bottom:none"><div class="qtext">4. 提重物</div><div class="dots"><span class="dot">0</span><span class="dot">1</span><span class="dot">2</span><span class="dot">3</span><span class="dot on">4</span><span class="dot">5</span></div></div>
+  </div>
+  <div class="card" style="background:#f8fafc;padding:10px 14px"><div class="row"><span class="muted">实时总分</span><span style="font-size:19px;font-weight:700;color:var(--teal)">36 / 100</span></div><div class="muted" style="margin-top:2px">较上次 −6（改善）· 完剩余 4 项</div></div>
+  <div class="btn">保存并出报告 →</div>
+ </div>
+</div>
+
+<!-- B 量表 校验错误 + 保存中 -->
+<div class="phone">
+ <div class="st"><span>9:46</span><span>5G ▮▮▮</span></div>
+ <div class="nav"><span class="back">‹</span><span class="t">量表 · ODI</span><span class="s" style="color:var(--err);font-weight:700">4 项未填</span></div>
+ <div class="body">
+  <div class="errbox"><span>⚠</span><div>还有 4 项未填写，无法生成报告。<br><b>第 5 项 站立时间</b> 等为必填项。</div></div>
+  <div class="qi err"><div class="qtext">5. 站立时间</div><div class="dots"><span class="dot">0</span><span class="dot">1</span><span class="dot">2</span><span class="dot">3</span><span class="dot">4</span><span class="dot">5</span></div><div class="qmeta" style="color:#9f1239">必填 · 未选择</div></div>
+  <div class="qi"><div class="qtext">6. 睡眠影响</div><div class="dots"><span class="dot prev">0</span><span class="dot">1</span><span class="dot">2</span><span class="dot">3</span><span class="dot">4</span><span class="dot">5</span></div><div class="qmeta">上次 2（虚线 = 上次值）</div></div>
+  <div class="qi"><div class="qtext">7. 社交活动</div><div class="dots"><span class="dot">0</span><span class="dot">1</span><span class="dot">2</span><span class="dot">3</span><span class="dot">4</span><span class="dot">5</span></div></div>
+  <div class="card" style="background:#f8fafc;padding:10px 14px"><div class="row"><span class="muted">当前总分（不完整）</span><span style="font-size:16px;font-weight:700;color:#94a3b8">— · 待填</span></div></div>
+  <div class="btn dis">请先完成必填项</div>
+  <div class="toast"><span class="spin"></span><span>正在保存草稿…</span></div>
+ </div>
+</div>
+
+<!-- C 报告 完整 -->
+<div class="phone">
+ <div class="st"><span>9:52</span><span>5G ▮▮▮</span></div>
+ <div class="nav"><span class="back">‹</span><span class="t">接诊报告</span><span class="s">已生成</span></div>
+ <div class="body">
+  <div class="card" style="padding:11px 14px"><div class="row"><div><div class="title">王 · CS-2501</div><div class="muted" style="margin-top:2px">女 · 62 岁 · 第 2 次接诊 · 2026/10/26</div></div><span class="tag t">可出报告</span></div></div>
+  <div class="card" style="padding:11px 14px"><div class="sec">ODI 总分趋势</div>
+   <div class="trend"><i style="height:42px"></i><i style="height:34px"></i><i style="height:28px"></i><i style="height:24px"></i><span>42→36</span></div>
+   <div class="muted" style="margin-top:4px">4 次接诊 · 较首次改善 6 分</div>
+  </div>
+  <div class="paper"><div class="h">功能改善摘要</div>ODI 36/100（上次 42，−6）；疼痛 3/5，行走与站立受限为主；夜间痛较前减轻。</div>
+  <div class="card" style="padding:10px 14px">
+   <div class="sec">本次关键要点</div>
+   <div class="chips"><span class="chip">疼痛部位 · 腰</span><span class="chip">病程 2 月</span><span class="chip">活动加重</span><span class="chip">夜间痛减轻</span></div>
+  </div>
+  <div class="card" style="padding:10px 14px">
+   <div class="sec">建议与复诊</div>
+   <div class="kv"><span>训练</span><span style="color:#334155">核心稳定 · 步态纠正</span></div>
+   <div class="kv"><span>频次</span><span style="color:#334155">每周 2 次 · 共 4 周</span></div>
+   <div class="kv"><span>复评</span><span style="color:#334155">11/09（ODI + 疼痛）</span></div>
+  </div>
+  <div class="card" style="padding:10px 14px"><div class="row"><span class="muted">数据同步</span><span style="color:var(--teal);font-weight:700;font-size:11.5px">✓ 已同步 · 10:52</span></div></div>
+  <div class="btn">发送给家属</div>
+  <div class="btn ghost" style="margin-top:8px">继续下一位 →</div>
+ </div>
+</div>
+
+<!-- D 同步失败 详情 -->
+<div class="phone">
+ <div class="st"><span>9:58</span><span>5G ▮</span></div>
+ <div class="nav"><span class="back">‹</span><span class="t">待同步</span><span class="s">1 条失败</span></div>
+ <div class="body">
+  <div class="errbox"><span>⚠</span><div><b>回传失败（第 3 次）</b><br>网络超时，已自动重试 2 次。数据已安全保存在本机。</div></div>
+  <div class="card">
+   <div class="row"><div class="title">赵 · CS-2512</div><span class="tag w">待同步</span></div>
+   <div class="kv" style="margin-top:6px"><span>语音</span><span>00:48 · 要点 4 项</span></div>
+   <div class="kv"><span>量表</span><span>ODI 44/100</span></div>
+   <div class="kv"><span>报告</span><span>已生成（本地）</span></div>
+   <div class="kv"><span>最后尝试</span><span>09:57</span></div>
+  </div>
+  <div class="card" style="background:#f8fafc"><div class="muted">下次自动重试：网络恢复时 · 退避间隔 30s / 2m / 10m</div></div>
+  <div class="btn">立即重试</div>
+  <div class="btn ghost" style="margin-top:8px">导出备份（JSONL）</div>
+  <div class="btn soft" style="margin-top:8px">稍后处理</div>
+ </div>
+</div>
+
+</body></html>
