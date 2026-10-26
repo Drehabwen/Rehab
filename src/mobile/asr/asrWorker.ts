@@ -1,4 +1,4 @@
-﻿/// <reference lib="webworker" />
+/// <reference lib="webworker" />
 /**
  * 端侧 ASR worker（sherpa-onnx WASM）。
  * 资源未就绪时返回 { available: false }，由主线程降级为要点点选。
@@ -24,7 +24,8 @@ async function loadRuntime(): Promise<SherpaRuntime | null> {
       unavailableReason = 'model-not-deployed';
       return null;
     }
-    const module = await import(/* @vite-ignore */ '/asr/sherpa-onnx-wasm-main.js' as string);
+    const runtimeUrl = '/asr/sherpa-onnx-wasm-main.js';
+    const module = await import(/* @vite-ignore */ runtimeUrl);
     const factory = (module as { default?: unknown }).default;
     if (typeof factory !== 'function') {
       unavailableReason = 'runtime-invalid';

@@ -20,6 +20,9 @@
     "desktop:build": "powershell -ExecutionPolicy Bypass -File desktop/build-desktop.ps1"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/drawing_utils": "^0.3.1675466124",
     "@mediapipe/holistic": "^0.5.1675471629",
