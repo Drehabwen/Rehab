@@ -6,6 +6,7 @@ import type { VisitTaskSummary } from '@/hub/workflow';
 interface VisitsScreenProps {
   onStartVisit: () => void;
   onOpenPatient: (patientId: string) => void;
+  onImport: () => void;
 }
 
 const statusOf = (task: VisitTaskSummary) => {
@@ -15,7 +16,7 @@ const statusOf = (task: VisitTaskSummary) => {
   return { label: '待开始', cls: 'bg-slate-100 text-slate-500' };
 };
 
-export const VisitsScreen: React.FC<VisitsScreenProps> = ({ onStartVisit, onOpenPatient }) => {
+export const VisitsScreen: React.FC<VisitsScreenProps> = ({ onStartVisit, onOpenPatient, onImport }) => {
   const { tasks, stats, loading } = useMobileVisits();
   const [keyword, setKeyword] = useState('');
 
@@ -61,6 +62,7 @@ export const VisitsScreen: React.FC<VisitsScreenProps> = ({ onStartVisit, onOpen
             <div className="text-3xl text-[#0f9b8e]">＋</div>
             <div className="text-sm font-bold text-slate-900">今天还没有接诊</div>
             <div className="max-w-[240px] text-xs text-slate-500">3 分钟走完第一位患者：建档 → 量表 → 报告</div>
+            <button onClick={onImport} className="mt-2 rounded-full border border-[#0f9b8e] px-3 py-1.5 text-[11.5px] font-semibold text-[#0f9b8e]">导入历史名单</button>
           </div>
         ) : (
           visibleTasks.map((task) => {

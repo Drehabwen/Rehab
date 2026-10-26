@@ -5,8 +5,9 @@ import { ScaleScreen } from './screens/ScaleScreen';
 import { ReportScreen } from './screens/ReportScreen';
 import { VoiceScreen } from './screens/VoiceScreen';
 import { SyncScreen } from './screens/SyncScreen';
+import { ImportScreen } from './screens/ImportScreen';
 
-type MobileRoute = 'visits' | 'new' | 'scale' | 'voice' | 'report' | 'sync';
+type MobileRoute = 'visits' | 'new' | 'scale' | 'voice' | 'report' | 'sync' | 'import';
 
 /**
  * 移动端 v1 壳（PWA）。
@@ -25,10 +26,13 @@ export const MobileApp: React.FC = () => {
           <span className="text-[11px] text-slate-400">青跃智衡</span>
         </header>
         <section className="flex-1 overflow-hidden p-4">
-          {route === 'visits' ? (
+          {route === 'import' ? (
+            <ImportScreen onDone={() => setRoute('visits')} onCancel={() => setRoute('visits')} />
+          ) : route === 'visits' ? (
             <VisitsScreen
               onStartVisit={() => setRoute('new')}
               onOpenPatient={() => setRoute('scale')}
+              onImport={() => setRoute('import')}
             />
           ) : route === 'new' ? (
             <NewVisitScreen
