@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
+import { decodeTo16kMono, useOfflineAsr } from '../asr/useOfflineAsr';
 
 const POINTS = ['疼痛部位', '病程', '诱因', '活动加重', '夜间痛', '既往治疗', '伴随症状'];
 
@@ -21,6 +22,9 @@ export const VoiceScreen: React.FC<VoiceScreenProps> = ({ patientId, sessionId, 
   const [seconds, setSeconds] = useState(0);
   const [points, setPoints] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const { status: asrStatus, transcribe } = useOfflineAsr();
+  const [transcript, setTranscript] = useState('');
+  const [transcribing, setTranscribing] = useState(false);
 
   useEffect(() => () => {
     recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
@@ -44,9 +48,26 @@ export const VoiceScreen: React.FC<VoiceScreenProps> = ({ patientId, sessionId, 
   };
 
   const stop = () => {
-    recorderRef.current?.stop();
-    recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
-    recorderRef.current = null;
+    const recorder = recorderRef.current;
+    if (recorder) {
+      recorder.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        if (asrStatus !== 'ready' || blob.size === 0) return;
+        setTranscribing(true);
+        try {
+          const samples = await decodeTo16kMono(blob);
+          const result = await transcribe(samples);
+          if (result.available && result.text.trim()) setTranscript(result.text.trim());
+        } catch {
+          // 识别失败时静默降级为要点点选
+        } finally {
+          setTranscribing(false);
+        }
+      };
+      recorder.stop();
+      recorder.stream.getTracks().forEach((track) => track.stop());
+      recorderRef.current = null;
+    }
     if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
     setRecording(false);
   };
@@ -64,7 +85,7 @@ export const VoiceScreen: React.FC<VoiceScreenProps> = ({ patientId, sessionId, 
         data: {
           medvoice: {
             mode: 'voice',
-            transcript: '',
+            transcript,
             structuredCase: {
               主诉: points.join('、'),
               现病史: `语音问诊 ${seconds}s，要点：${points.join('、')}`,
@@ -98,6 +119,24 @@ export const VoiceScreen: React.FC<VoiceScreenProps> = ({ patientId, sessionId, 
       </section>
 
       {error ? <div className="rounded-xl bg-rose-50 px-3 py-2 text-[11.5px] text-rose-700">{error}</div> : null}
+
+      <section className="rounded-2xl border border-slate-200 p-3">
+        <div className="mb-2 flex items-center justify-between text-[10.5px] text-slate-400">
+          <span>转写文本（可编辑）</span>
+          <span>
+            {asrStatus === 'unavailable' ? '本机未部署模型 · 已降级为要点点选'
+              : transcribing ? '识别中…'
+              : transcript ? '已转写' : asrStatus === 'ready' ? '录制后自动识别' : '模型加载中…'}
+          </span>
+        </div>
+        <textarea
+          value={transcript}
+          onChange={(event) => setTranscript(event.target.value)}
+          rows={3}
+          placeholder="录音结束后自动填充；也可手动补充"
+          className="w-full resize-none rounded-xl border border-slate-200 p-2 text-[11.5px] leading-relaxed outline-none focus:border-[#0f9b8e]"
+        />
+      </section>
 
       <section className="rounded-2xl border border-slate-200 p-3">
         <div className="mb-2 text-[10.5px] tracking-wider text-slate-400">关键要点（必选）</div>
