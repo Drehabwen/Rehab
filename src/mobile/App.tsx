@@ -53,7 +53,16 @@ export const MobileApp: React.FC = () => {
               onBack={() => setRoute('visits')}
             />
           ) : route === 'voice' ? (
-            <VoiceScreen onSaved={() => setRoute('report')} onBack={() => setRoute('visits')} />
+            visit ? (
+              <VoiceScreen
+                patientId={visit.patientId}
+                sessionId={visit.sessionId}
+                onSaved={() => setRoute('report')}
+                onBack={() => setRoute('visits')}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs text-slate-400">请先新建接诊</div>
+            )
           ) : (
             <SyncScreen onBack={() => setRoute('visits')} />
           )}

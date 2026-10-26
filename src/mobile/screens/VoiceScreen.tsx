@@ -1,14 +1,19 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
+import { useAssessmentStore } from '@/store/useAssessmentStore';
 
 const POINTS = ['疼痛部位', '病程', '诱因', '活动加重', '夜间痛', '既往治疗', '伴随症状'];
 
 interface VoiceScreenProps {
+  patientId: string;
+  sessionId: string;
   onSaved: (durationSec: number, points: string[]) => void;
   onBack: () => void;
 }
 
 /** 屏 5：语音问诊（录音 + 关键要点点选，不依赖转写） */
-export const VoiceScreen: React.FC<VoiceScreenProps> = ({ onSaved, onBack }) => {
+export const VoiceScreen: React.FC<VoiceScreenProps> = ({ patientId, sessionId, onSaved, onBack }) => {
+  const addAssessment = useAssessmentStore((state) => state.addAssessment);
+  const [saving, setSaving] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
@@ -46,10 +51,35 @@ export const VoiceScreen: React.FC<VoiceScreenProps> = ({ onSaved, onBack }) => 
     setRecording(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (points.length === 0) { setError('请至少选择 1 个关键要点'); return; }
     setError(null);
-    onSaved(seconds, points);
+    setSaving(true);
+    try {
+      await addAssessment({
+        sessionId,
+        patientId,
+        type: 'medvoice',
+        mode: 'voice',
+        data: {
+          medvoice: {
+            mode: 'voice',
+            transcript: '',
+            structuredCase: {
+              主诉: points.join('、'),
+              现病史: `语音问诊 ${seconds}s，要点：${points.join('、')}`,
+            },
+            patientInfo: { name: '', gender: '', age: '', case_id: patientId, visit_date: new Date().toISOString().slice(0, 10) },
+            viewMode: 'standard',
+          },
+        },
+      });
+      onSaved(seconds, points);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存语音问诊失败，请重试');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -94,10 +124,10 @@ export const VoiceScreen: React.FC<VoiceScreenProps> = ({ onSaved, onBack }) => 
       <div className="mt-auto space-y-2">
         <button
           onClick={handleSave}
-          disabled={points.length === 0}
+          disabled={points.length === 0 || saving}
           className="h-12 w-full rounded-xl bg-[#0f9b8e] text-[15px] font-bold text-white disabled:bg-slate-300"
         >
-          {points.length === 0 ? '请先选择关键要点' : '完成语音问诊 →'}
+          {points.length === 0 ? '请先选择关键要点' : saving ? '保存中…' : '完成语音问诊 →'}
         </button>
         <button onClick={onBack} className="h-11 w-full rounded-xl border border-slate-200 text-sm font-semibold text-slate-600">返回</button>
       </div>
