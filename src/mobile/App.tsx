@@ -3,8 +3,10 @@ import { VisitsScreen } from './screens/VisitsScreen';
 import { NewVisitScreen } from './screens/NewVisitScreen';
 import { ScaleScreen } from './screens/ScaleScreen';
 import { ReportScreen } from './screens/ReportScreen';
+import { VoiceScreen } from './screens/VoiceScreen';
+import { SyncScreen } from './screens/SyncScreen';
 
-type MobileRoute = 'visits' | 'new' | 'scale' | 'report' | 'sync';
+type MobileRoute = 'visits' | 'new' | 'scale' | 'voice' | 'report' | 'sync';
 
 /**
  * 移动端 v1 壳（PWA）。
@@ -50,17 +52,16 @@ export const MobileApp: React.FC = () => {
               onContinue={() => setRoute('visits')}
               onBack={() => setRoute('visits')}
             />
+          ) : route === 'voice' ? (
+            <VoiceScreen onSaved={() => setRoute('report')} onBack={() => setRoute('visits')} />
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-              <div className="text-sm font-bold text-slate-900">待同步</div>
-              <div className="max-w-[240px] text-xs text-slate-500">弱网与失败重试队列（下一屏实现）</div>
-            </div>
+            <SyncScreen onBack={() => setRoute('visits')} />
           )}
         </section>
         <nav className="flex h-14 items-center justify-around border-t border-slate-200 text-[11px] text-slate-400">
           <button onClick={() => setRoute('visits')} className={route === 'visits' ? 'font-bold text-[#0f9b8e]' : ''}>接诊</button>
           <button onClick={() => setRoute('new')} className={route === 'new' ? 'font-bold text-[#0f9b8e]' : ''}>新建</button>
-          <button onClick={() => setRoute('scale')} className={route === 'scale' ? 'font-bold text-[#0f9b8e]' : ''}>量表</button>
+          <button onClick={() => setRoute('voice')} className={route === 'voice' ? 'font-bold text-[#0f9b8e]' : ''}>语音</button>
           <button onClick={() => setRoute('report')} className={route === 'report' ? 'font-bold text-[#0f9b8e]' : ''}>报告</button>
           <button onClick={() => setRoute('sync')} className={route === 'sync' ? 'font-bold text-[#0f9b8e]' : ''}>同步</button>
         </nav>
