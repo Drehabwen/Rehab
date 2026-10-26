@@ -15,7 +15,7 @@ type MobileRoute = 'visits' | 'new' | 'scale' | 'voice' | 'report' | 'sync' | 'i
  */
 export const MobileApp: React.FC = () => {
   const [route, setRoute] = useState<MobileRoute>('visits');
-  const [visit, setVisit] = useState<{ patientId: string; sessionId: string; total?: number } | null>(null);
+  const [visit, setVisit] = useState<{ patientId: string; sessionId: string; total?: number; points?: string[] } | null>(null);
   return (
     <div className="min-h-screen bg-[#eef2f7] text-slate-800">
       <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white">
@@ -53,6 +53,7 @@ export const MobileApp: React.FC = () => {
           ) : route === 'report' ? (
             <ReportScreen
               total={visit?.total ?? 0}
+              voicePoints={visit?.points}
               onContinue={() => setRoute('visits')}
               onBack={() => setRoute('visits')}
             />
@@ -61,7 +62,7 @@ export const MobileApp: React.FC = () => {
               <VoiceScreen
                 patientId={visit.patientId}
                 sessionId={visit.sessionId}
-                onSaved={() => setRoute('report')}
+                onSaved={(_duration, points) => { setVisit({ ...visit, points }); setRoute('report'); }}
                 onBack={() => setRoute('visits')}
               />
             ) : (
