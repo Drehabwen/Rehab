@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import type { ScaleAnswer } from '@/types/assessment';
 
@@ -33,13 +33,33 @@ const categoryOf = (index: number): ScaleAnswer['category'] => {
 /** 屏 4：量表（点选式，上次值虚线提示，必填校验，实时总分） */
 export const ScaleScreen: React.FC<ScaleScreenProps> = ({ patientId, sessionId, previousScores, onSaved, onBack }) => {
   const addAssessment = useAssessmentStore((state) => state.addAssessment);
+  const loadAssessmentsByPatient = useAssessmentStore((state) => state.loadAssessmentsByPatient);
+  const [historyScores, setHistoryScores] = useState<number[] | undefined>(previousScores);
   const [scores, setScores] = useState<Array<number | null>>(() => ITEMS.map(() => null));
   const [submitting, setSubmitting] = useState(false);
+
+  // 读取上次量表结果，用于「上次值」虚线提示与改善对比（不依赖外部传入）
+  useEffect(() => {
+    let alive = true;
+    if (previousScores) return undefined;
+    loadAssessmentsByPatient(patientId)
+      .then((list) => {
+        if (!alive) return;
+        const latestScale = [...list]
+          .filter((item) => item.type === 'scale' && item.data.scale)
+          .sort((a, b) => b.createdAt - a.createdAt)[0];
+        const answers = latestScale?.data.scale?.answers ?? [];
+        if (answers.length > 0) setHistoryScores(answers.map((answer) => answer.score));
+      })
+      .catch(() => undefined);
+    return () => { alive = false; };
+  }, [loadAssessmentsByPatient, patientId, previousScores]);
   const [error, setError] = useState<string | null>(null);
 
   const answered = scores.filter((score) => score !== null).length;
   const total = useMemo(() => scores.reduce<number>((sum, score) => sum + (score ?? 0), 0) * 2, [scores]);
-  const previousTotal = previousScores?.length ? previousScores.reduce((a, b) => a + b, 0) * 2 : null;
+  const prev = historyScores ?? previousScores;
+  const previousTotal = prev?.length ? Math.round((prev.reduce((a, b) => a + b, 0) / prev.length) * 10) : null;
   const missing = ITEMS.map((label, index) => ({ label, index })).filter((item) => scores[item.index] === null);
 
   const handleSave = async () => {
@@ -113,7 +133,7 @@ export const ScaleScreen: React.FC<ScaleScreenProps> = ({ patientId, sessionId, 
               <div className="mb-1.5 text-[12.5px] text-slate-800">{index + 1}. {label}</div>
               <div className="flex gap-1.5">
                 {[0, 1, 2, 3, 4, 5].map((point) => {
-                  const isPrev = previousScores?.[index] === point;
+                  const isPrev = (historyScores ?? previousScores)?.[index] === point;
                   const isOn = value === point;
                   return (
                     <button
