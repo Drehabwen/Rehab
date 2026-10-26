@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAssessmentStore } from '@/store/useAssessmentStore';
 import { usePatientStore } from '@/store/usePatientStore';
 import { useSessionStore } from '@/store/useSessionStore';
@@ -13,7 +13,7 @@ export function useMobileVisits() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([loadPatients(), loadAssessments(), loadSessions?.()])
+    Promise.all([loadPatients(), loadAssessments(), loadSessions()])
       .catch((error) => console.error('移动端加载接诊数据失败', error))
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
