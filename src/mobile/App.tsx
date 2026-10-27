@@ -6,8 +6,9 @@ import { ReportScreen } from './screens/ReportScreen';
 import { VoiceScreen } from './screens/VoiceScreen';
 import { SyncScreen } from './screens/SyncScreen';
 import { ImportScreen } from './screens/ImportScreen';
+import { InterventionScreen } from './screens/InterventionScreen';
 
-type MobileRoute = 'visits' | 'new' | 'scale' | 'voice' | 'report' | 'sync' | 'import';
+type MobileRoute = 'visits' | 'new' | 'scale' | 'intervention' | 'voice' | 'report' | 'sync' | 'import';
 
 /**
  * 移动端 v1 壳（PWA）。
@@ -15,7 +16,7 @@ type MobileRoute = 'visits' | 'new' | 'scale' | 'voice' | 'report' | 'sync' | 'i
  */
 export const MobileApp: React.FC = () => {
   const [route, setRoute] = useState<MobileRoute>('visits');
-  const [visit, setVisit] = useState<{ patientId: string; sessionId: string; total?: number; points?: string[] } | null>(null);
+  const [visit, setVisit] = useState<{ patientId: string; sessionId: string; total?: number; points?: string[]; enrollable?: boolean } | null>(null);
   return (
     <div className="min-h-screen bg-[#eef2f7] text-slate-800">
       <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white">
@@ -44,7 +45,7 @@ export const MobileApp: React.FC = () => {
               <ScaleScreen
                 patientId={visit.patientId}
                 sessionId={visit.sessionId}
-                onSaved={(total) => { setVisit({ ...visit, total }); setRoute('report'); }}
+                onSaved={(total) => { setVisit({ ...visit, total }); setRoute('intervention'); }}
                 onBack={() => setRoute('visits')}
               />
             ) : (
@@ -57,6 +58,16 @@ export const MobileApp: React.FC = () => {
               onContinue={() => setRoute('visits')}
               onBack={() => setRoute('visits')}
             />
+          ) : route === 'intervention' ? (
+            visit ? (
+              <InterventionScreen
+                sessionId={visit.sessionId}
+                onSaved={(_followUpAt, enrollable) => { setVisit({ ...visit, enrollable }); setRoute('report'); }}
+                onBack={() => setRoute('scale')}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-xs text-slate-400">请先新建接诊</div>
+            )
           ) : route === 'voice' ? (
             visit ? (
               <VoiceScreen
