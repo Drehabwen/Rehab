@@ -9,6 +9,6 @@ startGalenConnectorBridge()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    window.location.pathname.startsWith('/m') ? <MobileApp /> : <App />
+    {window.location.pathname.startsWith('/m') ? <MobileApp /> : <App />}
   </StrictMode>,
 )

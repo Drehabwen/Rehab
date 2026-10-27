@@ -31,17 +31,17 @@ export const VisitsScreen: React.FC<VisitsScreenProps> = ({ onStartVisit, onOpen
   return (
     <div className="flex h-full flex-col gap-3">
       <section className="rounded-2xl border border-slate-200 p-3">
-        <div className="flex items-end justify-between">
-          <div>
+        <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
+          <div className="min-w-0">
             <div className="text-[11.5px] text-slate-500">今天</div>
-            <div className="text-2xl font-bold text-slate-900">
+            <div className="whitespace-nowrap text-2xl font-bold text-slate-900">
               {stats.total} <span className="text-[11.5px] font-normal text-slate-500">位待处理</span>
             </div>
           </div>
-          <div className="flex gap-4 text-right">
-            <div><div className="text-[11px] text-slate-500">进行中</div><div className="font-bold">{stats.inProgress}</div></div>
-            <div><div className="text-[11px] text-slate-500">可报告</div><div className="font-bold text-[#0f9b8e]">{stats.ready}</div></div>
-            <div><div className="text-[11px] text-slate-500">待开始</div><div className="font-bold">{stats.pending}</div></div>
+          <div className="flex shrink-0 gap-3 text-right">
+            <div><div className="whitespace-nowrap text-[11px] text-slate-500">进行中</div><div className="font-bold">{stats.inProgress}</div></div>
+            <div><div className="whitespace-nowrap text-[11px] text-slate-500">可报告</div><div className="font-bold text-[#0f9b8e]">{stats.ready}</div></div>
+            <div><div className="whitespace-nowrap text-[11px] text-slate-500">待开始</div><div className="font-bold">{stats.pending}</div></div>
           </div>
         </div>
       </section>

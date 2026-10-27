@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { VisitsScreen } from './screens/VisitsScreen';
 import { NewVisitScreen } from './screens/NewVisitScreen';
 import { ScaleScreen } from './screens/ScaleScreen';
@@ -18,13 +18,13 @@ export const MobileApp: React.FC = () => {
   const [route, setRoute] = useState<MobileRoute>('visits');
   const [visit, setVisit] = useState<{ patientId: string; sessionId: string; total?: number; points?: string[]; enrollable?: boolean } | null>(null);
   return (
-    <div className="min-h-screen bg-[#eef2f7] text-slate-800">
-      <main className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white">
-        <header className="flex h-12 items-center justify-between border-b border-slate-200 px-4">
+    <div className="min-h-screen w-screen max-w-[100vw] overflow-x-hidden bg-[#eef2f7] text-slate-800">
+      <main className="mx-auto flex min-h-screen w-full flex-col overflow-x-hidden bg-white">
+        <header className="flex h-12 w-full items-center justify-between gap-2 overflow-hidden border-b border-slate-200 px-3">
           <span className="text-[15px] font-bold text-slate-900">
             {route === 'visits' ? '今日接诊' : route === 'new' ? '新建接诊' : route === 'scale' ? '量表' : route === 'report' ? '接诊报告' : '待同步'}
           </span>
-          <span className="text-[11px] text-slate-400">青跃智衡</span>
+          <span className="shrink-0 truncate text-[11px] text-slate-400">青跃智衡</span>
         </header>
         <section className="flex-1 overflow-hidden p-4">
           {route === 'import' ? (
@@ -83,7 +83,7 @@ export const MobileApp: React.FC = () => {
             <SyncScreen onBack={() => setRoute('visits')} />
           )}
         </section>
-        <nav className="flex h-14 items-center justify-around border-t border-slate-200 text-[11px] text-slate-400">
+        <nav className="flex h-14 w-full items-center justify-around gap-1 overflow-hidden border-t border-slate-200 px-1 text-[11px] text-slate-400">
           <button onClick={() => setRoute('visits')} className={route === 'visits' ? 'font-bold text-[#0f9b8e]' : ''}>接诊</button>
           <button onClick={() => setRoute('new')} className={route === 'new' ? 'font-bold text-[#0f9b8e]' : ''}>新建</button>
           <button onClick={() => setRoute('voice')} className={route === 'voice' ? 'font-bold text-[#0f9b8e]' : ''}>语音</button>

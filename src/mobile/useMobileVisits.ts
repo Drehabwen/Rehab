@@ -9,7 +9,7 @@ export function useMobileVisits() {
   const { patients, loadPatients } = usePatientStore();
   const { assessments, loadAssessments } = useAssessmentStore();
   const { sessions, loadSessions } = useSessionStore();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
