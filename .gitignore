@@ -37,3 +37,5 @@ presentations/exports/
 check_mic.py
 count_lines.py
 scan_large_files.ps1
+.env.local
+.env.*.local

@@ -39,6 +39,9 @@ export interface AiConfig {
 
 const STORAGE_KEY = 'qingyue.ai.config.v2';
 
+/** 构建期注入（VITE_*），内测包开箱可用；设置页可覆盖。 */
+const buildEnv = (import.meta as unknown as { env: Record<string, string | undefined> }).env ?? {};
+
 export const DEFAULT_AI_CONFIG: AiConfig = {
   asr: {
     provider: 'iflytek',
@@ -46,13 +49,17 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
     apiKey: '',
     model: 'whisper-1',
     language: 'zh',
-    iflytek: { appId: '', apiKey: '', apiSecret: '', domain: 'medical' },
+    iflytek: {
+      appId: buildEnv.VITE_IFLYTEK_APPID ?? '',
+      apiKey: buildEnv.VITE_IFLYTEK_APIKEY ?? '',
+      apiSecret: buildEnv.VITE_IFLYTEK_APISECRET ?? '',
+      domain: buildEnv.VITE_IFLYTEK_DOMAIN ?? 'medical',
+    },
   },
   llm: {
-    // 默认指向 DeepSeek（key 由用户在设置页填写，不进仓库）
-    baseUrl: 'https://api.deepseek.com',
-    apiKey: '',
-    model: 'deepseek-chat',
+    baseUrl: buildEnv.VITE_LLM_BASEURL ?? 'https://api.deepseek.com',
+    apiKey: buildEnv.VITE_LLM_APIKEY ?? '',
+    model: buildEnv.VITE_LLM_MODEL ?? 'deepseek-chat',
     temperature: 0.2,
   },
 };
