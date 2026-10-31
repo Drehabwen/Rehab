@@ -7,8 +7,9 @@ import { VoiceScreen } from './screens/VoiceScreen';
 import { SyncScreen } from './screens/SyncScreen';
 import { ImportScreen } from './screens/ImportScreen';
 import { InterventionScreen } from './screens/InterventionScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 
-type MobileRoute = 'visits' | 'new' | 'scale' | 'intervention' | 'voice' | 'report' | 'sync' | 'import';
+type MobileRoute = 'visits' | 'new' | 'scale' | 'intervention' | 'voice' | 'report' | 'sync' | 'import' | 'settings';
 
 /**
  * 移动端 v1 壳（PWA）。
@@ -22,12 +23,14 @@ export const MobileApp: React.FC = () => {
       <main className="mx-auto flex min-h-screen w-full flex-col overflow-x-hidden bg-white">
         <header className="flex h-12 w-full items-center justify-between gap-2 overflow-hidden border-b border-slate-200 px-3">
           <span className="text-[15px] font-bold text-slate-900">
-            {route === 'visits' ? '今日接诊' : route === 'new' ? '新建接诊' : route === 'scale' ? '量表' : route === 'report' ? '接诊报告' : '待同步'}
+            {route === 'visits' ? '今日接诊' : route === 'new' ? '新建接诊' : route === 'scale' ? '量表' : route === 'report' ? '接诊报告' : route === 'settings' ? '设置' : route === 'voice' ? '语音问诊' : '待同步'}
           </span>
-          <span className="shrink-0 truncate text-[11px] text-slate-400">青跃智衡</span>
+          <button onClick={() => setRoute('settings')} className="shrink-0 rounded-full border border-slate-200 px-2.5 py-1 text-[10.5px] font-semibold text-slate-500">设置</button>
         </header>
         <section className="flex-1 overflow-hidden p-4">
-          {route === 'import' ? (
+          {route === 'settings' ? (
+            <SettingsScreen onBack={() => setRoute('visits')} />
+          ) : route === 'import' ? (
             <ImportScreen onDone={() => setRoute('visits')} onCancel={() => setRoute('visits')} />
           ) : route === 'visits' ? (
             <VisitsScreen
