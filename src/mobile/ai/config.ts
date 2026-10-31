@@ -49,9 +49,10 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
     iflytek: { appId: '', apiKey: '', apiSecret: '', domain: 'medical' },
   },
   llm: {
-    baseUrl: '',
+    // 默认指向 DeepSeek（key 由用户在设置页填写，不进仓库）
+    baseUrl: 'https://api.deepseek.com',
     apiKey: '',
-    model: '',
+    model: 'deepseek-chat',
     temperature: 0.2,
   },
 };
